@@ -1,13 +1,44 @@
-// --- Supabase config via window globals (set in index.html) ---
-// Netlify: Set SUPABASE_URL and SUPABASE_KEY as environment variables and inject into index.html
-// Example in index.html:
-// <script>
-//   window.SUPABASE_URL = '<YOUR_NETLIFY_ENV_SUPABASE_URL>';
-//   window.SUPABASE_KEY = '<YOUR_NETLIFY_ENV_SUPABASE_KEY>';
-// </script>
+// --- Supabase config fetched from Netlify function ---
+async function getSupabaseConfig() {
+  const res = await fetch('/.netlify/functions/config');
+  if (!res.ok) throw new Error('Failed to load Supabase config');
+  return res.json();
+}
 
-// --- Supabase client initialization ---
-const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+(async () => {
+  const config = await getSupabaseConfig();
+  const supabase = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
+  window.supabaseClient = supabase; // For debugging/global access if needed
+
+  // Fleet Manager - Minimal design with enhanced functionality
+  class FleetManager {
+    constructor() {
+      this.currentVehicle = null;
+      this.currentDriver = null;
+      this.currentStep = 'vehicle';
+      this.selectedVehicleRow = null;
+      this.selectedDriverRow = null;
+      this.init();
+    }
+    // ... rest of your FleetManager class ...
+  }
+
+  // Initialize app
+  window.app = new FleetManager();
+
+  // Service Worker Registration for PWA
+  if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+              .then(registration => {
+                  console.log('SW registered: ', registration);
+              })
+              .catch(registrationError => {
+                  console.log('SW registration failed: ', registrationError);
+              });
+      });
+  }
+})();
 
 // Fleet Manager - Minimal design with enhanced functionality
 class FleetManager {
