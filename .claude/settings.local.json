@@ -4,7 +4,10 @@
       "Bash(python:*)",
       "Bash(del read_excel.py read_xls.py analyze_format.py)",
       "Bash(rm:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }

@@ -284,8 +284,6 @@ async function getSupabaseConfig() {
                 console.error('Failed to fetch vehicles from Supabase');
                 return;
             }
-
-            const tableBody = document.getElementById('vehicle-table-body');
             tableBody.innerHTML = vehicles.map(vehicle => {
                 return `
                 <tr class="clickable vehicle-type-${vehicle.type}" data-id="${vehicle.id}">
@@ -338,9 +336,8 @@ async function getSupabaseConfig() {
                 console.error('Failed to fetch drivers from Supabase');
                 return;
             }
-
-            const tableBody = document.getElementById('driver-table-body');
-        tableBody.innerHTML = drivers.map(driver => `
+            
+            tableBody.innerHTML = drivers.map(driver => `
             <tr class="clickable" data-id="${driver.id}">
                 <td><strong>${driver.code}</strong></td>
                 <td>${driver.name}</td>
