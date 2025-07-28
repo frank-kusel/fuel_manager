@@ -889,49 +889,150 @@ class FleetManager {
                 } else {
                     console.error('selected-vehicle-info element not found');
                 }
-                
-                // Ensure drivers are rendered before showing driver step
-                this.renderDrivers().then(() => {
-                    this.showStep('driver');
-                });
-            } else {
-                console.error('Vehicle not found in database');
-                alert('Vehicle not found. Please try again.');
-            }
-            stmt.free();
-        } catch (error) {
-            console.error('Error selecting vehicle:', error);
-            alert('Error selecting vehicle. Please try again.');
+    // --- SUPABASE CRUD METHODS ---
+    async fetchVehiclesFromSupabase() {
+        const { data, error } = await supabase
+            .from('vehicles')
+            .select('*')
+            .order('id', { ascending: true });
+        if (error) {
+            console.error('Error fetching vehicles:', error);
+            return [];
+        }
+        return data;
+    }
+
+    async addVehicle(vehicleObj) {
+        const { error } = await supabase.from('vehicles').insert([vehicleObj]);
+        if (error) {
+            console.error('Error adding vehicle:', error);
+            alert('Error adding vehicle.');
+        } else {
+            alert('Vehicle added!');
+            await this.renderVehicles();
         }
     }
 
-    selectDriver(driverId) {
-        console.log(`Selecting driver with ID: ${driverId}`);
-        
-        if (!this.db) {
-            console.error('Database not available for driver selection');
-            alert('Database not ready. Please wait a moment and try again.');
-            return;
+    async updateVehicle(vehicleId, updateObj) {
+        const { error } = await supabase.from('vehicles').update(updateObj).eq('id', vehicleId);
+        if (error) {
+            console.error('Error updating vehicle:', error);
+            alert('Error updating vehicle.');
+        } else {
+            alert('Vehicle updated!');
+            await this.renderVehicles();
         }
-        
-        if (!this.currentVehicle) {
-            console.error('No vehicle selected');
-            alert('Please select a vehicle first.');
-            this.showStep('vehicle');
-            return;
+    }
+
+    async deleteVehicle(vehicleId) {
+        if (!confirm('Are you sure you want to delete this vehicle?')) return;
+        const { error } = await supabase.from('vehicles').delete().eq('id', vehicleId);
+        if (error) {
+            console.error('Error deleting vehicle:', error);
+            alert('Error deleting vehicle.');
+        } else {
+            alert('Vehicle deleted!');
+            await this.renderVehicles();
         }
-        
-        try {
-            const stmt = this.db.prepare('SELECT * FROM drivers WHERE id = ?');
-            stmt.bind([driverId]);
-            
-            if (stmt.step()) {
-                this.currentDriver = stmt.getAsObject();
-                console.log('Driver selected:', this.currentDriver);
-                
-                const driverInfoElement = document.getElementById('selected-driver-info');
-                if (driverInfoElement) {
-                    driverInfoElement.innerHTML = `
+    }
+
+    async fetchDriversFromSupabase() {
+        const { data, error } = await supabase
+            .from('drivers')
+            .select('*')
+            .order('id', { ascending: true });
+        if (error) {
+            console.error('Error fetching drivers:', error);
+            return [];
+        }
+        return data;
+    }
+
+    async addDriver(driverObj) {
+        const { error } = await supabase.from('drivers').insert([driverObj]);
+        if (error) {
+            console.error('Error adding driver:', error);
+            alert('Error adding driver.');
+        } else {
+            alert('Driver added!');
+            await this.renderDrivers();
+        }
+    }
+
+    async updateDriver(driverId, updateObj) {
+        const { error } = await supabase.from('drivers').update(updateObj).eq('id', driverId);
+        if (error) {
+            console.error('Error updating driver:', error);
+            alert('Error updating driver.');
+        } else {
+            alert('Driver updated!');
+            await this.renderDrivers();
+        }
+    }
+
+    async deleteDriver(driverId) {
+        if (!confirm('Are you sure you want to delete this driver?')) return;
+        const { error } = await supabase.from('drivers').delete().eq('id', driverId);
+        if (error) {
+            console.error('Error deleting driver:', error);
+            alert('Error deleting driver.');
+        } else {
+            alert('Driver deleted!');
+            await this.renderDrivers();
+        }
+    }
+
+    async fetchFuelEntriesFromSupabase() {
+        const { data, error } = await supabase
+            .from('fuel_entries')
+            .select('*')
+            .order('id', { ascending: true });
+        if (error) {
+            console.error('Error fetching fuel entries:', error);
+            return [];
+        }
+        return data;
+    }
+
+    async addFuelEntry(entryObj) {
+        const { error } = await supabase.from('fuel_entries').insert([entryObj]);
+        if (error) {
+            console.error('Error adding fuel entry:', error);
+            alert('Error adding fuel entry.');
+        } else {
+            alert('Fuel entry added!');
+            await this.renderFuelEntries();
+        }
+    }
+
+    async updateFuelEntry(entryId, updateObj) {
+        const { error } = await supabase.from('fuel_entries').update(updateObj).eq('id', entryId);
+        if (error) {
+            console.error('Error updating fuel entry:', error);
+            alert('Error updating fuel entry.');
+        } else {
+            alert('Fuel entry updated!');
+            await this.renderFuelEntries();
+        }
+    }
+
+    async deleteFuelEntry(entryId) {
+        if (!confirm('Are you sure you want to delete this fuel entry?')) return;
+        const { error } = await supabase.from('fuel_entries').delete().eq('id', entryId);
+        if (error) {
+            console.error('Error deleting fuel entry:', error);
+            alert('Error deleting fuel entry.');
+        } else {
+            alert('Fuel entry deleted!');
+            await this.renderFuelEntries();
+        }
+    }
+    // --- END SUPABASE CRUD METHODS ---
+}
+// --- END FleetManager class ---
+
+// (Optional) App initialization code here, if needed.
+
                         <strong>${this.currentDriver.code}</strong> - ${this.currentDriver.name}<br>
                         <small>${this.currentDriver.license_number || 'No license on file'}</small>
                     `;
@@ -2278,19 +2379,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     deleteRequest.onerror = () => console.error('Error clearing IndexedDB');
                 }
             }
-        };
-        
-        console.log('Debug functions available: window.fleetDebug');
-        console.log('If you see IndexedDB errors, clear browser cache and refresh (Ctrl+Shift+R)');
-        
-        // Add cache clearing function
-        window.fleetDebug.clearCache = () => {
-            if ('caches' in window) {
-                caches.keys().then(names => {
-                    names.forEach(name => {
-                        caches.delete(name);
-                    });
-                });
             }
             localStorage.clear();
             location.reload(true);
