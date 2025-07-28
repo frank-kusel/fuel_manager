@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(del read_excel.py read_xls.py analyze_format.py)",
+      "Bash(rm:*)"
+    ],
+    "deny": []
+  }
+}

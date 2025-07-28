@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FarmTrack - Fleet & Fuel Manager</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#15803d">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="header-brand">
+                <div class="brand-icon">🚧</div>
+                <h1>Fleet Manager</h1>
+            </div>
+            <nav class="nav">
+                <button id="nav-fuel-entry" class="nav-btn active">Fuel Entry</button>
+                <button id="nav-dashboard" class="nav-btn">Dashboard</button>
+                <button id="nav-vehicles" class="nav-btn">Vehicles</button>
+                <button id="nav-drivers" class="nav-btn">Drivers</button>
+            </nav>
+        </header>
+
+        <main class="main">
+            <!-- Fuel Entry Flow -->
+            <section id="fuel-entry-section" class="section active">
+                <div class="container">
+                    <!-- Step 1: Vehicle Selection -->
+                    <div id="step-vehicle" class="step active">
+                        <h2>Select Vehicle</h2>
+                        <div class="table-container">
+                            <table class="table" id="vehicle-table">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>Registration</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vehicle-table-body">
+                                    <!-- Vehicles will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 2: Driver Selection -->
+                    <div id="step-driver" class="step hidden">
+                        <h2>Select Driver</h2>
+                        <button class="back-btn" id="back-to-vehicle">← Back to Vehicles</button>
+                        <div class="table-container">
+                            <table class="table" id="driver-table">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>License</th>
+                                        <th>Phone</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="driver-table-body">
+                                    <!-- Drivers will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 3: Activity Selection -->
+                    <div id="step-activity" class="step hidden">
+                        <h2>Select Activity & Field</h2>
+                        <button class="back-btn" id="back-to-driver">← Back to Drivers</button>
+                        <div class="form-container">
+                            <div class="selected-info">
+                                <div class="info-card">
+                                    <div class="info-label">Vehicle</div>
+                                    <div id="selected-vehicle-info"></div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-label">Driver</div>
+                                    <div id="selected-driver-info"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="activity">Activity/Purpose *</label>
+                                <select id="activity" required>
+                                    <option value="">Select activity</option>
+                                    <option value="field-preparation">Field Preparation</option>
+                                    <option value="planting">Planting</option>
+                                    <option value="harvesting">Harvesting</option>
+                                    <option value="transport">Transport</option>
+                                    <option value="maintenance">Maintenance</option>
+                                    <option value="loading">Loading/Unloading</option>
+                                    <option value="delivery">Delivery</option>
+                                    <option value="inspection">Inspection</option>
+                                    <option value="emergency">Emergency</option>
+                                    <option value="other">Other Business</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="field-name">Field/Location *</label>
+                                <select id="field-name" required>
+                                    <option value="">Select field</option>
+                                    <option value="North Field A">North Field A</option>
+                                    <option value="South Field B">South Field B</option>
+                                    <option value="East Field C">East Field C</option>
+                                    <option value="West Field D">West Field D</option>
+                                    <option value="Main Depot">Main Depot</option>
+                                    <option value="Workshop Bay">Workshop Bay</option>
+                                    <option value="Quarry Site">Quarry Site</option>
+                                    <option value="Storage Facility">Storage Facility</option>
+                                    <option value="Loading Bay">Loading Bay</option>
+                                    <option value="Other">Other (specify in notes)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" id="next-to-fuel" class="btn btn-primary">Next: Fuel Data →</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 4: Fuel Data Entry -->
+                    <div id="step-fuel-data" class="step hidden">
+                        <h2>Fuel & Odometer Data</h2>
+                        <button class="back-btn" id="back-to-activity">← Back to Activity</button>
+                        <div class="form-container">
+                            <div class="selected-info">
+                                <div class="info-card">
+                                    <div class="info-label">Vehicle</div>
+                                    <div id="selected-vehicle-info-2"></div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-label">Activity</div>
+                                    <div id="selected-activity-info"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="odo-start">Odometer Start (km) *</label>
+                                    <input type="number" id="odo-start" required min="0" step="0.1">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="odo-end">Odometer End (km) *</label>
+                                    <input type="number" id="odo-end" required min="0" step="0.1">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="litres-used">Litres Used *</label>
+                                <input type="number" id="litres-used" required min="0" step="0.01">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="fuel-consumption">Fuel Consumption (L/100km)</label>
+                                <input type="text" id="fuel-consumption" readonly>
+                            </div>
+                            
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="gauge-broken">
+                                <label for="gauge-broken" class="mb-0">Gauge broken (use start ODO as end ODO)</label>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" id="next-to-review" class="btn btn-primary">Next: Review & Save →</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 5: Review & Save -->
+                    <div id="step-review" class="step hidden">
+                        <h2>Review & Save Record</h2>
+                        <button class="back-btn" id="back-to-fuel-data">← Back to Fuel Data</button>
+                        <div class="form-container">
+                            <div id="review-summary">
+                                <!-- Summary will be populated by JavaScript -->
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="date">Date *</label>
+                                <input type="date" id="date" required>
+                            </div>
+                            
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="needs-review">
+                                <label for="needs-review" class="mb-0">Flag for review (incomplete information)</label>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" id="cancel-entry" class="btn btn-secondary">Cancel</button>
+                                <button type="button" id="save-fuel-record" class="btn btn-primary">Save Record</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Vehicle Management Section -->
+            <section id="vehicles-section" class="section">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Vehicle Management</h2>
+                        <button id="add-vehicle" class="btn btn-primary">+ Add Vehicle</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="table" id="vehicles-management-table">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Make/Model</th>
+                                    <th>Registration</th>
+                                    <th>Current ODO</th>
+                                    <th>Records</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vehicles-management-body">
+                                <!-- Vehicle management list will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Driver Management Section -->
+            <section id="drivers-section" class="section">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Driver Management</h2>
+                        <button id="add-driver" class="btn btn-primary">+ Add Driver</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="table" id="drivers-management-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>License</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                    <th>Records</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drivers-management-body">
+                                <!-- Driver management list will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="section">
+                <div class="container dashboard-container">
+                    <h2>Fleet Dashboard</h2>
+                    
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <h3>Total Fuel Used</h3>
+                            <div class="stat" id="total-fuel">0 L</div>
+                        </div>
+                        
+                        <div class="card">
+                            <h3>Total Distance</h3>
+                            <div class="stat" id="total-distance">0 km</div>
+                        </div>
+                        
+                        <div class="card">
+                            <h3>Average Consumption</h3>
+                            <div class="stat" id="avg-consumption">0 L/100km</div>
+                        </div>
+                        
+                        <div class="card">
+                            <h3>Active Vehicles</h3>
+                            <div class="stat" id="active-vehicles">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-actions">
+                        <button id="export-monthly" class="btn btn-primary">Export Monthly Report (SARS)</button>
+                        <button id="export-annual" class="btn btn-secondary">Export Annual Report (SARS)</button>
+                        <button id="export-canepro" class="btn btn-success">Export CanePro Format</button>
+                    </div>
+                    
+                    <div class="plot-container">
+                        <h3 class="mb-2">Vehicle Fuel Consumption Comparison</h3>
+                        <canvas id="comparison-chart" width="400" height="200"></canvas>
+                    </div>
+                    
+                    <div class="plot-container">
+                        <h3 class="mb-2">Fuel Consumption Trend Over Time</h3>
+                        <canvas id="consumption-chart" width="400" height="200"></canvas>
+                    </div>
+                    
+                    <div class="activity-calendar">
+                        <h3 class="mb-2">Fleet Activity Overview</h3>
+                        <div id="activity-calendar-grid" class="calendar-grid">
+                            <!-- Activity calendar will be populated by JavaScript -->
+                        </div>
+                        <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--gray-600);">
+                            <span style="display: inline-flex; align-items: center; margin-right: 1rem;">
+                                <div class="calendar-cell" style="margin-right: 0.25rem;"></div> No activity
+                            </span>
+                            <span style="display: inline-flex; align-items: center; margin-right: 1rem;">
+                                <div class="calendar-cell level-1" style="margin-right: 0.25rem;"></div> 1-2 records
+                            </span>
+                            <span style="display: inline-flex; align-items: center; margin-right: 1rem;">
+                                <div class="calendar-cell level-2" style="margin-right: 0.25rem;"></div> 3-4 records
+                            </span>
+                            <span style="display: inline-flex; align-items: center; margin-right: 1rem;">
+                                <div class="calendar-cell level-3" style="margin-right: 0.25rem;"></div> 5-6 records
+                            </span>
+                            <span style="display: inline-flex; align-items: center;">
+                                <div class="calendar-cell level-4" style="margin-right: 0.25rem;"></div> 7+ records
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="vehicle-summary">
+                        <h3>Vehicle Summary</h3>
+                        <div id="vehicle-summary-table">
+                            <!-- Table will be populated by JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <div class="recent-records">
+                        <h3>Recent Fuel Records</h3>
+                        <div id="recent-records-table">
+                            <!-- Table will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Vehicle Modal -->
+        <div id="vehicle-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="vehicle-modal-title">Add Vehicle</h3>
+                    <button class="modal-close" id="close-vehicle-modal">&times;</button>
+                </div>
+                <form id="vehicle-form" class="modal-form">
+                    <input type="hidden" id="vehicle-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="vehicle-code">Vehicle Code *</label>
+                            <input type="text" id="vehicle-code" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="vehicle-name">Vehicle Name *</label>
+                            <input type="text" id="vehicle-name" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="vehicle-make">Make *</label>
+                            <input type="text" id="vehicle-make" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="vehicle-model">Model *</label>
+                            <input type="text" id="vehicle-model" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="vehicle-year">Year *</label>
+                            <input type="number" id="vehicle-year" required min="1980" max="2030">
+                        </div>
+                        <div class="form-group">
+                            <label for="vehicle-registration">Registration Number *</label>
+                            <input type="text" id="vehicle-registration" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="vehicle-value">Vehicle Value (R)</label>
+                            <input type="number" id="vehicle-value" min="0" step="1000">
+                        </div>
+                        <div class="form-group">
+                            <label for="current-odo">Current Odometer (km)</label>
+                            <input type="number" id="current-odo" min="0" step="0.1">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vehicle-type">Vehicle Type *</label>
+                        <select id="vehicle-type" required>
+                            <option value="">Select vehicle type</option>
+                            <option value="tractor">Tractor</option>
+                            <option value="bakkie">Bakkie</option>
+                            <option value="truck">Truck</option>
+                            <option value="loader">Loader</option>
+                            <option value="utility">Utility Vehicle</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="vehicle-description">Description</label>
+                        <textarea id="vehicle-description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="license-details">License Details</label>
+                        <textarea id="license-details" rows="2"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancel-vehicle">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Vehicle</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Driver Modal -->
+        <div id="driver-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="driver-modal-title">Add Driver</h3>
+                    <button class="modal-close" id="close-driver-modal">&times;</button>
+                </div>
+                <form id="driver-form" class="modal-form">
+                    <input type="hidden" id="driver-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="driver-code-input">Driver Code *</label>
+                            <input type="text" id="driver-code-input" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="driver-name-input">Full Name *</label>
+                            <input type="text" id="driver-name-input" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="driver-license">License Number</label>
+                            <input type="text" id="driver-license">
+                        </div>
+                        <div class="form-group">
+                            <label for="driver-phone">Phone Number</label>
+                            <input type="tel" id="driver-phone">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="driver-email">Email Address</label>
+                        <input type="email" id="driver-email">
+                    </div>
+                    <div class="form-group">
+                        <label for="driver-notes">Notes</label>
+                        <textarea id="driver-notes" rows="3"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancel-driver">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Driver</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=3"></script>
+</body>
+</html>
