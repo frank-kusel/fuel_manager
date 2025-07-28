@@ -1568,30 +1568,31 @@ async function getSupabaseConfig() {
         };
         return activityMap[activity] || activity;
     }
+}
 
-    // Initialize the app when DOM is loaded
-    document.addEventListener('DOMContentLoaded', async () => {
-        console.log('DOM Content Loaded - Initializing Fleet Manager');
-        try {
-            window.app = new FleetManager();
-        } catch (error) {
-            console.error('Failed to initialize Fleet Manager:', error);
-            alert('Failed to initialize the application. Please refresh the page.');
-        }
-    });
-
-    // Service Worker Registration for PWA
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
-                .then(registration => {
-                    console.log('SW registered: ', registration);
-                })
-                .catch(registrationError => {
-                    console.log('SW registration failed: ', registrationError);
-                });
-        });
+// Initialize the app when DOM is loaded
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('DOM Content Loaded - Initializing Fleet Manager');
+    try {
+        window.app = new FleetManager();
+    } catch (error) {
+        console.error('Failed to initialize Fleet Manager:', error);
+        alert('Failed to initialize the application. Please refresh the page.');
     }
+});
+
+// Service Worker Registration for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+            .then(registration => {
+                console.log('SW registered: ', registration);
+            })
+            .catch(registrationError => {
+                console.log('SW registration failed: ', registrationError);
+            });
+    });
+}
 
   } catch (error) {
     console.error('Failed to initialize application:', error);
