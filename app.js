@@ -5,6 +5,7 @@
 // Make sure 'supabase_config.js' is in your .gitignore!
 import { SUPABASE_URL, SUPABASE_KEY } from './supabase_config.js';
 
+
 // --- Supabase client initialization ---
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
