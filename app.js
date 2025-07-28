@@ -1,15 +1,18 @@
-// --- Supabase config via environment variables ---
-// Credentials are injected by Netlify at build time via environment variables
-if (!window.SUPABASE_URL || !window.SUPABASE_KEY) {
-    console.error('Supabase credentials not found. Please check Netlify environment variables.');
-    alert('Database configuration error. Please contact administrator.');
+// --- Supabase config fetched from Netlify function ---
+async function getSupabaseConfig() {
+  const res = await fetch('/.netlify/functions/config');
+  if (!res.ok) throw new Error('Failed to load Supabase config');
+  return res.json();
 }
 
-// --- Supabase client initialization ---
-const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+(async () => {
+  try {
+    const config = await getSupabaseConfig();
+    const supabase = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
+    window.supabaseClient = supabase; // For debugging/global access if needed
 
-// Fleet Manager - Minimal design with enhanced functionality
-class FleetManager {
+    // Fleet Manager - Minimal design with enhanced functionality
+    class FleetManager {
     constructor() {
         this.currentVehicle = null;
         this.currentDriver = null;
@@ -1565,28 +1568,33 @@ class FleetManager {
         };
         return activityMap[activity] || activity;
     }
-}
 
-// Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOM Content Loaded - Initializing Fleet Manager');
-    try {
-        window.app = new FleetManager();
-    } catch (error) {
-        console.error('Failed to initialize Fleet Manager:', error);
-        alert('Failed to initialize the application. Please refresh the page.');
-    }
-});
-
-// Service Worker Registration for PWA
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-            .then(registration => {
-                console.log('SW registered: ', registration);
-            })
-            .catch(registrationError => {
-                console.log('SW registration failed: ', registrationError);
-            });
+    // Initialize the app when DOM is loaded
+    document.addEventListener('DOMContentLoaded', async () => {
+        console.log('DOM Content Loaded - Initializing Fleet Manager');
+        try {
+            window.app = new FleetManager();
+        } catch (error) {
+            console.error('Failed to initialize Fleet Manager:', error);
+            alert('Failed to initialize the application. Please refresh the page.');
+        }
     });
-}
+
+    // Service Worker Registration for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(registration => {
+                    console.log('SW registered: ', registration);
+                })
+                .catch(registrationError => {
+                    console.log('SW registration failed: ', registrationError);
+                });
+        });
+    }
+
+  } catch (error) {
+    console.error('Failed to initialize application:', error);
+    alert('Failed to load application configuration. Please check your connection and try again.');
+  }
+})();
