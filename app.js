@@ -1,13 +1,10 @@
-// --- Supabase config via window globals (set in index.html) ---
-// Netlify: Set SUPABASE_URL and SUPABASE_KEY as environment variables and inject into index.html
-// Example in index.html:
-// <script>
-//   window.SUPABASE_URL = '<YOUR_NETLIFY_ENV_SUPABASE_URL>';
-//   window.SUPABASE_KEY = '<YOUR_NETLIFY_ENV_SUPABASE_KEY>';
-// </script>
+// --- Supabase config with fallback ---
+// Try to use environment variables first, fallback to direct config
+const SUPABASE_URL = window.SUPABASE_URL || 'https://szskplrwmeuahwvicyos.supabase.co';
+const SUPABASE_KEY = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MDkzMTEsImV4cCI6MjA2OTI4NTMxMX0.phbhjcVVF-ENJn167Pd0XxlF_VicDcJW7id5K8Vy7Mc';
 
 // --- Supabase client initialization ---
-const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Fleet Manager - Minimal design with enhanced functionality
 class FleetManager {
