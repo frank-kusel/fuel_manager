@@ -1,10 +1,7 @@
-// --- Supabase config import ---
-// IMPORTANT: Create a file named 'supabase_config.js' with the following content:
-// export const SUPABASE_URL = 'https://your-project.supabase.co';
-// export const SUPABASE_KEY = 'your-anon-key';
-// Make sure 'supabase_config.js' is in your .gitignore!
-import { SUPABASE_URL, SUPABASE_KEY } from './supabase_config.js';
-
+// --- Supabase configuration ---
+// Direct configuration for production deployment
+const SUPABASE_URL = 'https://szskplrwmeuahwvicyos.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MDkzMTEsImV4cCI6MjA2OTI4NTMxMX0.phbhjcVVF-ENJn167Pd0XxlF_VicDcJW7id5K8Vy7Mc';
 
 // --- Supabase client initialization ---
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
