@@ -1,3 +1,13 @@
+// --- Supabase config import ---
+// IMPORTANT: Create a file named 'supabase_config.js' with the following content:
+// export const SUPABASE_URL = 'https://your-project.supabase.co';
+// export const SUPABASE_KEY = 'your-anon-key';
+// Make sure 'supabase_config.js' is in your .gitignore!
+import { SUPABASE_URL, SUPABASE_KEY } from './supabase_config.js';
+
+// --- Supabase client initialization ---
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // Fleet Manager - Minimal design with enhanced functionality
 class FleetManager {
     constructor() {
