@@ -436,7 +436,6 @@ async function getSupabaseConfig() {
                     .from('fuel_entries')
                     .select('odo_end')
                     .eq('vehicle_id', this.currentVehicle.id)
-                    .eq('gauge_broken', false)
                     .order('date', { ascending: false })
                     .limit(1)
                     .single();
