@@ -8,8 +8,8 @@ async function getSupabaseConfig() {
 (async () => {
   try {
     const config = await getSupabaseConfig();
-    const supabase = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
-    window.supabaseClient = supabase; // For debugging/global access if needed
+    const supabaseClient = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
+    window.supabaseClient = supabaseClient; // Make it globally accessible
 
     // Fleet Manager - Minimal design with enhanced functionality
     class FleetManager {
@@ -45,7 +45,7 @@ async function getSupabaseConfig() {
 
     async testSupabaseConnection() {
         try {
-            const { data, error } = await supabase.from('vehicles').select('count', { count: 'exact' });
+            const { data, error } = await window.supabaseClient.from('vehicles').select('count', { count: 'exact' });
             if (error) {
                 console.error('Supabase connection error:', error);
                 alert('Unable to connect to database. Please check your internet connection.');
