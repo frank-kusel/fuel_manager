@@ -1577,16 +1577,15 @@ async function getSupabaseConfig() {
     }
 }
 
-// Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOM Content Loaded - Initializing Fleet Manager');
-    try {
-        window.app = new FleetManager();
-    } catch (error) {
-        console.error('Failed to initialize Fleet Manager:', error);
-        alert('Failed to initialize the application. Please refresh the page.');
-    }
-});
+// Initialize the app immediately since DOM is likely already loaded
+console.log('Initializing Fleet Manager after Supabase setup...');
+try {
+    window.app = new FleetManager();
+    console.log('Fleet Manager initialized successfully');
+} catch (error) {
+    console.error('Failed to initialize Fleet Manager:', error);
+    alert('Failed to initialize the application. Please refresh the page.');
+}
 
 // Service Worker Registration for PWA
 if ('serviceWorker' in navigator) {
