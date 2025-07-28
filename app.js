@@ -6,8 +6,6 @@ async function getSupabaseConfig() {
   if (!res.ok) throw new Error(`Failed to load Supabase config: ${res.status} ${res.statusText}`);
   const config = await res.json();
   console.log('Supabase config loaded successfully');
-  console.log('SUPABASE_URL from Netlify function:', config.SUPABASE_URL);
-  console.log('SUPABASE_KEY from Netlify function:', config.SUPABASE_KEY ? 'Present' : 'Missing');
   return config;
 }
 
@@ -646,11 +644,8 @@ async function getSupabaseConfig() {
                 field_name: fieldName,
                 odo_start: odoStart,
                 odo_end: gaugeBroken ? odoStart : odoEnd,
-                litres_used: litresUsed,
-                distance: distance,
-                consumption: consumption,
-                gauge_broken: gaugeBroken,
-                needs_review: needsReview
+                fuel_amount: litresUsed,
+                notes: document.getElementById('needs-review').checked ? 'Flagged for review' : null
             };
             
             const { data, error } = await window.supabaseClient
@@ -937,15 +932,10 @@ async function getSupabaseConfig() {
         const vehicleData = {
             code: document.getElementById('vehicle-code').value,
             name: document.getElementById('vehicle-name').value,
-            make: document.getElementById('vehicle-make').value,
-            model: document.getElementById('vehicle-model').value,
-            year: parseInt(document.getElementById('vehicle-year').value),
             registration: document.getElementById('vehicle-registration').value,
             type: document.getElementById('vehicle-type').value,
-            value: parseFloat(document.getElementById('vehicle-value').value) || null,
-            current_odo: parseFloat(document.getElementById('current-odo').value) || 0,
             description: document.getElementById('vehicle-description').value || null,
-            license_details: document.getElementById('license-details').value || null
+            license: document.getElementById('license-details').value || null
         };
         
         try {
@@ -1188,7 +1178,7 @@ async function getSupabaseConfig() {
                 return;
             }
 
-            const totalFuel = fuelEntries.reduce((sum, entry) => sum + (entry.litres_used || 0), 0);
+            const totalFuel = fuelEntries.reduce((sum, entry) => sum + (entry.fuel_amount || 0), 0);
             const totalDistance = fuelEntries.reduce((sum, entry) => sum + (entry.distance || 0), 0);
             const avgConsumption = totalDistance > 0 ? (totalFuel / totalDistance) * 100 : 0;
 
@@ -1213,7 +1203,7 @@ async function getSupabaseConfig() {
                 .from('fuel_entries')
                 .select(`
                     *,
-                    vehicles (code, name, make, model, year, registration)
+                    vehicles (code, name, registration, type, description, license)
                 `);
                 
             if (error) {
@@ -1235,7 +1225,7 @@ async function getSupabaseConfig() {
                     };
                 }
                 
-                vehicleStats[vehicleKey].totalFuel += entry.litres_used || 0;
+                vehicleStats[vehicleKey].totalFuel += entry.fuel_amount || 0;
                 vehicleStats[vehicleKey].totalDistance += entry.distance || 0;
                 vehicleStats[vehicleKey].recordCount++;
             });
@@ -1311,7 +1301,7 @@ async function getSupabaseConfig() {
                                     <td>${entry.vehicles?.code || 'N/A'}</td>
                                     <td>${entry.drivers?.code || 'N/A'}</td>
                                     <td>${entry.activity?.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}</td>
-                                    <td>${entry.litres_used?.toFixed(1) || 0}L</td>
+                                    <td>${entry.fuel_amount?.toFixed(1) || 0}L</td>
                                     <td>${entry.distance?.toFixed(1) || 0}km</td>
                                 </tr>
                             `).join('')}
@@ -1397,7 +1387,7 @@ async function getSupabaseConfig() {
                 .from('fuel_entries')
                 .select(`
                     *,
-                    vehicles (code, name, make, model, year, registration),
+                    vehicles (code, name, registration, type, description, license),
                     drivers (code, name)
                 `)
                 .gte('date', startDate)
@@ -1453,9 +1443,9 @@ async function getSupabaseConfig() {
                 doc.text(record.vehicles?.code || 'N/A', 30, yPosition);
                 doc.text(record.drivers?.code || 'N/A', 60, yPosition);
                 doc.text((record.activity || '').replace('-', ' '), 90, yPosition);
-                doc.text((record.litres_used || 0).toFixed(1), 130, yPosition);
+                doc.text((record.fuel_amount || 0).toFixed(1), 130, yPosition);
                 doc.text((record.distance || 0).toFixed(1), 160, yPosition);
-                doc.text(record.distance > 0 ? ((record.litres_used / record.distance) * 100).toFixed(2) : 'N/A', 190, yPosition);
+                doc.text(record.distance > 0 ? ((record.fuel_amount / record.distance) * 100).toFixed(2) : 'N/A', 190, yPosition);
                 
                 yPosition += 8;
             });
@@ -1481,7 +1471,7 @@ async function getSupabaseConfig() {
                 .from('fuel_entries')
                 .select(`
                     *,
-                    vehicles (code, name, make, model, year, registration),
+                    vehicles (code, name, registration, type, description, license),
                     drivers (code, name)
                 `)
                 .gte('date', startDate)
@@ -1529,7 +1519,7 @@ async function getSupabaseConfig() {
                 ws[`B${cellRow}`] = { v: record.vehicles?.code || '', t: 's' };
                 ws[`C${cellRow}`] = { v: record.field_name || '', t: 's' };
                 ws[`D${cellRow}`] = { v: this.mapActivityToCode(record.activity), t: 's' };
-                ws[`E${cellRow}`] = { v: record.litres_used || 0, t: 'n' };
+                ws[`E${cellRow}`] = { v: record.fuel_amount || 0, t: 'n' };
                 ws[`F${cellRow}`] = { v: record.distance || 0, t: 'n' };
                 ws[`G${cellRow}`] = { v: record.odo_end || 0, t: 'n' };
                 ws[`H${cellRow}`] = { v: '', t: 's' }; // Store - empty
