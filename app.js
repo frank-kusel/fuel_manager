@@ -1411,25 +1411,47 @@ class FleetManager {
 
     // Vehicle Management
     async renderVehicleManagement() {
-        const stmt = this.db.prepare(`
-            SELECT v.*, 
-                   COUNT(fr.id) as total_records,
-                   COALESCE(SUM(fr.distance), 0) as total_distance,
-                   COALESCE(SUM(fr.litres_used), 0) as total_fuel
-            FROM vehicles v
-            LEFT JOIN fuel_records fr ON v.id = fr.vehicle_id
-            GROUP BY v.id
-            ORDER BY v.type, v.code
-        `);
-        
-        const vehicles = [];
-        while (stmt.step()) {
-            vehicles.push(stmt.getAsObject());
-        }
-        stmt.free();
+        try {
+            // Get vehicles from Supabase
+            const { data: vehicles, error: vehiclesError } = await supabase
+                .from('vehicles')
+                .select('*')
+                .order('code', { ascending: true });
 
-        const tableBody = document.getElementById('vehicles-management-body');
-        tableBody.innerHTML = vehicles.map(vehicle => `
+            if (vehiclesError) {
+                console.error('Error fetching vehicles:', vehiclesError);
+                return;
+            }
+
+            // Get fuel records statistics for each vehicle
+            const vehiclesWithStats = await Promise.all(
+                vehicles.map(async (vehicle) => {
+                    const { data: fuelRecords, error: recordsError } = await supabase
+                        .from('fuel_entries')
+                        .select('distance, litres_used')
+                        .eq('vehicle_id', vehicle.id);
+
+                    if (recordsError) {
+                        console.error('Error fetching fuel records for vehicle:', recordsError);
+                        return {
+                            ...vehicle,
+                            total_records: 0,
+                            total_distance: 0,
+                            total_fuel: 0
+                        };
+                    }
+
+                    return {
+                        ...vehicle,
+                        total_records: fuelRecords.length,
+                        total_distance: fuelRecords.reduce((sum, r) => sum + r.distance, 0),
+                        total_fuel: fuelRecords.reduce((sum, r) => sum + r.litres_used, 0)
+                    };
+                })
+            );
+
+            const tableBody = document.getElementById('vehicles-management-body');
+            tableBody.innerHTML = vehiclesWithStats.map(vehicle => `
             <tr class="vehicle-type-${vehicle.type}">
                 <td>
                     <div class="vehicle-type-indicator"></div>
@@ -1447,6 +1469,13 @@ class FleetManager {
                 </td>
             </tr>
         `).join('');
+        } catch (error) {
+            console.error('Error rendering vehicle management:', error);
+            const tableBody = document.getElementById('vehicles-management-body');
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading vehicles. Please refresh the page.</td></tr>';
+            }
+        }
     }
 
     showVehicleModal(vehicleData = null) {
@@ -1569,24 +1598,45 @@ class FleetManager {
 
     // Driver Management
     async renderDriverManagement() {
-        const stmt = this.db.prepare(`
-            SELECT d.*, 
-                   COUNT(fr.id) as total_records,
-                   COALESCE(SUM(fr.distance), 0) as total_distance
-            FROM drivers d
-            LEFT JOIN fuel_records fr ON d.id = fr.driver_id
-            GROUP BY d.id
-            ORDER BY d.code
-        `);
-        
-        const drivers = [];
-        while (stmt.step()) {
-            drivers.push(stmt.getAsObject());
-        }
-        stmt.free();
+        try {
+            // Get drivers from Supabase
+            const { data: drivers, error: driversError } = await supabase
+                .from('drivers')
+                .select('*')
+                .order('code', { ascending: true });
 
-        const tableBody = document.getElementById('drivers-management-body');
-        tableBody.innerHTML = drivers.map(driver => `
+            if (driversError) {
+                console.error('Error fetching drivers:', driversError);
+                return;
+            }
+
+            // Get fuel records statistics for each driver
+            const driversWithStats = await Promise.all(
+                drivers.map(async (driver) => {
+                    const { data: fuelRecords, error: recordsError } = await supabase
+                        .from('fuel_entries')
+                        .select('distance')
+                        .eq('driver_id', driver.id);
+
+                    if (recordsError) {
+                        console.error('Error fetching fuel records for driver:', recordsError);
+                        return {
+                            ...driver,
+                            total_records: 0,
+                            total_distance: 0
+                        };
+                    }
+
+                    return {
+                        ...driver,
+                        total_records: fuelRecords.length,
+                        total_distance: fuelRecords.reduce((sum, r) => sum + r.distance, 0)
+                    };
+                })
+            );
+
+            const tableBody = document.getElementById('drivers-management-body');
+            tableBody.innerHTML = driversWithStats.map(driver => `
             <tr>
                 <td><strong>${driver.code}</strong></td>
                 <td>${driver.name}</td>
@@ -1600,6 +1650,13 @@ class FleetManager {
                 </td>
             </tr>
         `).join('');
+        } catch (error) {
+            console.error('Error rendering driver management:', error);
+            const tableBody = document.getElementById('drivers-management-body');
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
+            }
+        }
     }
 
     showDriverModal(driverData = null) {
@@ -1723,27 +1780,40 @@ class FleetManager {
     }
 
     async calculateStats() {
-        const statsStmt = this.db.prepare(`
-            SELECT 
-                COALESCE(SUM(CASE WHEN gauge_broken = 0 THEN litres_used ELSE 0 END), 0) as total_fuel,
-                COALESCE(SUM(distance), 0) as total_distance,
-                COUNT(DISTINCT vehicle_id) as active_vehicles,
-                COALESCE(AVG(CASE WHEN gauge_broken = 0 AND fuel_consumption > 0 THEN fuel_consumption END), 0) as avg_consumption
-            FROM fuel_records
-        `);
-        
-        let stats = { totalFuel: 0, totalDistance: 0, avgConsumption: 0, activeVehicles: 0 };
-        
-        if (statsStmt.step()) {
-            const result = statsStmt.getAsObject();
-            stats.totalFuel = result.total_fuel;
-            stats.totalDistance = result.total_distance;
-            stats.activeVehicles = result.active_vehicles;
-            stats.avgConsumption = result.avg_consumption;
+        try {
+            const { data: fuelRecords, error } = await supabase
+                .from('fuel_entries')
+                .select('litres_used, distance, fuel_consumption, gauge_broken, vehicle_id');
+
+            if (error) {
+                console.error('Error fetching stats:', error);
+                return { totalFuel: 0, totalDistance: 0, avgConsumption: 0, activeVehicles: 0 };
+            }
+
+            const stats = {
+                totalFuel: fuelRecords
+                    .filter(r => !r.gauge_broken)
+                    .reduce((sum, r) => sum + r.litres_used, 0),
+                totalDistance: fuelRecords
+                    .reduce((sum, r) => sum + r.distance, 0),
+                activeVehicles: new Set(fuelRecords.map(r => r.vehicle_id)).size,
+                avgConsumption: 0
+            };
+
+            const validConsumptionRecords = fuelRecords.filter(r => 
+                !r.gauge_broken && r.fuel_consumption > 0
+            );
+
+            if (validConsumptionRecords.length > 0) {
+                stats.avgConsumption = validConsumptionRecords
+                    .reduce((sum, r) => sum + r.fuel_consumption, 0) / validConsumptionRecords.length;
+            }
+
+            return stats;
+        } catch (error) {
+            console.error('Error calculating stats:', error);
+            return { totalFuel: 0, totalDistance: 0, avgConsumption: 0, activeVehicles: 0 };
         }
-        statsStmt.free();
-        
-        return stats;
     }
 
     async renderVehicleSummary() {
