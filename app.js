@@ -1,13 +1,13 @@
-// --- Supabase config import ---
-// IMPORTANT: Create a file named 'supabase_config.js' with the following content:
-// export const SUPABASE_URL = 'https://your-project.supabase.co';
-// export const SUPABASE_KEY = 'your-anon-key';
-// Make sure 'supabase_config.js' is in your .gitignore!
-import { SUPABASE_URL, SUPABASE_KEY } from './supabase_config.js';
-
+// --- Supabase config via window globals (set in index.html) ---
+// Netlify: Set SUPABASE_URL and SUPABASE_KEY as environment variables and inject into index.html
+// Example in index.html:
+// <script>
+//   window.SUPABASE_URL = '<YOUR_NETLIFY_ENV_SUPABASE_URL>';
+//   window.SUPABASE_KEY = '<YOUR_NETLIFY_ENV_SUPABASE_KEY>';
+// </script>
 
 // --- Supabase client initialization ---
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
 
 // Fleet Manager - Minimal design with enhanced functionality
 class FleetManager {
