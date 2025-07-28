@@ -6,6 +6,8 @@ async function getSupabaseConfig() {
   if (!res.ok) throw new Error(`Failed to load Supabase config: ${res.status} ${res.statusText}`);
   const config = await res.json();
   console.log('Supabase config loaded successfully');
+  console.log('SUPABASE_URL from Netlify function:', config.SUPABASE_URL);
+  console.log('SUPABASE_KEY from Netlify function:', config.SUPABASE_KEY ? 'Present' : 'Missing');
   return config;
 }
 
