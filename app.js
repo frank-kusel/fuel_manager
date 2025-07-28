@@ -26,6 +26,11 @@ async function getSupabaseConfig() {
         this.currentStep = 'vehicle';
         this.selectedVehicleRow = null;
         this.selectedDriverRow = null;
+        // Cache for database data
+        this.vehiclesCache = null;
+        this.driversCache = null;
+        this.cacheTimestamp = null;
+        this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
         this.init();
     }
 
@@ -68,10 +73,20 @@ async function getSupabaseConfig() {
     }
 
     async loadInitialData() {
-        await this.renderVehicles();
-        await this.renderDrivers();
-        await this.renderVehicleManagement();
-        await this.renderDriverManagement();
+        // Preload vehicles and drivers data in parallel to populate cache
+        const [vehicles, drivers] = await Promise.all([
+            this.fetchVehiclesFromSupabase(),
+            this.fetchDriversFromSupabase()
+        ]);
+        
+        // Now render everything using cached data
+        await Promise.all([
+            this.renderVehicles(),
+            this.renderDrivers(),
+            this.renderVehicleManagement(),
+            this.renderDriverManagement()
+        ]);
+        
         await this.updateDashboard();
     }
 
@@ -259,6 +274,11 @@ async function getSupabaseConfig() {
 
     async renderVehicles() {
         try {
+            const tableBody = document.getElementById('vehicle-table-body');
+            if (!this.isCacheValid()) {
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Loading vehicles...</td></tr>';
+            }
+            
             const vehicles = await this.fetchVehiclesFromSupabase();
             if (!vehicles) {
                 console.error('Failed to fetch vehicles from Supabase');
@@ -308,6 +328,11 @@ async function getSupabaseConfig() {
 
     async renderDrivers() {
         try {
+            const tableBody = document.getElementById('driver-table-body');
+            if (!this.isCacheValid()) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">Loading drivers...</td></tr>';
+            }
+            
             const drivers = await this.fetchDriversFromSupabase();
             if (!drivers) {
                 console.error('Failed to fetch drivers from Supabase');
@@ -725,7 +750,22 @@ async function getSupabaseConfig() {
     }
 
     // --- SUPABASE CRUD METHODS ---
+    isCacheValid() {
+        return this.cacheTimestamp && (Date.now() - this.cacheTimestamp) < this.cacheTimeout;
+    }
+
+    invalidateCache() {
+        this.vehiclesCache = null;
+        this.driversCache = null;
+        this.cacheTimestamp = null;
+    }
+
     async fetchVehiclesFromSupabase() {
+        // Return cached data if valid
+        if (this.vehiclesCache && this.isCacheValid()) {
+            return this.vehiclesCache;
+        }
+
         const { data, error } = await window.supabaseClient
             .from('vehicles')
             .select('*')
@@ -734,10 +774,19 @@ async function getSupabaseConfig() {
             console.error('Error fetching vehicles:', error);
             return [];
         }
+        
+        // Update cache
+        this.vehiclesCache = data;
+        this.cacheTimestamp = Date.now();
         return data;
     }
 
     async fetchDriversFromSupabase() {
+        // Return cached data if valid
+        if (this.driversCache && this.isCacheValid()) {
+            return this.driversCache;
+        }
+
         const { data, error } = await window.supabaseClient
             .from('drivers')
             .select('*')
@@ -746,6 +795,10 @@ async function getSupabaseConfig() {
             console.error('Error fetching drivers:', error);
             return [];
         }
+        
+        // Update cache
+        this.driversCache = data;
+        this.cacheTimestamp = Date.now();
         return data;
     }
 
@@ -961,6 +1014,7 @@ async function getSupabaseConfig() {
             }
             
             alert(vehicleId ? 'Vehicle updated successfully!' : 'Vehicle added successfully!');
+            this.invalidateCache(); // Clear cache to force fresh data
             this.hideVehicleModal();
             await this.renderVehicleManagement();
             await this.renderVehicles(); // Refresh fuel entry vehicles list
@@ -1006,6 +1060,7 @@ async function getSupabaseConfig() {
             }
             
             alert('Vehicle and associated records deleted successfully!');
+            this.invalidateCache(); // Clear cache to force fresh data
             await this.renderVehicleManagement();
             await this.renderVehicles(); // Refresh fuel entry vehicles list
             
@@ -1103,6 +1158,7 @@ async function getSupabaseConfig() {
             }
             
             alert(driverId ? 'Driver updated successfully!' : 'Driver added successfully!');
+            this.invalidateCache(); // Clear cache to force fresh data
             this.hideDriverModal();
             await this.renderDriverManagement();
             await this.renderDrivers(); // Refresh fuel entry drivers list
@@ -1148,6 +1204,7 @@ async function getSupabaseConfig() {
             }
             
             alert('Driver and associated records deleted successfully!');
+            this.invalidateCache(); // Clear cache to force fresh data
             await this.renderDriverManagement();
             await this.renderDrivers(); // Refresh fuel entry drivers list
             
