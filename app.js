@@ -358,7 +358,7 @@ async function getSupabaseConfig() {
         console.log(`Selecting vehicle with ID: ${vehicleId}`);
         
         try {
-            const { data: vehicle, error } = await supabase
+            const { data: vehicle, error } = await window.supabaseClient
                 .from('vehicles')
                 .select('*')
                 .eq('id', vehicleId)
@@ -405,7 +405,7 @@ async function getSupabaseConfig() {
         }
         
         try {
-            const { data: driver, error } = await supabase
+            const { data: driver, error } = await window.supabaseClient
                 .from('drivers')
                 .select('*')
                 .eq('id', driverId)
@@ -432,7 +432,7 @@ async function getSupabaseConfig() {
             
             // Set default odometer start value to last reading
             try {
-                const { data: lastRecord, error: odoError } = await supabase
+                const { data: lastRecord, error: odoError } = await window.supabaseClient
                     .from('fuel_entries')
                     .select('odo_end')
                     .eq('vehicle_id', this.currentVehicle.id)
@@ -651,7 +651,7 @@ async function getSupabaseConfig() {
                 needs_review: needsReview
             };
             
-            const { data, error } = await supabase
+            const { data, error } = await window.supabaseClient
                 .from('fuel_entries')
                 .insert([fuelEntry])
                 .select();
@@ -730,7 +730,7 @@ async function getSupabaseConfig() {
 
     // --- SUPABASE CRUD METHODS ---
     async fetchVehiclesFromSupabase() {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabaseClient
             .from('vehicles')
             .select('*')
             .order('code', { ascending: true });
@@ -742,7 +742,7 @@ async function getSupabaseConfig() {
     }
 
     async fetchDriversFromSupabase() {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabaseClient
             .from('drivers')
             .select('*')
             .order('code', { ascending: true });
@@ -754,7 +754,7 @@ async function getSupabaseConfig() {
     }
 
     async fetchFuelEntriesFromSupabase() {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabaseClient
             .from('fuel_entries')
             .select('*')
             .order('date', { ascending: false });
@@ -783,7 +783,7 @@ async function getSupabaseConfig() {
 
             const vehiclesWithStats = await Promise.all(
                 vehicles.map(async (vehicle) => {
-                    const { data: records, error } = await supabase
+                    const { data: records, error } = await window.supabaseClient
                         .from('fuel_entries')
                         .select('*')
                         .eq('vehicle_id', vehicle.id);
@@ -839,7 +839,7 @@ async function getSupabaseConfig() {
 
             const driversWithStats = await Promise.all(
                 drivers.map(async (driver) => {
-                    const { data: records, error } = await supabase
+                    const { data: records, error } = await window.supabaseClient
                         .from('fuel_entries')
                         .select('*')
                         .eq('driver_id', driver.id);
@@ -897,7 +897,7 @@ async function getSupabaseConfig() {
 
     async loadVehicleForEdit(vehicleId) {
         try {
-            const { data: vehicle, error } = await supabase
+            const { data: vehicle, error } = await window.supabaseClient
                 .from('vehicles')
                 .select('*')
                 .eq('id', vehicleId)
@@ -950,14 +950,14 @@ async function getSupabaseConfig() {
             let error;
             if (vehicleId) {
                 // Update existing vehicle
-                const result = await supabase
+                const result = await window.supabaseClient
                     .from('vehicles')
                     .update(vehicleData)
                     .eq('id', vehicleId);
                 error = result.error;
             } else {
                 // Insert new vehicle
-                const result = await supabase
+                const result = await window.supabaseClient
                     .from('vehicles')
                     .insert([vehicleData]);
                 error = result.error;
@@ -991,7 +991,7 @@ async function getSupabaseConfig() {
         
         try {
             // First delete associated fuel entries
-            const { error: fuelError } = await supabase
+            const { error: fuelError } = await window.supabaseClient
                 .from('fuel_entries')
                 .delete()
                 .eq('vehicle_id', vehicleId);
@@ -1003,7 +1003,7 @@ async function getSupabaseConfig() {
             }
             
             // Then delete the vehicle
-            const { error: vehicleError } = await supabase
+            const { error: vehicleError } = await window.supabaseClient
                 .from('vehicles')
                 .delete()
                 .eq('id', vehicleId);
@@ -1049,7 +1049,7 @@ async function getSupabaseConfig() {
 
     async loadDriverForEdit(driverId) {
         try {
-            const { data: driver, error } = await supabase
+            const { data: driver, error } = await window.supabaseClient
                 .from('drivers')
                 .select('*')
                 .eq('id', driverId)
@@ -1092,14 +1092,14 @@ async function getSupabaseConfig() {
             let error;
             if (driverId) {
                 // Update existing driver
-                const result = await supabase
+                const result = await window.supabaseClient
                     .from('drivers')
                     .update(driverData)
                     .eq('id', driverId);
                 error = result.error;
             } else {
                 // Insert new driver
-                const result = await supabase
+                const result = await window.supabaseClient
                     .from('drivers')
                     .insert([driverData]);
                 error = result.error;
@@ -1133,7 +1133,7 @@ async function getSupabaseConfig() {
         
         try {
             // First delete associated fuel entries
-            const { error: fuelError } = await supabase
+            const { error: fuelError } = await window.supabaseClient
                 .from('fuel_entries')
                 .delete()
                 .eq('driver_id', driverId);
@@ -1145,7 +1145,7 @@ async function getSupabaseConfig() {
             }
             
             // Then delete the driver
-            const { error: driverError } = await supabase
+            const { error: driverError } = await window.supabaseClient
                 .from('drivers')
                 .delete()
                 .eq('id', driverId);
@@ -1177,7 +1177,7 @@ async function getSupabaseConfig() {
 
     async calculateStats() {
         try {
-            const { data: fuelEntries, error } = await supabase
+            const { data: fuelEntries, error } = await window.supabaseClient
                 .from('fuel_entries')
                 .select('*');
                 
@@ -1190,7 +1190,7 @@ async function getSupabaseConfig() {
             const totalDistance = fuelEntries.reduce((sum, entry) => sum + (entry.distance || 0), 0);
             const avgConsumption = totalDistance > 0 ? (totalFuel / totalDistance) * 100 : 0;
 
-            const { data: vehicles, error: vehicleError } = await supabase
+            const { data: vehicles, error: vehicleError } = await window.supabaseClient
                 .from('vehicles')
                 .select('id');
                 
@@ -1207,7 +1207,7 @@ async function getSupabaseConfig() {
 
     async renderVehicleSummary() {
         try {
-            const { data: fuelEntries, error } = await supabase
+            const { data: fuelEntries, error } = await window.supabaseClient
                 .from('fuel_entries')
                 .select(`
                     *,
@@ -1268,7 +1268,7 @@ async function getSupabaseConfig() {
 
     async renderRecentRecords() {
         try {
-            const { data: recentEntries, error } = await supabase
+            const { data: recentEntries, error } = await window.supabaseClient
                 .from('fuel_entries')
                 .select(`
                     *,
@@ -1331,7 +1331,7 @@ async function getSupabaseConfig() {
 
     async renderActivityCalendar() {
         try {
-            const { data: entries, error } = await supabase
+            const { data: entries, error } = await window.supabaseClient
                 .from('fuel_entries')
                 .select('date')
                 .gte('date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
@@ -1391,7 +1391,7 @@ async function getSupabaseConfig() {
 
     async exportReport(startDate, endDate, reportType) {
         try {
-            const { data: records, error } = await supabase
+            const { data: records, error } = await window.supabaseClient
                 .from('fuel_entries')
                 .select(`
                     *,
@@ -1475,7 +1475,7 @@ async function getSupabaseConfig() {
             const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString().split('T')[0];
             const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split('T')[0];
             
-            const { data: records, error } = await supabase
+            const { data: records, error } = await window.supabaseClient
                 .from('fuel_entries')
                 .select(`
                     *,
