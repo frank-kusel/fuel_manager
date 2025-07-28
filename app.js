@@ -21,195 +21,167 @@ class FleetManager {
     }
 
     async init() {
-        console.log('Initializing Fleet Manager...');
+        console.log('Initializing Fleet Manager with Supabase...');
         
         // Show fuel entry section immediately
         this.showSection('fuel-entry');
         this.showStep('vehicle');
         this.setDefaultDate();
         
-        // Initialize database
-        await this.initDatabase();
+        // Test Supabase connection
+        await this.testSupabaseConnection();
         
         // Setup event listeners
         this.setupEventListeners();
         
-        // Load data if database is available
-        if (this.db) {
-            await this.loadInitialData();
-            console.log('Initial data loaded successfully');
-        } else {
-            console.warn('Database not available, some features will be limited');
-            // Still render the UI components with placeholder data
-            this.renderVehicles();
-            this.renderDrivers();
-        }
+        // Load data from Supabase
+        await this.loadInitialData();
+        console.log('Initial data loaded successfully from Supabase');
         
         console.log('Fleet Manager initialization complete');
     }
 
-    async initDatabase() {
+    async testSupabaseConnection() {
         try {
-            console.log('Initializing database...');
-            
-            // Check if sql.js is loaded
-            if (typeof initSqlJs === 'undefined') {
-                throw new Error('sql.js library not loaded. Please check your internet connection.');
+            const { data, error } = await supabase.from('vehicles').select('count', { count: 'exact' });
+            if (error) {
+                console.error('Supabase connection error:', error);
+                alert('Unable to connect to database. Please check your internet connection.');
+                return false;
             }
-            
-            const config = {
-                locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
-            };
-            const SQL = await initSqlJs(config);
-            console.log('SQL.js loaded successfully');
-            
-            // Try to load existing database from IndexedDB first, then localStorage
-            const savedDb = await this.loadDatabaseFromStorage();
-            if (savedDb) {
-                console.log('Loading existing database from storage');
-                this.db = new SQL.Database(savedDb);
-            } else {
-                console.log('Creating new database');
-                this.db = new SQL.Database();
-                await this.createTables();
-                await this.insertInitialData();
-                console.log('Database created and populated');
-            }
-            
-            // Check if database needs migration
-            await this.checkAndMigrateDatabase();
-            
-            // Test database connectivity
-            const testStmt = this.db.prepare('SELECT COUNT(*) as count FROM vehicles');
-            if (testStmt.step()) {
-                const result = testStmt.getAsObject();
-                console.log(`Database ready. Vehicle count: ${result.count}`);
-            }
-            testStmt.free();
-            
+            console.log('Supabase connection successful');
+            return true;
         } catch (error) {
-            console.error('Database initialization error:', error);
-            
-            // Create a fallback in-memory database for basic functionality
-            console.log('Creating fallback database without persistence...');
-            try {
-                if (typeof initSqlJs !== 'undefined') {
-                    const SQL = await initSqlJs({
-                        locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
-                    });
-                    this.db = new SQL.Database();
-                    await this.createTables();
-                    await this.insertInitialData();
-                    console.log('Fallback database created successfully');
-                    
-                    // Re-render UI components now that database is available
-                    setTimeout(() => {
-                        this.renderVehicles();
-                        this.renderDrivers();
-                    }, 100);
-                } else {
-                    throw new Error('SQL.js not available');
-                }
-            } catch (fallbackError) {
-                console.error('Fallback database creation failed:', fallbackError);
-                alert('Database system unavailable. Please check your internet connection and refresh the page.');
-                // Continue with basic UI functionality
-            }
+            console.error('Supabase connection failed:', error);
+            alert('Database connection failed. The application may not work properly.');
+            return false;
         }
     }
 
-    async createTables() {
-        const createTablesSQL = `
-            CREATE TABLE IF NOT EXISTS vehicles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                code TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                make TEXT NOT NULL,
-                model TEXT NOT NULL,
-                year INTEGER NOT NULL,
-                registration TEXT NOT NULL,
-                type TEXT NOT NULL DEFAULT 'other',
-                value REAL,
-                current_odo REAL DEFAULT 0,
-                description TEXT,
-                license_details TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
 
-            CREATE TABLE IF NOT EXISTS drivers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                code TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                license_number TEXT,
-                phone TEXT,
-                email TEXT,
-                notes TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS fuel_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                vehicle_id INTEGER NOT NULL,
-                driver_id INTEGER NOT NULL,
-                activity TEXT NOT NULL,
-                field_name TEXT NOT NULL,
-                odo_start REAL NOT NULL,
-                odo_end REAL NOT NULL,
-                distance REAL NOT NULL,
-                litres_used REAL NOT NULL,
-                fuel_consumption REAL NOT NULL,
-                gauge_broken BOOLEAN DEFAULT 0,
-                needs_review BOOLEAN DEFAULT 0,
-                date DATE NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (vehicle_id) REFERENCES vehicles (id),
-                FOREIGN KEY (driver_id) REFERENCES drivers (id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_fuel_records_date ON fuel_records(date);
-            CREATE INDEX IF NOT EXISTS idx_fuel_records_vehicle ON fuel_records(vehicle_id);
-            CREATE INDEX IF NOT EXISTS idx_fuel_records_driver ON fuel_records(driver_id);
-        `;
-
-        this.db.exec(createTablesSQL);
+    async loadInitialData() {
+        await this.renderVehicles();
+        await this.renderDrivers();
+        await this.renderVehicleManagement();
+        await this.renderDriverManagement();
+        await this.updateDashboard();
     }
-    
-    async checkAndMigrateDatabase() {
-        try {
-            // Check if the fuel_records table has the old schema
-            const schemaStmt = this.db.prepare("PRAGMA table_info(fuel_records)");
-            const columns = [];
-            while (schemaStmt.step()) {
-                const row = schemaStmt.getAsObject();
-                columns.push(row.name);
+
+    setupEventListeners() {
+        console.log('Setting up event listeners...');
+        
+        // Navigation - with null checks
+        const navElements = [
+            { id: 'nav-fuel-entry', section: 'fuel-entry' },
+            { id: 'nav-dashboard', section: 'dashboard' },
+            { id: 'nav-vehicles', section: 'vehicles' },
+            { id: 'nav-drivers', section: 'drivers' }
+        ];
+        
+        navElements.forEach(({ id, section }) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener('click', () => this.showSection(section));
+            } else {
+                console.error(`Navigation element ${id} not found`);
             }
-            schemaStmt.free();
-            
-            console.log('Current fuel_records columns:', columns);
-            
-            // Check if we need to migrate from old schema
-            if (columns.includes('location') && columns.includes('field_location') && !columns.includes('field_name')) {
-                console.log('Migrating database schema from location fields to field_name...');
-                
-                // Create new table with correct schema
-                this.db.exec(`
-                    CREATE TABLE fuel_records_new (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        vehicle_id INTEGER NOT NULL,
-                        driver_id INTEGER NOT NULL,
-                        activity TEXT NOT NULL,
-                        field_name TEXT NOT NULL,
-                        odo_start REAL NOT NULL,
-                        odo_end REAL NOT NULL,
-                        distance REAL NOT NULL,
-                        litres_used REAL NOT NULL,
-                        fuel_consumption REAL NOT NULL,
-                        gauge_broken BOOLEAN DEFAULT 0,
-                        needs_review BOOLEAN DEFAULT 0,
-                        date DATE NOT NULL,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        });
+
+        // Step navigation - with null checks
+        const stepElements = [
+            { id: 'back-to-vehicle', action: () => this.showStep('vehicle') },
+            { id: 'back-to-driver', action: () => this.showStep('driver') },
+            { id: 'back-to-activity', action: () => this.showStep('activity') },
+            { id: 'back-to-fuel-data', action: () => this.showStep('fuel-data') },
+            { id: 'next-to-fuel', action: () => this.nextToFuelData() },
+            { id: 'next-to-review', action: () => this.nextToReview() },
+            { id: 'save-fuel-record', action: () => this.saveFuelRecord() }
+        ];
+        
+        stepElements.forEach(({ id, action }) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener('click', action);
+            } else {
+                console.error(`Step navigation element ${id} not found`);
+            }
+        });
+
+        // Form handling - with null checks
+        const cancelEntry = document.getElementById('cancel-entry');
+        
+        if (cancelEntry) {
+            cancelEntry.addEventListener('click', () => this.cancelFuelEntry());
+        } else {
+            console.error('Cancel entry button not found');
+        }
+
+        // Vehicle management
+        document.getElementById('add-vehicle').addEventListener('click', () => this.showVehicleModal());
+        document.getElementById('vehicle-form').addEventListener('submit', (e) => this.handleVehicleFormSubmit(e));
+        document.getElementById('close-vehicle-modal').addEventListener('click', () => this.hideVehicleModal());
+        document.getElementById('cancel-vehicle').addEventListener('click', () => this.hideVehicleModal());
+
+        // Driver management
+        document.getElementById('add-driver').addEventListener('click', () => this.showDriverModal());
+        document.getElementById('driver-form').addEventListener('submit', (e) => this.handleDriverFormSubmit(e));
+        document.getElementById('close-driver-modal').addEventListener('click', () => this.hideDriverModal());
+        document.getElementById('cancel-driver').addEventListener('click', () => this.hideDriverModal());
+
+        // Fuel consumption calculation and gauge broken functionality
+        document.getElementById('odo-start').addEventListener('input', () => this.calculateConsumption());
+        document.getElementById('odo-end').addEventListener('input', () => this.calculateConsumption());
+        document.getElementById('litres-used').addEventListener('input', () => this.calculateConsumption());
+        document.getElementById('gauge-broken').addEventListener('change', () => this.handleGaugeBroken());
+
+        // Export functionality
+        document.getElementById('export-monthly').addEventListener('click', () => this.exportMonthlyReport());
+        document.getElementById('export-annual').addEventListener('click', () => this.exportAnnualReport());
+        document.getElementById('export-canepro').addEventListener('click', () => this.exportCaneProFormat());
+
+        // Modal backdrop clicks
+        document.getElementById('vehicle-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) this.hideVehicleModal();
+        });
+        document.getElementById('driver-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) this.hideDriverModal();
+        });
+    }
+
+    showSection(section) {
+        console.log(`Switching to section: ${section}`);
+        
+        // Update navigation
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        const navBtn = document.getElementById(`nav-${section}`);
+        if (navBtn) {
+            navBtn.classList.add('active');
+        } else {
+            console.error(`Navigation button nav-${section} not found`);
+        }
+
+        // Show section
+        document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+        const sectionElement = document.getElementById(`${section}-section`);
+        if (sectionElement) {
+            sectionElement.classList.add('active');
+            console.log(`Section ${section} is now active`);
+        } else {
+            console.error(`Section ${section}-section not found`);
+        }
+
+        if (section === 'dashboard') {
+            this.updateDashboard();
+        } else if (section === 'vehicles') {
+            this.renderVehicleManagement();
+        } else if (section === 'drivers') {
+            this.renderDriverManagement();
+        } else if (section === 'fuel-entry') {
+            // Ensure vehicles are rendered for fuel entry
+            this.renderVehicles();
+            this.renderDrivers();
+        }
+    }
                         FOREIGN KEY (vehicle_id) REFERENCES vehicles (id),
                         FOREIGN KEY (driver_id) REFERENCES drivers (id)
                     );
@@ -757,31 +729,16 @@ class FleetManager {
     }
 
     async renderVehicles() {
-        if (!this.db) {
-            console.error('Database not initialized - showing placeholder message');
-            const tableBody = document.getElementById('vehicle-table-body');
-            if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 2rem; color: #64748b;">Loading vehicles... Please wait for database initialization.</td></tr>';
+        try {
+            const vehicles = await this.fetchVehiclesFromSupabase();
+            if (!vehicles) {
+                console.error('Failed to fetch vehicles from Supabase');
+                return;
             }
-            return;
-        }
 
-        const stmt = this.db.prepare(`
-            SELECT v.*, 
-                   (SELECT MAX(odo_end) FROM fuel_records fr WHERE fr.vehicle_id = v.id AND fr.gauge_broken = 0) as last_odo
-            FROM vehicles v 
-            ORDER BY v.type, v.code
-        `);
-        
-        const vehicles = [];
-        while (stmt.step()) {
-            vehicles.push(stmt.getAsObject());
-        }
-        stmt.free();
-
-        const tableBody = document.getElementById('vehicle-table-body');
-        tableBody.innerHTML = vehicles.map(vehicle => {
-            return `
+            const tableBody = document.getElementById('vehicle-table-body');
+            tableBody.innerHTML = vehicles.map(vehicle => {
+                return `
                 <tr class="clickable vehicle-type-${vehicle.type}" data-id="${vehicle.id}">
                     <td><span class="vehicle-code-colored">${vehicle.code}</span></td>
                     <td>${vehicle.name}</td>
@@ -811,26 +768,24 @@ class FleetManager {
                 this.selectVehicle(vehicleId);
             }
         });
+        } catch (error) {
+            console.error('Error rendering vehicles:', error);
+            const tableBody = document.getElementById('vehicle-table-body');
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading vehicles. Please refresh the page.</td></tr>';
+            }
+        }
     }
 
     async renderDrivers() {
-        if (!this.db) {
-            console.error('Database not initialized - showing placeholder message');
-            const tableBody = document.getElementById('driver-table-body');
-            if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #64748b;">Loading drivers... Please wait for database initialization.</td></tr>';
+        try {
+            const drivers = await this.fetchDriversFromSupabase();
+            if (!drivers) {
+                console.error('Failed to fetch drivers from Supabase');
+                return;
             }
-            return;
-        }
 
-        const stmt = this.db.prepare('SELECT * FROM drivers ORDER BY code');
-        const drivers = [];
-        while (stmt.step()) {
-            drivers.push(stmt.getAsObject());
-        }
-        stmt.free();
-
-        const tableBody = document.getElementById('driver-table-body');
+            const tableBody = document.getElementById('driver-table-body');
         tableBody.innerHTML = drivers.map(driver => `
             <tr class="clickable" data-id="${driver.id}">
                 <td><strong>${driver.code}</strong></td>
@@ -861,24 +816,33 @@ class FleetManager {
                 this.selectDriver(driverId);
             }
         });
+        } catch (error) {
+            console.error('Error rendering drivers:', error);
+            const tableBody = document.getElementById('driver-table-body');
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
+            }
+        }
     }
 
-    selectVehicle(vehicleId) {
+    async selectVehicle(vehicleId) {
         console.log(`Selecting vehicle with ID: ${vehicleId}`);
         
-        if (!this.db) {
-            console.error('Database not available for vehicle selection');
-            alert('Database not ready. Please wait a moment and try again.');
-            return;
-        }
-        
         try {
-            const stmt = this.db.prepare('SELECT * FROM vehicles WHERE id = ?');
-            stmt.bind([vehicleId]);
+            const { data: vehicle, error } = await supabase
+                .from('vehicles')
+                .select('*')
+                .eq('id', vehicleId)
+                .single();
+                
+            if (error) {
+                console.error('Error selecting vehicle:', error);
+                alert('Error selecting vehicle. Please try again.');
+                return;
+            }
             
-            if (stmt.step()) {
-                this.currentVehicle = stmt.getAsObject();
-                console.log('Vehicle selected:', this.currentVehicle);
+            this.currentVehicle = vehicle;
+            console.log('Vehicle selected:', this.currentVehicle);
                 
                 const vehicleInfoElement = document.getElementById('selected-vehicle-info');
                 if (vehicleInfoElement) {
@@ -889,12 +853,24 @@ class FleetManager {
                 } else {
                     console.error('selected-vehicle-info element not found');
                 }
+                
+                // Ensure drivers are rendered before showing driver step
+                this.renderDrivers().then(() => {
+                    this.showStep('driver');
+                });
+                
+        } catch (error) {
+            console.error('Error selecting vehicle:', error);
+            alert('Error selecting vehicle. Please try again.');
+        }
+    }
+
     // --- SUPABASE CRUD METHODS ---
     async fetchVehiclesFromSupabase() {
         const { data, error } = await supabase
             .from('vehicles')
             .select('*')
-            .order('id', { ascending: true });
+            .order('code', { ascending: true });
         if (error) {
             console.error('Error fetching vehicles:', error);
             return [];
@@ -902,14 +878,92 @@ class FleetManager {
         return data;
     }
 
-    async addVehicle(vehicleObj) {
-        const { error } = await supabase.from('vehicles').insert([vehicleObj]);
+    async fetchDriversFromSupabase() {
+        const { data, error } = await supabase
+            .from('drivers')
+            .select('*')
+            .order('code', { ascending: true });
         if (error) {
-            console.error('Error adding vehicle:', error);
-            alert('Error adding vehicle.');
-        } else {
-            alert('Vehicle added!');
-            await this.renderVehicles();
+            console.error('Error fetching drivers:', error);
+            return [];
+        }
+        return data;
+    }
+
+    async fetchFuelEntriesFromSupabase() {
+        const { data, error } = await supabase
+            .from('fuel_entries')
+            .select('*')
+            .order('date', { ascending: false });
+        if (error) {
+            console.error('Error fetching fuel entries:', error);
+            return [];
+        }
+        return data;
+    }
+
+    async selectDriver(driverId) {
+        console.log(`Selecting driver with ID: ${driverId}`);
+        
+        if (!this.currentVehicle) {
+            console.error('No vehicle selected');
+            alert('Please select a vehicle first.');
+            this.showStep('vehicle');
+            return;
+        }
+        
+        try {
+            const { data: driver, error } = await supabase
+                .from('drivers')
+                .select('*')
+                .eq('id', driverId)
+                .single();
+                
+            if (error) {
+                console.error('Error selecting driver:', error);
+                alert('Error selecting driver. Please try again.');
+                return;
+            }
+            
+            this.currentDriver = driver;
+            console.log('Driver selected:', this.currentDriver);
+            
+            const driverInfoElement = document.getElementById('selected-driver-info');
+            if (driverInfoElement) {
+                driverInfoElement.innerHTML = `
+                    <strong>${this.currentDriver.code}</strong> - ${this.currentDriver.name}<br>
+                    <small>${this.currentDriver.license_number || 'No license on file'}</small>
+                `;
+            } else {
+                console.error('selected-driver-info element not found');
+            }
+            
+            // Set default odometer start value to last reading
+            try {
+                const { data: lastRecord, error: odoError } = await supabase
+                    .from('fuel_entries')
+                    .select('odo_end')
+                    .eq('vehicle_id', this.currentVehicle.id)
+                    .eq('gauge_broken', false)
+                    .order('date', { ascending: false })
+                    .limit(1)
+                    .single();
+                    
+                if (!odoError && lastRecord) {
+                    const odoStartElement = document.getElementById('odo-start');
+                    if (odoStartElement) {
+                        odoStartElement.value = lastRecord.odo_end;
+                    }
+                }
+            } catch (odoError) {
+                console.warn('Could not set default odometer value:', odoError);
+            }
+            
+            this.showStep('activity');
+            
+        } catch (error) {
+            console.error('Error selecting driver:', error);
+            alert('Error selecting driver. Please try again.');
         }
     }
 
@@ -1210,8 +1264,8 @@ class FleetManager {
         }
     }
 
-    saveFuelRecord() {
-        console.log('Saving fuel record');
+    async saveFuelRecord() {
+        console.log('Saving fuel record to Supabase');
         
         // Check if we have selected vehicle and driver
         if (!this.currentVehicle) {
@@ -1221,11 +1275,6 @@ class FleetManager {
         
         if (!this.currentDriver) {
             alert('Please select a driver first');
-            return;
-        }
-        
-        if (!this.db) {
-            alert('Database not available. Please refresh the page.');
             return;
         }
         
@@ -1266,31 +1315,37 @@ class FleetManager {
             const distance = odoEnd - odoStart;
             const consumption = gaugeBroken ? 0 : (distance > 0 && litresUsed > 0) ? (litresUsed / distance) * 100 : 0;
 
-            const insertStmt = this.db.prepare(`
-                INSERT INTO fuel_records 
-                (vehicle_id, driver_id, activity, field_name, odo_start, odo_end, distance, litres_used, fuel_consumption, gauge_broken, needs_review, date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `);
+            // Create fuel entry object for Supabase
+            const fuelEntry = {
+                vehicle_id: this.currentVehicle.id,
+                driver_id: this.currentDriver.id,
+                activity: activity,
+                field_name: fieldName,
+                odo_start: odoStart,
+                odo_end: odoEnd,
+                distance: distance,
+                litres_used: litresUsed,
+                fuel_consumption: consumption,
+                gauge_broken: gaugeBroken,
+                needs_review: needsReview,
+                date: date
+            };
 
-            insertStmt.run([
-                this.currentVehicle.id,
-                this.currentDriver.id,
-                activity,
-                fieldName,
-                odoStart,
-                odoEnd,
-                distance,
-                litresUsed,
-                consumption,
-                gaugeBroken ? 1 : 0,
-                needsReview ? 1 : 0,
-                date
-            ]);
+            console.log('Saving to Supabase:', fuelEntry);
 
-            insertStmt.free();
-            this.saveDatabase();
-            
-            console.log('Record saved successfully');
+            // Insert into Supabase
+            const { data, error } = await supabase
+                .from('fuel_entries')
+                .insert([fuelEntry])
+                .select();
+
+            if (error) {
+                console.error('Supabase error:', error);
+                alert('Error saving fuel record to database: ' + error.message);
+                return;
+            }
+
+            console.log('Record saved successfully to Supabase:', data);
             
             const message = needsReview ? 
                 'Fuel record saved and flagged for review!' : 
@@ -1979,54 +2034,97 @@ class FleetManager {
     }
 
     // Export functionality
-    exportMonthlyReport() {
+    async exportMonthlyReport() {
         const currentDate = new Date();
         const currentMonth = currentDate.getMonth() + 1;
         const currentYear = currentDate.getFullYear();
         
-        const stmt = this.db.prepare(`
-            SELECT 
-                fr.*, v.code as vehicle_code, v.name as vehicle_name, v.make, v.model, v.year, v.registration,
-                d.code as driver_code, d.name as driver_name
-            FROM fuel_records fr
-            JOIN vehicles v ON fr.vehicle_id = v.id
-            JOIN drivers d ON fr.driver_id = d.id
-            WHERE strftime('%Y', fr.date) = ? AND strftime('%m', fr.date) = ?
-            ORDER BY fr.date
-        `);
-        stmt.bind([currentYear.toString(), currentMonth.toString().padStart(2, '0')]);
-        
-        const records = [];
-        while (stmt.step()) {
-            records.push(stmt.getAsObject());
-        }
-        stmt.free();
+        try {
+            // Get start and end of current month
+            const startDate = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`;
+            const endDate = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0]; // Last day of month
+            
+            const { data: records, error } = await supabase
+                .from('fuel_entries')
+                .select(`
+                    *,
+                    vehicles (code, name, make, model, year, registration),
+                    drivers (code, name)
+                `)
+                .gte('date', startDate)
+                .lte('date', endDate)
+                .order('date', { ascending: true });
 
-        this.generateSARSReport(records, 'monthly', currentYear, currentMonth);
+            if (error) {
+                console.error('Error fetching monthly data:', error);
+                alert('Error generating monthly report: ' + error.message);
+                return;
+            }
+
+            // Transform data to match expected format
+            const transformedRecords = records.map(record => ({
+                ...record,
+                vehicle_code: record.vehicles.code,
+                vehicle_name: record.vehicles.name,
+                make: record.vehicles.make,
+                model: record.vehicles.model,
+                year: record.vehicles.year,
+                registration: record.vehicles.registration,
+                driver_code: record.drivers.code,
+                driver_name: record.drivers.name
+            }));
+
+            this.generateSARSReport(transformedRecords, 'monthly', currentYear, currentMonth);
+            
+        } catch (error) {
+            console.error('Error in monthly export:', error);
+            alert('Error generating monthly report: ' + error.message);
+        }
     }
 
-    exportAnnualReport() {
+    async exportAnnualReport() {
         const currentYear = new Date().getFullYear();
         
-        const stmt = this.db.prepare(`
-            SELECT 
-                fr.*, v.code as vehicle_code, v.name as vehicle_name, v.make, v.model, v.year, v.registration,
-                d.code as driver_code, d.name as driver_name
-            FROM fuel_records fr
-            JOIN vehicles v ON fr.vehicle_id = v.id
-            JOIN drivers d ON fr.driver_id = d.id
-            WHERE strftime('%Y', fr.date) = ?
-            ORDER BY fr.date
-        `);
-        stmt.bind([currentYear.toString()]);
-        
-        const records = [];
-        while (stmt.step()) {
-            records.push(stmt.getAsObject());
-        }
-        stmt.free();
+        try {
+            const startDate = `${currentYear}-01-01`;
+            const endDate = `${currentYear}-12-31`;
+            
+            const { data: records, error } = await supabase
+                .from('fuel_entries')
+                .select(`
+                    *,
+                    vehicles (code, name, make, model, year, registration),
+                    drivers (code, name)
+                `)
+                .gte('date', startDate)
+                .lte('date', endDate)
+                .order('date', { ascending: true });
 
-        this.generateSARSReport(records, 'annual', currentYear);
+            if (error) {
+                console.error('Error fetching annual data:', error);
+                alert('Error generating annual report: ' + error.message);
+                return;
+            }
+
+            // Transform data to match expected format
+            const transformedRecords = records.map(record => ({
+                ...record,
+                vehicle_code: record.vehicles.code,
+                vehicle_name: record.vehicles.name,
+                make: record.vehicles.make,
+                model: record.vehicles.model,
+                year: record.vehicles.year,
+                registration: record.vehicles.registration,
+                driver_code: record.drivers.code,
+                driver_name: record.drivers.name
+            }));
+
+            this.generateSARSReport(transformedRecords, 'annual', currentYear);
+            
+        } catch (error) {
+            console.error('Error in annual export:', error);
+            alert('Error generating annual report: ' + error.message);
+        }
     }
 
     generateSARSReport(records, type, year, month = null) {
@@ -2144,35 +2242,53 @@ class FleetManager {
     }
 
     // CanePro Export Functionality
-    exportCaneProFormat() {
+    async exportCaneProFormat() {
         const currentDate = new Date();
         const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString().split('T')[0];
         const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split('T')[0];
         
-        const stmt = this.db.prepare(`
-            SELECT 
-                fr.*, v.code as vehicle_code, v.name as vehicle_name, v.make, v.model, v.year, v.registration,
-                d.code as driver_code, d.name as driver_name
-            FROM fuel_records fr
-            JOIN vehicles v ON fr.vehicle_id = v.id
-            JOIN drivers d ON fr.driver_id = d.id
-            WHERE fr.date BETWEEN ? AND ?
-            ORDER BY fr.date ASC
-        `);
-        stmt.bind([startOfMonth, endOfMonth]);
-        
-        const records = [];
-        while (stmt.step()) {
-            records.push(stmt.getAsObject());
-        }
-        stmt.free();
+        try {
+            const { data: records, error } = await supabase
+                .from('fuel_entries')
+                .select(`
+                    *,
+                    vehicles (code, name, make, model, year, registration),
+                    drivers (code, name)
+                `)
+                .gte('date', startOfMonth)
+                .lte('date', endOfMonth)
+                .order('date', { ascending: true });
 
-        if (records.length === 0) {
-            alert('No records found for current month');
-            return;
-        }
+            if (error) {
+                console.error('Error fetching CanePro data:', error);
+                alert('Error generating CanePro export: ' + error.message);
+                return;
+            }
 
-        this.generateCaneProExcel(records);
+            if (records.length === 0) {
+                alert('No records found for current month');
+                return;
+            }
+
+            // Transform data to match expected format
+            const transformedRecords = records.map(record => ({
+                ...record,
+                vehicle_code: record.vehicles.code,
+                vehicle_name: record.vehicles.name,
+                make: record.vehicles.make,
+                model: record.vehicles.model,
+                year: record.vehicles.year,
+                registration: record.vehicles.registration,
+                driver_code: record.drivers.code,
+                driver_name: record.drivers.name
+            }));
+
+            this.generateCaneProExcel(transformedRecords);
+            
+        } catch (error) {
+            console.error('Error in CanePro export:', error);
+            alert('Error generating CanePro export: ' + error.message);
+        }
     }
 
     generateCaneProExcel(records) {
