@@ -1,15 +1,22 @@
 // --- Supabase config fetched from Netlify function ---
 async function getSupabaseConfig() {
+  console.log('Fetching Supabase config from Netlify function...');
   const res = await fetch('/.netlify/functions/config');
-  if (!res.ok) throw new Error('Failed to load Supabase config');
-  return res.json();
+  console.log('Netlify function response status:', res.status);
+  if (!res.ok) throw new Error(`Failed to load Supabase config: ${res.status} ${res.statusText}`);
+  const config = await res.json();
+  console.log('Supabase config loaded successfully');
+  return config;
 }
 
 (async () => {
+  console.log('Starting app initialization...');
   try {
     const config = await getSupabaseConfig();
+    console.log('Creating Supabase client...');
     const supabaseClient = window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
     window.supabaseClient = supabaseClient; // Make it globally accessible
+    console.log('Supabase client created and stored globally');
 
     // Fleet Manager - Minimal design with enhanced functionality
     class FleetManager {
