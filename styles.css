@@ -937,62 +937,86 @@ input[readonly] {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
 }
 
-/* Mobile Column Widths */
+/* Mobile Table Layout */
 @media (max-width: 768px) {
-    /* Vehicle table columns */
+    .table-container {
+        margin: 0.5rem 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .table {
+        min-width: 100%;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem 0.25rem;
+        vertical-align: middle;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* Vehicle table columns - fixed widths */
+    #vehicles-management-table {
+        min-width: 500px;
+    }
+    
     #vehicles-management-table th:nth-child(1), /* Code */
     #vehicles-management-table td:nth-child(1) {
-        width: 20%;
-        min-width: 70px;
+        width: 60px;
     }
     
     #vehicles-management-table th:nth-child(2), /* Type */
     #vehicles-management-table td:nth-child(2) {
-        width: 25%;
-        min-width: 90px;
+        width: 120px;
     }
     
     #vehicles-management-table th:nth-child(3), /* Name */
     #vehicles-management-table td:nth-child(3) {
-        width: 35%;
-        min-width: 120px;
+        width: 200px;
     }
     
     #vehicles-management-table th:nth-child(4), /* ODO */
     #vehicles-management-table td:nth-child(4) {
-        width: 15%;
-        min-width: 80px;
+        width: 80px;
+        text-align: right;
     }
     
     #vehicles-management-table th:nth-child(5), /* Delete */
     #vehicles-management-table td:nth-child(5) {
-        width: 5%;
-        min-width: 48px;
+        width: 40px;
+        text-align: center;
     }
     
-    /* Driver table columns */
+    /* Driver table columns - fixed widths */
+    #drivers-management-table {
+        min-width: 400px;
+    }
+    
     #drivers-management-table th:nth-child(1), /* Code */
     #drivers-management-table td:nth-child(1) {
-        width: 25%;
-        min-width: 80px;
+        width: 60px;
     }
     
     #drivers-management-table th:nth-child(2), /* Name */
     #drivers-management-table td:nth-child(2) {
-        width: 45%;
-        min-width: 120px;
+        width: 200px;
     }
     
     #drivers-management-table th:nth-child(3), /* License */
     #drivers-management-table td:nth-child(3) {
-        width: 25%;
-        min-width: 80px;
+        width: 100px;
     }
     
     #drivers-management-table th:nth-child(4), /* Delete */
     #drivers-management-table td:nth-child(4) {
-        width: 5%;
-        min-width: 48px;
+        width: 40px;
+        text-align: center;
     }
 }
 
