@@ -800,7 +800,6 @@ async function getSupabaseConfig() {
     // Vehicle Management Methods
     async renderVehicleManagement() {
         try {
-            console.log('renderVehicleManagement called');
             const vehicles = await this.fetchVehiclesFromSupabase();
             const tableBody = document.getElementById('vehicles-management-body');
             
@@ -808,8 +807,6 @@ async function getSupabaseConfig() {
                 console.error('Vehicle management table body not found');
                 return;
             }
-            
-            console.log('vehicles fetched:', vehicles);
 
             if (vehicles.length === 0) {
                 tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No vehicles found. Tap + to add.</td></tr>';
@@ -840,7 +837,6 @@ async function getSupabaseConfig() {
                 })
             );
 
-            console.log('About to render vehicle table with', vehiclesWithOdo.length, 'vehicles');
             tableBody.innerHTML = vehiclesWithOdo.map(vehicle => `
                 <tr data-id="${vehicle.id}" class="mobile-row">
                     <td class="editable-cell mobile-cell" data-field="code" data-type="text">${vehicle.code || ''}</td>
@@ -854,7 +850,6 @@ async function getSupabaseConfig() {
                     </td>
                 </tr>
             `).join('');
-            console.log('Vehicle table rendered');
 
             // Add inline editing event listeners
             this.setupInlineEditing('vehicles');
