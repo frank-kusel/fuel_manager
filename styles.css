@@ -937,97 +937,119 @@ input[readonly] {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
 }
 
-/* Mobile Table Layout - Clean and Minimal */
+/* Mobile Table Layout - Truly Responsive */
 @media (max-width: 768px) {
     .table-container {
         margin: 0.5rem 0;
         background: white;
         border-radius: 8px;
         border: 1px solid var(--gray-200);
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+        overflow: hidden;
     }
     
     .table {
-        font-size: 14px;
-        min-width: 100%;
+        width: 100%;
+        font-size: 12px;
+        border-collapse: collapse;
+        table-layout: fixed;
     }
     
     .table th,
     .table td {
-        padding: 0.75rem 0.5rem;
-        white-space: nowrap;
+        padding: 0.5rem 0.25rem;
         vertical-align: middle;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
     }
     
     .table th {
-        font-size: 0.75rem;
+        font-size: 0.65rem;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
         font-weight: 600;
         color: var(--gray-600);
         background: var(--gray-50);
+        border-bottom: 1px solid var(--gray-200);
     }
     
-    /* Management tables - minimal and compact */
-    #vehicles-management-table,
-    #drivers-management-table {
-        min-width: 500px;
+    .table td {
+        border-bottom: 1px solid var(--gray-100);
     }
     
+    /* Vehicle Management Table Mobile */
     #vehicles-management-table th:nth-child(1),
     #vehicles-management-table td:nth-child(1) { /* Code */
-        width: 80px;
+        width: 15%;
         font-weight: 600;
         color: var(--primary);
     }
     
     #vehicles-management-table th:nth-child(2),
     #vehicles-management-table td:nth-child(2) { /* Type */
-        width: 120px;
+        width: 25%;
+        font-size: 10px;
     }
     
     #vehicles-management-table th:nth-child(3),
     #vehicles-management-table td:nth-child(3) { /* Name */
-        width: 180px;
+        width: 35%;
         font-weight: 500;
     }
     
     #vehicles-management-table th:nth-child(4),
     #vehicles-management-table td:nth-child(4) { /* ODO */
-        width: 80px;
+        width: 15%;
         text-align: right;
         font-weight: 600;
+        font-size: 11px;
     }
     
     #vehicles-management-table th:nth-child(5),
     #vehicles-management-table td:nth-child(5) { /* Delete */
-        width: 40px;
+        width: 10%;
         text-align: center;
+        padding: 0.25rem;
     }
     
+    /* Driver Management Table Mobile */
     #drivers-management-table th:nth-child(1),
     #drivers-management-table td:nth-child(1) { /* Code */
-        width: 80px;
+        width: 20%;
         font-weight: 600;
         color: var(--primary);
     }
     
     #drivers-management-table th:nth-child(2),
     #drivers-management-table td:nth-child(2) { /* Name */
-        width: 200px;
+        width: 45%;
         font-weight: 500;
     }
     
     #drivers-management-table th:nth-child(3),
     #drivers-management-table td:nth-child(3) { /* License */
-        width: 120px;
+        width: 25%;
+        font-size: 11px;
     }
     
     #drivers-management-table th:nth-child(4),
     #drivers-management-table td:nth-child(4) { /* Delete */
-        width: 40px;
+        width: 10%;
         text-align: center;
+        padding: 0.25rem;
+    }
+    
+    /* Make type badges smaller on mobile */
+    .type-badge {
+        font-size: 8px;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+    
+    /* Smaller delete buttons on mobile */
+    .delete-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
     }
 }
 
