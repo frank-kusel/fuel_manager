@@ -210,16 +210,12 @@
                         <button id="add-vehicle" class="btn btn-primary">+ Add Vehicle</button>
                     </div>
                     <div class="table-container">
-                        <table class="table" id="vehicles-management-table">
+                        <table class="table compact-table" id="vehicles-management-table">
                             <thead>
                                 <tr>
-                                    <th>Type</th>
                                     <th>Code</th>
                                     <th>Name</th>
-                                    <th>Make/Model</th>
-                                    <th>Registration</th>
-                                    <th>Current ODO</th>
-                                    <th>Records</th>
+                                    <th>Type</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -239,13 +235,12 @@
                         <button id="add-driver" class="btn btn-primary">+ Add Driver</button>
                     </div>
                     <div class="table-container">
-                        <table class="table" id="drivers-management-table">
+                        <table class="table compact-table" id="drivers-management-table">
                             <thead>
                                 <tr>
                                     <th>Code</th>
                                     <th>Name</th>
                                     <th>License</th>
-                                    <th>Records</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -341,114 +336,6 @@
             </section>
         </main>
 
-        <!-- Vehicle Modal -->
-        <div id="vehicle-modal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 id="vehicle-modal-title">Add Vehicle</h3>
-                    <button class="modal-close" id="close-vehicle-modal">&times;</button>
-                </div>
-                <form id="vehicle-form" class="modal-form">
-                    <input type="hidden" id="vehicle-id">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="vehicle-code">Vehicle Code *</label>
-                            <input type="text" id="vehicle-code" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="vehicle-name">Vehicle Name *</label>
-                            <input type="text" id="vehicle-name" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="vehicle-make">Make *</label>
-                            <input type="text" id="vehicle-make" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="vehicle-model">Model *</label>
-                            <input type="text" id="vehicle-model" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="vehicle-year">Year *</label>
-                            <input type="number" id="vehicle-year" required min="1980" max="2030">
-                        </div>
-                        <div class="form-group">
-                            <label for="vehicle-registration">Registration Number *</label>
-                            <input type="text" id="vehicle-registration" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="vehicle-value">Vehicle Value (R)</label>
-                            <input type="number" id="vehicle-value" min="0" step="1000">
-                        </div>
-                        <div class="form-group">
-                            <label for="current-odo">Current Odometer (km)</label>
-                            <input type="number" id="current-odo" min="0" step="0.1">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="vehicle-type">Vehicle Type *</label>
-                        <select id="vehicle-type" required>
-                            <option value="">Select vehicle type</option>
-                            <option value="tractor">Tractor</option>
-                            <option value="bakkie">Bakkie</option>
-                            <option value="truck">Truck</option>
-                            <option value="loader">Loader</option>
-                            <option value="utility">Utility Vehicle</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="vehicle-description">Description</label>
-                        <textarea id="vehicle-description" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="license-details">License Details</label>
-                        <textarea id="license-details" rows="2"></textarea>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-secondary" id="cancel-vehicle">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Vehicle</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Driver Modal -->
-        <div id="driver-modal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 id="driver-modal-title">Add Driver</h3>
-                    <button class="modal-close" id="close-driver-modal">&times;</button>
-                </div>
-                <form id="driver-form" class="modal-form">
-                    <input type="hidden" id="driver-id">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="driver-code-input">Driver Code *</label>
-                            <input type="text" id="driver-code-input" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="driver-name-input">Full Name *</label>
-                            <input type="text" id="driver-name-input" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="driver-license">License Number</label>
-                        <input type="text" id="driver-license">
-                    </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-secondary" id="cancel-driver">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Driver</button>
-                    </div>
-                </form>
-            </div>
-        </div>
     </div>
 
     <script src="app.js?v=3"></script>

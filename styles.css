@@ -677,3 +677,66 @@ input[readonly] {
         border: 1px solid var(--gray-300);
     }
 }
+
+/* Compact Table and Inline Editing Styles */
+.compact-table {
+    font-size: 14px;
+}
+
+.compact-table th,
+.compact-table td {
+    padding: 8px 12px !important;
+    text-align: left;
+}
+
+.compact-table .editable-cell {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    min-width: 80px;
+}
+
+.compact-table .editable-cell:hover {
+    background-color: var(--gray-100);
+}
+
+.compact-table .editable-cell.editing {
+    background-color: var(--primary-light);
+    color: white;
+}
+
+.inline-edit-input {
+    width: 100% !important;
+    border: 2px solid var(--primary) !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    font-size: 14px !important;
+    font-family: inherit !important;
+    background: white !important;
+    color: var(--gray-900) !important;
+}
+
+.inline-edit-input:focus {
+    outline: none !important;
+    border-color: var(--primary-dark) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+}
+
+/* Action buttons in compact table */
+.compact-table .btn-small {
+    padding: 4px 8px !important;
+    font-size: 16px !important;
+    border: none !important;
+    background: transparent !important;
+    cursor: pointer !important;
+    border-radius: 4px !important;
+    transition: background-color 0.2s ease !important;
+}
+
+.compact-table .btn-small:hover {
+    background-color: var(--gray-200) !important;
+}
+
+.compact-table .btn-error:hover {
+    background-color: var(--error) !important;
+    color: white !important;
+}

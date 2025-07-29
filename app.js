@@ -140,16 +140,10 @@ async function getSupabaseConfig() {
         }
 
         // Vehicle management
-        document.getElementById('add-vehicle').addEventListener('click', () => this.showVehicleModal());
-        document.getElementById('vehicle-form').addEventListener('submit', (e) => this.handleVehicleFormSubmit(e));
-        document.getElementById('close-vehicle-modal').addEventListener('click', () => this.hideVehicleModal());
-        document.getElementById('cancel-vehicle').addEventListener('click', () => this.hideVehicleModal());
+        document.getElementById('add-vehicle').addEventListener('click', () => this.addNewVehicle());
 
         // Driver management
-        document.getElementById('add-driver').addEventListener('click', () => this.showDriverModal());
-        document.getElementById('driver-form').addEventListener('submit', (e) => this.handleDriverFormSubmit(e));
-        document.getElementById('close-driver-modal').addEventListener('click', () => this.hideDriverModal());
-        document.getElementById('cancel-driver').addEventListener('click', () => this.hideDriverModal());
+        document.getElementById('add-driver').addEventListener('click', () => this.addNewDriver());
 
         // Fuel consumption calculation and gauge broken functionality
         document.getElementById('odo-start').addEventListener('input', () => this.calculateConsumption());
@@ -162,13 +156,6 @@ async function getSupabaseConfig() {
         document.getElementById('export-annual').addEventListener('click', () => this.exportAnnualReport());
         document.getElementById('export-canepro').addEventListener('click', () => this.exportCaneProFormat());
 
-        // Modal backdrop clicks
-        document.getElementById('vehicle-modal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) this.hideVehicleModal();
-        });
-        document.getElementById('driver-modal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) this.hideDriverModal();
-        });
     }
 
     showSection(section) {
@@ -823,46 +810,28 @@ async function getSupabaseConfig() {
             }
 
             if (vehicles.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">No vehicles found. Add a vehicle to get started.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">No vehicles found. Add a vehicle to get started.</td></tr>';
                 return;
             }
 
-            const vehiclesWithStats = await Promise.all(
-                vehicles.map(async (vehicle) => {
-                    const { data: records, error } = await window.supabaseClient
-                        .from('fuel_entries')
-                        .select('*')
-                        .eq('vehicle_id', vehicle.id);
-                    
-                    const recordCount = error ? 0 : records.length;
-                    const lastRecord = records && records.length > 0 ? 
-                        records.sort((a, b) => new Date(b.date) - new Date(a.date))[0] : null;
-                    const currentOdo = lastRecord ? lastRecord.odo_end : (vehicle.current_odo || 0);
-
-                    return { ...vehicle, recordCount, currentOdo };
-                })
-            );
-
-            tableBody.innerHTML = vehiclesWithStats.map(vehicle => `
-                <tr>
-                    <td>${this.getVehicleTypeIcon(vehicle.type)}</td>
-                    <td><strong>${vehicle.code}</strong></td>
-                    <td>${vehicle.name}</td>
-                    <td>${vehicle.make} ${vehicle.model} (${vehicle.year})</td>
-                    <td>${vehicle.registration}</td>
-                    <td>${vehicle.currentOdo.toFixed(1)} km</td>
-                    <td><span class="badge">${vehicle.recordCount}</span></td>
+            tableBody.innerHTML = vehicles.map(vehicle => `
+                <tr data-id="${vehicle.id}">
+                    <td class="editable-cell" data-field="code" data-type="text">${vehicle.code}</td>
+                    <td class="editable-cell" data-field="name" data-type="text">${vehicle.name}</td>
+                    <td class="editable-cell" data-field="type" data-type="select" data-options="tractor,bakkie,truck,loader,utility,other">${vehicle.type}</td>
                     <td>
-                        <button class="btn btn-small btn-warning" onclick="app.editVehicle(${vehicle.id})">Edit</button>
-                        <button class="btn btn-small btn-error" onclick="app.deleteVehicle(${vehicle.id})">Delete</button>
+                        <button class="btn btn-small btn-error" onclick="app.deleteVehicle(${vehicle.id})" title="Delete">🗑️</button>
                     </td>
                 </tr>
             `).join('');
+
+            // Add inline editing event listeners
+            this.setupInlineEditing('vehicles');
         } catch (error) {
             console.error('Error rendering vehicle management:', error);
             const tableBody = document.getElementById('vehicles-management-body');
             if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading vehicles. Please refresh the page.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading vehicles. Please refresh the page.</td></tr>';
             }
         }
     }
@@ -883,40 +852,221 @@ async function getSupabaseConfig() {
                 return;
             }
 
-            const driversWithStats = await Promise.all(
-                drivers.map(async (driver) => {
-                    const { data: records, error } = await window.supabaseClient
-                        .from('fuel_entries')
-                        .select('*')
-                        .eq('driver_id', driver.id);
-                    
-                    const recordCount = error ? 0 : records.length;
-                    return { ...driver, recordCount };
-                })
-            );
-
-            tableBody.innerHTML = driversWithStats.map(driver => `
-                <tr>
-                    <td><strong>${driver.code}</strong></td>
-                    <td>${driver.name}</td>
-                    <td>${driver.license || 'N/A'}</td>
-                    <td><span class="badge">${driver.recordCount}</span></td>
+            tableBody.innerHTML = drivers.map(driver => `
+                <tr data-id="${driver.id}">
+                    <td class="editable-cell" data-field="code" data-type="text">${driver.code}</td>
+                    <td class="editable-cell" data-field="name" data-type="text">${driver.name}</td>
+                    <td class="editable-cell" data-field="license" data-type="text">${driver.license || ''}</td>
                     <td>
-                        <button class="btn btn-small btn-warning" onclick="app.editDriver(${driver.id})">Edit</button>
-                        <button class="btn btn-small btn-error" onclick="app.deleteDriver(${driver.id})">Delete</button>
+                        <button class="btn btn-small btn-error" onclick="app.deleteDriver(${driver.id})" title="Delete">🗑️</button>
                     </td>
                 </tr>
             `).join('');
+
+            // Add inline editing event listeners
+            this.setupInlineEditing('drivers');
         } catch (error) {
             console.error('Error rendering driver management:', error);
             const tableBody = document.getElementById('drivers-management-body');
             if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
             }
         }
     }
 
-    // Vehicle Modal Methods
+    // Inline Editing Methods
+    setupInlineEditing(tableType) {
+        const tableBody = document.getElementById(`${tableType}-management-body`);
+        if (!tableBody) return;
+
+        // Remove existing listeners to prevent duplicates
+        const newTableBody = tableBody.cloneNode(true);
+        tableBody.parentNode.replaceChild(newTableBody, tableBody);
+
+        newTableBody.addEventListener('click', (e) => {
+            const cell = e.target.closest('.editable-cell');
+            if (cell && !cell.querySelector('input, select')) {
+                this.startInlineEdit(cell, tableType);
+            }
+        });
+    }
+
+    startInlineEdit(cell, tableType) {
+        const originalValue = cell.textContent.trim();
+        const field = cell.dataset.field;
+        const type = cell.dataset.type;
+        const rowId = cell.closest('tr').dataset.id;
+
+        let input;
+        if (type === 'select') {
+            input = document.createElement('select');
+            const options = cell.dataset.options.split(',');
+            options.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option;
+                optionElement.textContent = option.charAt(0).toUpperCase() + option.slice(1);
+                if (option === originalValue) {
+                    optionElement.selected = true;
+                }
+                input.appendChild(optionElement);
+            });
+        } else {
+            input = document.createElement('input');
+            input.type = 'text';
+            input.value = originalValue;
+        }
+
+        input.className = 'inline-edit-input';
+        input.style.width = '100%';
+        input.style.border = '1px solid #ccc';
+        input.style.padding = '4px';
+        input.style.borderRadius = '4px';
+
+        // Replace cell content with input
+        cell.innerHTML = '';
+        cell.appendChild(input);
+        input.focus();
+        if (input.type === 'text') {
+            input.select();
+        }
+
+        // Handle save on blur or Enter
+        const saveEdit = async () => {
+            const newValue = input.value.trim();
+            if (newValue !== originalValue && newValue !== '') {
+                const success = await this.saveInlineEdit(tableType, rowId, field, newValue);
+                if (success) {
+                    cell.textContent = newValue;
+                } else {
+                    cell.textContent = originalValue;
+                }
+            } else {
+                cell.textContent = originalValue;
+            }
+        };
+
+        const cancelEdit = () => {
+            cell.textContent = originalValue;
+        };
+
+        input.addEventListener('blur', saveEdit);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                input.blur();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEdit();
+            }
+        });
+    }
+
+    async saveInlineEdit(tableType, id, field, value) {
+        try {
+            const { error } = await window.supabaseClient
+                .from(tableType)
+                .update({ [field]: value })
+                .eq('id', id);
+
+            if (error) {
+                console.error(`Error updating ${tableType}:`, error);
+                alert(`Error updating ${tableType.slice(0, -1)}: ${error.message}`);
+                return false;
+            }
+
+            // Invalidate cache to ensure fresh data
+            this.invalidateCache();
+            
+            // Also refresh the fuel entry tables if they're showing
+            if (tableType === 'vehicles') {
+                this.renderVehicles();
+            } else if (tableType === 'drivers') {
+                this.renderDrivers();
+            }
+
+            return true;
+        } catch (error) {
+            console.error(`Error saving ${tableType} edit:`, error);
+            alert(`Error saving changes. Please try again.`);
+            return false;
+        }
+    }
+
+    // Add New Item Methods
+    async addNewVehicle() {
+        const code = prompt('Enter vehicle code:');
+        if (!code || !code.trim()) return;
+
+        const name = prompt('Enter vehicle name:');
+        if (!name || !name.trim()) return;
+
+        const type = prompt('Enter vehicle type (tractor/bakkie/truck/loader/utility/other):');
+        if (!type || !type.trim()) return;
+
+        const vehicleData = {
+            code: code.trim(),
+            name: name.trim(),
+            type: type.trim().toLowerCase()
+        };
+
+        try {
+            const { error } = await window.supabaseClient
+                .from('vehicles')
+                .insert([vehicleData]);
+
+            if (error) {
+                console.error('Error adding vehicle:', error);
+                alert('Error adding vehicle: ' + error.message);
+                return;
+            }
+
+            alert('Vehicle added successfully!');
+            this.invalidateCache();
+            await this.renderVehicleManagement();
+            await this.renderVehicles();
+        } catch (error) {
+            console.error('Error adding vehicle:', error);
+            alert('Error adding vehicle. Please try again.');
+        }
+    }
+
+    async addNewDriver() {
+        const code = prompt('Enter driver code:');
+        if (!code || !code.trim()) return;
+
+        const name = prompt('Enter driver name:');
+        if (!name || !name.trim()) return;
+
+        const license = prompt('Enter license number (optional):');
+
+        const driverData = {
+            code: code.trim(),
+            name: name.trim(),
+            license: license ? license.trim() : null
+        };
+
+        try {
+            const { error } = await window.supabaseClient
+                .from('drivers')
+                .insert([driverData]);
+
+            if (error) {
+                console.error('Error adding driver:', error);
+                alert('Error adding driver: ' + error.message);
+                return;
+            }
+
+            alert('Driver added successfully!');
+            this.invalidateCache();
+            await this.renderDriverManagement();
+            await this.renderDrivers();
+        } catch (error) {
+            console.error('Error adding driver:', error);
+            alert('Error adding driver. Please try again.');
+        }
+    }
+
+    // Vehicle Modal Methods (DEPRECATED - keeping for compatibility)
     showVehicleModal(vehicleId = null) {
         const modal = document.getElementById('vehicle-modal');
         const title = document.getElementById('vehicle-modal-title');
