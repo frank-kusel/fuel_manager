@@ -283,9 +283,9 @@ async function getSupabaseConfig() {
             tableBody.innerHTML = vehicles.map(vehicle => {
                 return `
                 <tr class="clickable vehicle-type-${vehicle.type}" data-id="${vehicle.id}">
-                    <td><span class="vehicle-code-colored">${vehicle.code}</span></td>
-                    <td>${vehicle.name}</td>
-                    <td>${vehicle.registration}</td>
+                    <td><span class="vehicle-code-colored">${vehicle.code || ''}</span></td>
+                    <td>${vehicle.name || ''}</td>
+                    <td>${vehicle.registration || '-'}</td>
                 </tr>
             `;
         }).join('');
