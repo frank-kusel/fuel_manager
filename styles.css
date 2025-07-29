@@ -958,9 +958,6 @@ input[readonly] {
     .table td {
         padding: 0.5rem 0.25rem;
         vertical-align: middle;
-        text-overflow: ellipsis;
-        overflow: hidden;
-        white-space: nowrap;
     }
     
     .table th {
@@ -979,34 +976,32 @@ input[readonly] {
     /* Vehicle Management Table Mobile */
     #vehicles-management-table th:nth-child(1),
     #vehicles-management-table td:nth-child(1) { /* Code */
-        width: 15%;
+        width: 18%;
         font-weight: 600;
         color: var(--primary);
     }
     
     #vehicles-management-table th:nth-child(2),
     #vehicles-management-table td:nth-child(2) { /* Type */
-        width: 25%;
-        font-size: 10px;
+        width: 30%;
     }
     
     #vehicles-management-table th:nth-child(3),
     #vehicles-management-table td:nth-child(3) { /* Name */
-        width: 35%;
+        width: 32%;
         font-weight: 500;
     }
     
     #vehicles-management-table th:nth-child(4),
     #vehicles-management-table td:nth-child(4) { /* ODO */
-        width: 15%;
+        width: 12%;
         text-align: right;
         font-weight: 600;
-        font-size: 11px;
     }
     
     #vehicles-management-table th:nth-child(5),
     #vehicles-management-table td:nth-child(5) { /* Delete */
-        width: 10%;
+        width: 8%;
         text-align: center;
         padding: 0.25rem;
     }
@@ -1038,10 +1033,10 @@ input[readonly] {
         padding: 0.25rem;
     }
     
-    /* Make type badges smaller on mobile */
+    /* Mobile type badges */
     .type-badge {
-        font-size: 8px;
-        padding: 2px 6px;
+        font-size: 10px;
+        padding: 3px 6px;
         border-radius: 4px;
     }
     
