@@ -678,6 +678,147 @@ input[readonly] {
     }
 }
 
+/* Mobile-First Responsive Design */
+@media (max-width: 768px) {
+    body {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    .container {
+        padding: 0.5rem;
+    }
+    
+    .header {
+        padding: 0.75rem 0;
+    }
+    
+    .nav {
+        gap: 0.5rem;
+        padding: 0 0.5rem;
+    }
+    
+    .nav-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+        min-width: auto;
+    }
+    
+    .section-header {
+        margin-bottom: 1rem;
+    }
+    
+    .section-header h2 {
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Mobile Table Styles */
+.mobile-table {
+    font-size: 14px;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.mobile-table th,
+.mobile-table td {
+    padding: 0.5rem 0.25rem !important;
+    text-align: left;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.mobile-table th {
+    background-color: var(--gray-50);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--gray-600);
+    letter-spacing: 0.025em;
+}
+
+.mobile-row:nth-child(even) {
+    background-color: var(--gray-50);
+}
+
+.mobile-row:hover {
+    background-color: var(--gray-100);
+}
+
+.mobile-cell {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.mobile-cell:hover {
+    background-color: var(--primary-light);
+    color: white;
+    border-radius: 4px;
+}
+
+.mobile-cell:active {
+    transform: scale(0.98);
+}
+
+/* Type Badge Styles */
+.type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.type-tractor { background-color: #dcfce7; color: #166534; }
+.type-bakkie { background-color: #dbeafe; color: #1e40af; }
+.type-truck { background-color: #fef3c7; color: #92400e; }
+.type-loader { background-color: #f3e8ff; color: #7c3aed; }
+.type-utility { background-color: #fce7f3; color: #be185d; }
+.type-other { background-color: var(--gray-200); color: var(--gray-700); }
+
+/* ODO Cell Styles */
+.odo-cell {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: var(--gray-600);
+    text-align: right;
+}
+
+/* Delete Button Styles */
+.delete-cell {
+    width: 32px;
+    text-align: center;
+}
+
+.delete-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    color: var(--gray-400);
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.delete-btn:hover {
+    background-color: var(--error);
+    color: white;
+    transform: scale(1.1);
+}
+
+.delete-btn:active {
+    transform: scale(0.95);
+}
+
 /* Compact Table and Inline Editing Styles */
 .compact-table {
     font-size: 14px;
@@ -692,7 +833,7 @@ input[readonly] {
 .compact-table .editable-cell {
     cursor: pointer;
     transition: background-color 0.2s ease;
-    min-width: 80px;
+    min-width: 60px;
 }
 
 .compact-table .editable-cell:hover {
@@ -721,22 +862,226 @@ input[readonly] {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
 }
 
-/* Action buttons in compact table */
-.compact-table .btn-small {
-    padding: 4px 8px !important;
-    font-size: 16px !important;
-    border: none !important;
-    background: transparent !important;
-    cursor: pointer !important;
-    border-radius: 4px !important;
-    transition: background-color 0.2s ease !important;
+/* Mobile Column Widths */
+@media (max-width: 768px) {
+    .mobile-table th:nth-child(1), /* Code */
+    .mobile-table td:nth-child(1) {
+        width: 15%;
+        min-width: 60px;
+    }
+    
+    .mobile-table th:nth-child(2), /* Type */
+    .mobile-table td:nth-child(2) {
+        width: 20%;
+        min-width: 70px;
+    }
+    
+    .mobile-table th:nth-child(3), /* Name */
+    .mobile-table td:nth-child(3) {
+        width: 40%;
+        min-width: 120px;
+    }
+    
+    .mobile-table th:nth-child(4), /* ODO/License */
+    .mobile-table td:nth-child(4) {
+        width: 20%;
+        min-width: 60px;
+    }
+    
+    .mobile-table th:nth-child(5), /* Delete */
+    .mobile-table td:nth-child(5) {
+        width: 5%;
+        min-width: 32px;
+    }
+    
+    /* Drivers table - no ODO column */
+    #drivers-management-table th:nth-child(3),
+    #drivers-management-table td:nth-child(3) {
+        width: 35%; /* License column */
+    }
+    
+    #drivers-management-table th:nth-child(4),
+    #drivers-management-table td:nth-child(4) {
+        width: 10%; /* Delete column */
+    }
 }
 
-.compact-table .btn-small:hover {
-    background-color: var(--gray-200) !important;
+/* Enhanced Button Styles */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
 }
 
-.compact-table .btn-error:hover {
-    background-color: var(--error) !important;
-    color: white !important;
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+}
+
+/* Mobile Dashboard Styles */
+.dashboard-header {
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.dashboard-header h2 {
+    color: var(--gray-800);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+}
+
+.stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: all 0.2s ease;
+    border: 1px solid var(--gray-200);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-100);
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1.2;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+.dashboard-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.btn-compact {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.85rem;
+    padding: 0.6rem 0.8rem !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+@media (max-width: 480px) {
+    .dashboard-actions {
+        flex-direction: column;
+    }
+    
+    .btn-compact {
+        width: 100%;
+    }
+}
+
+/* Enhanced Secondary Button */
+.btn-secondary {
+    background: linear-gradient(135deg, var(--gray-600) 0%, var(--gray-700) 100%);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: linear-gradient(135deg, var(--gray-700) 0%, var(--gray-800) 100%);
+}
+
+/* Enhanced Success Button */
+.btn-success {
+    background: linear-gradient(135deg, var(--success) 0%, #16a34a 100%);
+    color: white;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+}
+
+/* Hide complex dashboard elements on mobile */
+@media (max-width: 768px) {
+    .plot-container,
+    .activity-calendar {
+        display: none;
+    }
+    
+    .dashboard-container {
+        padding-bottom: 2rem;
+    }
+}
+
+/* Improved Touch Targets */
+@media (max-width: 768px) {
+    .btn {
+        min-height: 44px; /* iOS recommended touch target */
+        padding: 0.75rem 1rem;
+    }
+    
+    .mobile-cell {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .editable-cell {
+        min-height: 44px !important;
+    }
 }

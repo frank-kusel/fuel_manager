@@ -210,13 +210,14 @@
                         <button id="add-vehicle" class="btn btn-primary">+ Add Vehicle</button>
                     </div>
                     <div class="table-container">
-                        <table class="table compact-table" id="vehicles-management-table">
+                        <table class="table compact-table mobile-table" id="vehicles-management-table">
                             <thead>
                                 <tr>
                                     <th>Code</th>
-                                    <th>Name</th>
                                     <th>Type</th>
-                                    <th>Actions</th>
+                                    <th>Name</th>
+                                    <th>ODO</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody id="vehicles-management-body">
@@ -235,13 +236,13 @@
                         <button id="add-driver" class="btn btn-primary">+ Add Driver</button>
                     </div>
                     <div class="table-container">
-                        <table class="table compact-table" id="drivers-management-table">
+                        <table class="table compact-table mobile-table" id="drivers-management-table">
                             <thead>
                                 <tr>
                                     <th>Code</th>
                                     <th>Name</th>
                                     <th>License</th>
-                                    <th>Actions</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody id="drivers-management-body">
@@ -255,34 +256,48 @@
             <!-- Dashboard Section -->
             <section id="dashboard-section" class="section">
                 <div class="container dashboard-container">
-                    <h2>Fleet Dashboard</h2>
+                    <div class="dashboard-header">
+                        <h2>Dashboard</h2>
+                    </div>
                     
-                    <div class="dashboard-grid">
-                        <div class="card">
-                            <h3>Total Fuel Used</h3>
-                            <div class="stat" id="total-fuel">0 L</div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">⛽</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-fuel">0 L</div>
+                                <div class="stat-label">Total Fuel</div>
+                            </div>
                         </div>
                         
-                        <div class="card">
-                            <h3>Total Distance</h3>
-                            <div class="stat" id="total-distance">0 km</div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📏</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-distance">0 km</div>
+                                <div class="stat-label">Distance</div>
+                            </div>
                         </div>
                         
-                        <div class="card">
-                            <h3>Average Consumption</h3>
-                            <div class="stat" id="avg-consumption">0 L/100km</div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="avg-consumption">0 L/100km</div>
+                                <div class="stat-label">Avg Consumption</div>
+                            </div>
                         </div>
                         
-                        <div class="card">
-                            <h3>Active Vehicles</h3>
-                            <div class="stat" id="active-vehicles">0</div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🚛</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="active-vehicles">0</div>
+                                <div class="stat-label">Vehicles</div>
+                            </div>
                         </div>
                     </div>
                     
                     <div class="dashboard-actions">
-                        <button id="export-monthly" class="btn btn-primary">Export Monthly Report (SARS)</button>
-                        <button id="export-annual" class="btn btn-secondary">Export Annual Report (SARS)</button>
-                        <button id="export-canepro" class="btn btn-success">Export CanePro Format</button>
+                        <button id="export-monthly" class="btn btn-primary btn-compact">📄 Monthly</button>
+                        <button id="export-annual" class="btn btn-secondary btn-compact">📋 Annual</button>
+                        <button id="export-canepro" class="btn btn-success btn-compact">📊 CanePro</button>
                     </div>
                     
                     <div class="plot-container">

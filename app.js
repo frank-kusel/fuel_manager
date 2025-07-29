@@ -810,17 +810,36 @@ async function getSupabaseConfig() {
             }
 
             if (vehicles.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">No vehicles found. Add a vehicle to get started.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No vehicles found. Tap + to add.</td></tr>';
                 return;
             }
 
-            tableBody.innerHTML = vehicles.map(vehicle => `
-                <tr data-id="${vehicle.id}">
-                    <td class="editable-cell" data-field="code" data-type="text">${vehicle.code}</td>
-                    <td class="editable-cell" data-field="name" data-type="text">${vehicle.name}</td>
-                    <td class="editable-cell" data-field="type" data-type="select" data-options="tractor,bakkie,truck,loader,utility,other">${vehicle.type}</td>
-                    <td>
-                        <button class="btn btn-small btn-error" onclick="app.deleteVehicle(${vehicle.id})" title="Delete">🗑️</button>
+            // Get current ODO for each vehicle from latest fuel entry
+            const vehiclesWithOdo = await Promise.all(
+                vehicles.map(async (vehicle) => {
+                    const { data: lastRecord } = await window.supabaseClient
+                        .from('fuel_entries')
+                        .select('odo_end')
+                        .eq('vehicle_id', vehicle.id)
+                        .order('date', { ascending: false })
+                        .limit(1)
+                        .single();
+                    
+                    const currentOdo = lastRecord ? lastRecord.odo_end : 0;
+                    return { ...vehicle, currentOdo };
+                })
+            );
+
+            tableBody.innerHTML = vehiclesWithOdo.map(vehicle => `
+                <tr data-id="${vehicle.id}" class="mobile-row">
+                    <td class="editable-cell mobile-cell" data-field="code" data-type="text">${vehicle.code}</td>
+                    <td class="editable-cell mobile-cell" data-field="type" data-type="select" data-options="tractor,bakkie,truck,loader,utility,other">
+                        <span class="type-badge type-${vehicle.type}">${vehicle.type}</span>
+                    </td>
+                    <td class="editable-cell mobile-cell" data-field="name" data-type="text">${vehicle.name}</td>
+                    <td class="odo-cell">${vehicle.currentOdo.toFixed(0)}</td>
+                    <td class="delete-cell">
+                        <button class="delete-btn" onclick="app.deleteVehicle(${vehicle.id})" title="Delete">×</button>
                     </td>
                 </tr>
             `).join('');
@@ -831,7 +850,7 @@ async function getSupabaseConfig() {
             console.error('Error rendering vehicle management:', error);
             const tableBody = document.getElementById('vehicles-management-body');
             if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading vehicles. Please refresh the page.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1rem; color: #dc2626; font-size: 0.9rem;">Error loading vehicles. Please refresh.</td></tr>';
             }
         }
     }
@@ -848,17 +867,17 @@ async function getSupabaseConfig() {
             }
 
             if (drivers.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">No drivers found. Add a driver to get started.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No drivers found. Tap + to add.</td></tr>';
                 return;
             }
 
             tableBody.innerHTML = drivers.map(driver => `
-                <tr data-id="${driver.id}">
-                    <td class="editable-cell" data-field="code" data-type="text">${driver.code}</td>
-                    <td class="editable-cell" data-field="name" data-type="text">${driver.name}</td>
-                    <td class="editable-cell" data-field="license" data-type="text">${driver.license || ''}</td>
-                    <td>
-                        <button class="btn btn-small btn-error" onclick="app.deleteDriver(${driver.id})" title="Delete">🗑️</button>
+                <tr data-id="${driver.id}" class="mobile-row">
+                    <td class="editable-cell mobile-cell" data-field="code" data-type="text">${driver.code}</td>
+                    <td class="editable-cell mobile-cell" data-field="name" data-type="text">${driver.name}</td>
+                    <td class="editable-cell mobile-cell" data-field="license" data-type="text">${driver.license || ''}</td>
+                    <td class="delete-cell">
+                        <button class="delete-btn" onclick="app.deleteDriver(${driver.id})" title="Delete">×</button>
                     </td>
                 </tr>
             `).join('');
@@ -869,7 +888,7 @@ async function getSupabaseConfig() {
             console.error('Error rendering driver management:', error);
             const tableBody = document.getElementById('drivers-management-body');
             if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #dc2626; font-size: 0.9rem;">Error loading drivers. Please refresh.</td></tr>';
             }
         }
     }
@@ -892,7 +911,11 @@ async function getSupabaseConfig() {
     }
 
     startInlineEdit(cell, tableType) {
-        const originalValue = cell.textContent.trim();
+        // For type cells, get the value from the span element
+        const isTypeCell = cell.dataset.field === 'type';
+        const originalValue = isTypeCell ? 
+            cell.querySelector('.type-badge').textContent.trim() : 
+            cell.textContent.trim();
         const field = cell.dataset.field;
         const type = cell.dataset.type;
         const rowId = cell.closest('tr').dataset.id;
@@ -936,17 +959,33 @@ async function getSupabaseConfig() {
             if (newValue !== originalValue && newValue !== '') {
                 const success = await this.saveInlineEdit(tableType, rowId, field, newValue);
                 if (success) {
-                    cell.textContent = newValue;
+                    if (isTypeCell) {
+                        cell.innerHTML = `<span class="type-badge type-${newValue}">${newValue}</span>`;
+                    } else {
+                        cell.textContent = newValue;
+                    }
+                } else {
+                    if (isTypeCell) {
+                        cell.innerHTML = `<span class="type-badge type-${originalValue}">${originalValue}</span>`;
+                    } else {
+                        cell.textContent = originalValue;
+                    }
+                }
+            } else {
+                if (isTypeCell) {
+                    cell.innerHTML = `<span class="type-badge type-${originalValue}">${originalValue}</span>`;
                 } else {
                     cell.textContent = originalValue;
                 }
-            } else {
-                cell.textContent = originalValue;
             }
         };
 
         const cancelEdit = () => {
-            cell.textContent = originalValue;
+            if (isTypeCell) {
+                cell.innerHTML = `<span class="type-badge type-${originalValue}">${originalValue}</span>`;
+            } else {
+                cell.textContent = originalValue;
+            }
         };
 
         input.addEventListener('blur', saveEdit);
