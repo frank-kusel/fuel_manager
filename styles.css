@@ -779,97 +779,163 @@ input[readonly] {
     }
 }
 
-/* Mobile Table Container */
+/* Mobile Card-Based Design (like Championship Leaderboard) */
 @media (max-width: 768px) {
     .table-container {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
+        background: transparent;
+        border-radius: 0;
+        box-shadow: none;
+        overflow: visible;
     }
-}
-
-/* Mobile Table Styles */
-.mobile-table {
-    font-size: 15px;
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-}
-
-.mobile-table th,
-.mobile-table td {
-    padding: 1rem 0.75rem !important;
-    text-align: left;
-    border-bottom: 1px solid var(--gray-100);
-}
-
-.mobile-table th {
-    background-color: var(--gray-50);
-    font-weight: 600;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    color: var(--gray-700);
-    letter-spacing: 0.05em;
-    padding: 1.25rem 0.75rem !important;
-    border-bottom: 2px solid var(--gray-200);
-}
-
-.mobile-table th:first-child {
-    border-top-left-radius: 12px;
-}
-
-.mobile-table th:last-child {
-    border-top-right-radius: 12px;
-}
-
-.mobile-row {
-    transition: all 0.2s ease;
-    border-bottom: 1px solid var(--gray-100);
-}
-
-.mobile-row:hover {
-    background-color: var(--gray-50);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.mobile-row:last-child {
-    border-bottom: none;
-}
-
-.mobile-cell {
-    cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
-    font-weight: 500;
-    color: var(--gray-800);
-}
-
-.mobile-cell:hover {
-    background-color: var(--primary);
-    color: white;
-    border-radius: 8px;
-    transform: scale(1.02);
-}
-
-.mobile-cell:active {
-    transform: scale(0.98);
+    
+    /* Hide the traditional table structure on mobile */
+    .mobile-table {
+        display: none;
+    }
+    
+    /* Create custom card-based layout */
+    .mobile-card-list {
+        display: block;
+        background: transparent;
+    }
+    
+    .mobile-card {
+        background: white;
+        border-radius: 16px;
+        margin-bottom: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease;
+        position: relative;
+    }
+    
+    .mobile-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        border-color: var(--primary);
+    }
+    
+    .mobile-card:active {
+        transform: translateY(0);
+    }
+    
+    /* Add subtle animation on load */
+    .mobile-card {
+        animation: fadeInUp 0.3s ease-out;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Card header with main info */
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    
+    .card-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--gray-900);
+        margin: 0;
+    }
+    
+    .card-subtitle {
+        font-size: 14px;
+        color: var(--gray-600);
+        margin-top: 2px;
+    }
+    
+    /* Card body with secondary info */
+    .card-body {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .card-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .info-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--gray-500);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .info-value {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--gray-800);
+    }
+    
+    /* Actions area */
+    .card-actions {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+    }
+    
+    /* Delete button in card style */
+    .card-delete-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: var(--gray-100);
+        color: var(--gray-500);
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .card-delete-btn:hover {
+        background: var(--error);
+        color: white;
+        transform: scale(1.1);
+    }
 }
 
 /* Type Badge Styles */
 .type-badge {
     display: inline-block;
-    padding: 0.5rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 12px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.5px;
     white-space: nowrap;
-    min-width: 60px;
     text-align: center;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobile-specific type badge adjustments */
+@media (max-width: 768px) {
+    .mobile-card .type-badge {
+        padding: 4px 8px;
+        font-size: 11px;
+        border-radius: 8px;
+    }
 }
 
 .type-tractor { 
