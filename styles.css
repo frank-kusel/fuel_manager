@@ -949,7 +949,7 @@ input[readonly] {
     
     .table {
         width: 100%;
-        font-size: 12px;
+        font-size: 13px;
         border-collapse: collapse;
         table-layout: fixed;
     }
@@ -958,6 +958,8 @@ input[readonly] {
     .table td {
         padding: 0.5rem 0.25rem;
         vertical-align: middle;
+        display: table-cell;
+        word-wrap: break-word;
     }
     
     .table th {
@@ -1204,9 +1206,7 @@ input[readonly] {
     }
     
     .mobile-cell {
-        min-height: 48px;
-        display: flex;
-        align-items: center;
+        min-height: 44px;
     }
     
     .editable-cell {
