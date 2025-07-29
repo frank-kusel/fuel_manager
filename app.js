@@ -827,7 +827,7 @@ async function getSupabaseConfig() {
             }
 
             if (vehicles.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No vehicles found. Tap + to add.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No vehicles found. Tap + to add.</td></tr>';
                 return;
             }
 
@@ -866,10 +866,7 @@ async function getSupabaseConfig() {
                         <span class="type-badge type-${vehicle.type || 'other'}">${vehicle.type || 'other'}</span>
                     </td>
                     <td class="editable-cell mobile-cell" data-field="name" data-type="text">${vehicle.name || ''}</td>
-                    <td class="odo-cell">${(vehicle.currentOdo || 0).toFixed(0)}</td>
-                    <td class="delete-cell">
-                        <button class="delete-btn" onclick="app.deleteVehicle(${vehicle.id})" title="Delete">×</button>
-                    </td>
+                    <td class="odo-cell">${(vehicle.currentOdo || 0).toFixed(2)}</td>
                 </tr>
             `).join('');
 
@@ -896,7 +893,7 @@ async function getSupabaseConfig() {
             }
 
             if (drivers.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No drivers found. Tap + to add.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No drivers found. Tap + to add.</td></tr>';
                 return;
             }
 
@@ -906,9 +903,6 @@ async function getSupabaseConfig() {
                     <td class="editable-cell mobile-cell" data-field="code" data-type="text">${driver.code || ''}</td>
                     <td class="editable-cell mobile-cell" data-field="name" data-type="text">${driver.name || ''}</td>
                     <td class="editable-cell mobile-cell" data-field="license" data-type="text">${driver.license || ''}</td>
-                    <td class="delete-cell">
-                        <button class="delete-btn" onclick="app.deleteDriver(${driver.id})" title="Delete">×</button>
-                    </td>
                 </tr>
             `).join('');
 
