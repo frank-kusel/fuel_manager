@@ -807,7 +807,7 @@ input[readonly] {
 
 /* Mobile-specific type badge adjustments */
 @media (max-width: 768px) {
-    .mobile-card .type-badge {
+    .type-badge {
         padding: 4px 8px;
         font-size: 11px;
         border-radius: 8px;
