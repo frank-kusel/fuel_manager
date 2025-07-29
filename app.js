@@ -328,7 +328,7 @@ async function getSupabaseConfig() {
         try {
             const tableBody = document.getElementById('driver-table-body');
             if (!this.isCacheValid()) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">Loading drivers...</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Loading drivers...</td></tr>';
             }
             
             const drivers = await this.fetchDriversFromSupabase();
@@ -341,8 +341,7 @@ async function getSupabaseConfig() {
             <tr class="clickable" data-id="${driver.id}">
                 <td><strong>${driver.code}</strong></td>
                 <td>${driver.name}</td>
-                <td>${driver.license_number || 'N/A'}</td>
-                <td>${driver.phone || 'N/A'}</td>
+                <td>${driver.license || 'N/A'}</td>
             </tr>
         `).join('');
 
@@ -371,7 +370,7 @@ async function getSupabaseConfig() {
             console.error('Error rendering drivers:', error);
             const tableBody = document.getElementById('driver-table-body');
             if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
             }
         }
     }
@@ -446,7 +445,7 @@ async function getSupabaseConfig() {
             if (driverInfoElement) {
                 driverInfoElement.innerHTML = `
                     <strong>${this.currentDriver.code}</strong> - ${this.currentDriver.name}<br>
-                    <small>${this.currentDriver.license_number || 'No license on file'}</small>
+                    <small>${this.currentDriver.license || 'No license on file'}</small>
                 `;
             } else {
                 console.error('selected-driver-info element not found');
@@ -666,7 +665,8 @@ async function getSupabaseConfig() {
                 odo_start: odoStart,
                 odo_end: gaugeBroken ? odoStart : odoEnd,
                 fuel_amount: litresUsed,
-                notes: document.getElementById('needs-review').checked ? 'Flagged for review' : null
+                HrsKm: distance,
+                timestamp: new Date().toISOString()
             };
             
             const { data, error } = await window.supabaseClient
@@ -879,7 +879,7 @@ async function getSupabaseConfig() {
             }
 
             if (drivers.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No drivers found. Add a driver to get started.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">No drivers found. Add a driver to get started.</td></tr>';
                 return;
             }
 
@@ -899,9 +899,7 @@ async function getSupabaseConfig() {
                 <tr>
                     <td><strong>${driver.code}</strong></td>
                     <td>${driver.name}</td>
-                    <td>${driver.license_number || 'N/A'}</td>
-                    <td>${driver.phone || 'N/A'}</td>
-                    <td>${driver.email || 'N/A'}</td>
+                    <td>${driver.license || 'N/A'}</td>
                     <td><span class="badge">${driver.recordCount}</span></td>
                     <td>
                         <button class="btn btn-small btn-warning" onclick="app.editDriver(${driver.id})">Edit</button>
@@ -913,7 +911,7 @@ async function getSupabaseConfig() {
             console.error('Error rendering driver management:', error);
             const tableBody = document.getElementById('drivers-management-body');
             if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
             }
         }
     }
@@ -1108,10 +1106,7 @@ async function getSupabaseConfig() {
             document.getElementById('driver-id').value = driver.id;
             document.getElementById('driver-code-input').value = driver.code;
             document.getElementById('driver-name-input').value = driver.name;
-            document.getElementById('driver-license').value = driver.license_number || '';
-            document.getElementById('driver-phone').value = driver.phone || '';
-            document.getElementById('driver-email').value = driver.email || '';
-            document.getElementById('driver-notes').value = driver.notes || '';
+            document.getElementById('driver-license').value = driver.license || '';
         } catch (error) {
             console.error('Error loading driver for edit:', error);
             alert('Error loading driver data.');
@@ -1125,10 +1120,7 @@ async function getSupabaseConfig() {
         const driverData = {
             code: document.getElementById('driver-code-input').value,
             name: document.getElementById('driver-name-input').value,
-            license_number: document.getElementById('driver-license').value || null,
-            phone: document.getElementById('driver-phone').value || null,
-            email: document.getElementById('driver-email').value || null,
-            notes: document.getElementById('driver-notes').value || null
+            license: document.getElementById('driver-license').value || null
         };
         
         try {
