@@ -440,18 +440,17 @@ async function getSupabaseConfig() {
             
             // Set default odometer start value to last reading
             try {
-                const { data: lastRecord, error: odoError } = await window.supabaseClient
+                const { data: records, error: odoError } = await window.supabaseClient
                     .from('fuel_entries')
                     .select('odo_end')
                     .eq('vehicle_id', this.currentVehicle.id)
                     .order('date', { ascending: false })
-                    .limit(1)
-                    .single();
+                    .limit(1);
                     
-                if (!odoError && lastRecord) {
+                if (!odoError && records && records.length > 0) {
                     const odoStartElement = document.getElementById('odo-start');
                     if (odoStartElement) {
-                        odoStartElement.value = lastRecord.odo_end;
+                        odoStartElement.value = records[0].odo_end;
                     }
                 }
             } catch (odoError) {
@@ -817,27 +816,35 @@ async function getSupabaseConfig() {
             // Get current ODO for each vehicle from latest fuel entry
             const vehiclesWithOdo = await Promise.all(
                 vehicles.map(async (vehicle) => {
-                    const { data: lastRecord } = await window.supabaseClient
-                        .from('fuel_entries')
-                        .select('odo_end')
-                        .eq('vehicle_id', vehicle.id)
-                        .order('date', { ascending: false })
-                        .limit(1)
-                        .single();
-                    
-                    const currentOdo = lastRecord ? lastRecord.odo_end : 0;
-                    return { ...vehicle, currentOdo };
+                    try {
+                        const { data: records, error } = await window.supabaseClient
+                            .from('fuel_entries')
+                            .select('odo_end')
+                            .eq('vehicle_id', vehicle.id)
+                            .order('date', { ascending: false })
+                            .limit(1);
+                        
+                        if (error) {
+                            console.warn(`Error fetching ODO for vehicle ${vehicle.id}:`, error);
+                        }
+                        
+                        const currentOdo = (records && records.length > 0) ? records[0].odo_end : 0;
+                        return { ...vehicle, currentOdo };
+                    } catch (error) {
+                        console.warn(`Failed to fetch ODO for vehicle ${vehicle.id}:`, error);
+                        return { ...vehicle, currentOdo: 0 };
+                    }
                 })
             );
 
             tableBody.innerHTML = vehiclesWithOdo.map(vehicle => `
                 <tr data-id="${vehicle.id}" class="mobile-row">
-                    <td class="editable-cell mobile-cell" data-field="code" data-type="text">${vehicle.code}</td>
+                    <td class="editable-cell mobile-cell" data-field="code" data-type="text">${vehicle.code || ''}</td>
                     <td class="editable-cell mobile-cell" data-field="type" data-type="select" data-options="tractor,bakkie,truck,loader,utility,other">
-                        <span class="type-badge type-${vehicle.type}">${vehicle.type}</span>
+                        <span class="type-badge type-${vehicle.type || 'other'}">${vehicle.type || 'other'}</span>
                     </td>
-                    <td class="editable-cell mobile-cell" data-field="name" data-type="text">${vehicle.name}</td>
-                    <td class="odo-cell">${vehicle.currentOdo.toFixed(0)}</td>
+                    <td class="editable-cell mobile-cell" data-field="name" data-type="text">${vehicle.name || ''}</td>
+                    <td class="odo-cell">${(vehicle.currentOdo || 0).toFixed(0)}</td>
                     <td class="delete-cell">
                         <button class="delete-btn" onclick="app.deleteVehicle(${vehicle.id})" title="Delete">×</button>
                     </td>
@@ -873,8 +880,8 @@ async function getSupabaseConfig() {
 
             tableBody.innerHTML = drivers.map(driver => `
                 <tr data-id="${driver.id}" class="mobile-row">
-                    <td class="editable-cell mobile-cell" data-field="code" data-type="text">${driver.code}</td>
-                    <td class="editable-cell mobile-cell" data-field="name" data-type="text">${driver.name}</td>
+                    <td class="editable-cell mobile-cell" data-field="code" data-type="text">${driver.code || ''}</td>
+                    <td class="editable-cell mobile-cell" data-field="name" data-type="text">${driver.name || ''}</td>
                     <td class="editable-cell mobile-cell" data-field="license" data-type="text">${driver.license || ''}</td>
                     <td class="delete-cell">
                         <button class="delete-btn" onclick="app.deleteDriver(${driver.id})" title="Delete">×</button>
@@ -1105,113 +1112,7 @@ async function getSupabaseConfig() {
         }
     }
 
-    // Vehicle Modal Methods (DEPRECATED - keeping for compatibility)
-    showVehicleModal(vehicleId = null) {
-        const modal = document.getElementById('vehicle-modal');
-        const title = document.getElementById('vehicle-modal-title');
-        const form = document.getElementById('vehicle-form');
-        
-        if (vehicleId) {
-            title.textContent = 'Edit Vehicle';
-            this.loadVehicleForEdit(vehicleId);
-        } else {
-            title.textContent = 'Add Vehicle';
-            form.reset();
-            document.getElementById('vehicle-id').value = '';
-        }
-        
-        modal.classList.remove('hidden');
-    }
-
-    hideVehicleModal() {
-        document.getElementById('vehicle-modal').classList.add('hidden');
-        document.getElementById('vehicle-form').reset();
-    }
-
-    async loadVehicleForEdit(vehicleId) {
-        try {
-            const { data: vehicle, error } = await window.supabaseClient
-                .from('vehicles')
-                .select('*')
-                .eq('id', vehicleId)
-                .single();
-                
-            if (error) {
-                console.error('Error loading vehicle for edit:', error);
-                alert('Error loading vehicle data.');
-                return;
-            }
-            
-            // Populate form fields
-            document.getElementById('vehicle-id').value = vehicle.id;
-            document.getElementById('vehicle-code').value = vehicle.code;
-            document.getElementById('vehicle-name').value = vehicle.name;
-            document.getElementById('vehicle-make').value = vehicle.make;
-            document.getElementById('vehicle-model').value = vehicle.model;
-            document.getElementById('vehicle-year').value = vehicle.year;
-            document.getElementById('vehicle-registration').value = vehicle.registration;
-            document.getElementById('vehicle-type').value = vehicle.type;
-            document.getElementById('vehicle-value').value = vehicle.value || '';
-            document.getElementById('current-odo').value = vehicle.current_odo || '';
-            document.getElementById('vehicle-description').value = vehicle.description || '';
-            document.getElementById('license-details').value = vehicle.license_details || '';
-        } catch (error) {
-            console.error('Error loading vehicle for edit:', error);
-            alert('Error loading vehicle data.');
-        }
-    }
-
-    async handleVehicleFormSubmit(e) {
-        e.preventDefault();
-        
-        const vehicleId = document.getElementById('vehicle-id').value;
-        const vehicleData = {
-            code: document.getElementById('vehicle-code').value,
-            name: document.getElementById('vehicle-name').value,
-            registration: document.getElementById('vehicle-registration').value,
-            type: document.getElementById('vehicle-type').value,
-            description: document.getElementById('vehicle-description').value || null,
-            license: document.getElementById('license-details').value || null
-        };
-        
-        try {
-            let error;
-            if (vehicleId) {
-                // Update existing vehicle
-                const result = await window.supabaseClient
-                    .from('vehicles')
-                    .update(vehicleData)
-                    .eq('id', vehicleId);
-                error = result.error;
-            } else {
-                // Insert new vehicle
-                const result = await window.supabaseClient
-                    .from('vehicles')
-                    .insert([vehicleData]);
-                error = result.error;
-            }
-            
-            if (error) {
-                console.error('Error saving vehicle:', error);
-                alert('Error saving vehicle: ' + error.message);
-                return;
-            }
-            
-            alert(vehicleId ? 'Vehicle updated successfully!' : 'Vehicle added successfully!');
-            this.invalidateCache(); // Clear cache to force fresh data
-            this.hideVehicleModal();
-            await this.renderVehicleManagement();
-            await this.renderVehicles(); // Refresh fuel entry vehicles list
-            
-        } catch (error) {
-            console.error('Error saving vehicle:', error);
-            alert('Error saving vehicle. Please try again.');
-        }
-    }
-
-    async editVehicle(vehicleId) {
-        this.showVehicleModal(vehicleId);
-    }
+    // Vehicle Modal Methods (REMOVED - using inline editing now)
 
     async deleteVehicle(vehicleId) {
         if (!confirm('Are you sure you want to delete this vehicle? This will also delete all associated fuel records.')) {
@@ -1254,102 +1155,7 @@ async function getSupabaseConfig() {
         }
     }
 
-    // Driver Modal Methods
-    showDriverModal(driverId = null) {
-        const modal = document.getElementById('driver-modal');
-        const title = document.getElementById('driver-modal-title');
-        const form = document.getElementById('driver-form');
-        
-        if (driverId) {
-            title.textContent = 'Edit Driver';
-            this.loadDriverForEdit(driverId);
-        } else {
-            title.textContent = 'Add Driver';
-            form.reset();
-            document.getElementById('driver-id').value = '';
-        }
-        
-        modal.classList.remove('hidden');
-    }
-
-    hideDriverModal() {
-        document.getElementById('driver-modal').classList.add('hidden');
-        document.getElementById('driver-form').reset();
-    }
-
-    async loadDriverForEdit(driverId) {
-        try {
-            const { data: driver, error } = await window.supabaseClient
-                .from('drivers')
-                .select('*')
-                .eq('id', driverId)
-                .single();
-                
-            if (error) {
-                console.error('Error loading driver for edit:', error);
-                alert('Error loading driver data.');
-                return;
-            }
-            
-            // Populate form fields
-            document.getElementById('driver-id').value = driver.id;
-            document.getElementById('driver-code-input').value = driver.code;
-            document.getElementById('driver-name-input').value = driver.name;
-            document.getElementById('driver-license').value = driver.license || '';
-        } catch (error) {
-            console.error('Error loading driver for edit:', error);
-            alert('Error loading driver data.');
-        }
-    }
-
-    async handleDriverFormSubmit(e) {
-        e.preventDefault();
-        
-        const driverId = document.getElementById('driver-id').value;
-        const driverData = {
-            code: document.getElementById('driver-code-input').value,
-            name: document.getElementById('driver-name-input').value,
-            license: document.getElementById('driver-license').value || null
-        };
-        
-        try {
-            let error;
-            if (driverId) {
-                // Update existing driver
-                const result = await window.supabaseClient
-                    .from('drivers')
-                    .update(driverData)
-                    .eq('id', driverId);
-                error = result.error;
-            } else {
-                // Insert new driver
-                const result = await window.supabaseClient
-                    .from('drivers')
-                    .insert([driverData]);
-                error = result.error;
-            }
-            
-            if (error) {
-                console.error('Error saving driver:', error);
-                alert('Error saving driver: ' + error.message);
-                return;
-            }
-            
-            alert(driverId ? 'Driver updated successfully!' : 'Driver added successfully!');
-            this.invalidateCache(); // Clear cache to force fresh data
-            this.hideDriverModal();
-            await this.renderDriverManagement();
-            await this.renderDrivers(); // Refresh fuel entry drivers list
-            
-        } catch (error) {
-            console.error('Error saving driver:', error);
-            alert('Error saving driver. Please try again.');
-        }
-    }
-
-    async editDriver(driverId) {
-        this.showDriverModal(driverId);
-    }
+    // Driver Modal Methods (REMOVED - using inline editing now)
 
     async deleteDriver(driverId) {
         if (!confirm('Are you sure you want to delete this driver? This will also delete all associated fuel records.')) {
