@@ -75,7 +75,7 @@ body {
     display: flex;
     justify-content: center;
     gap: 0.25rem;
-    padding: 0 1rem;
+    padding: 0;
     flex-wrap: wrap;
 }
 
@@ -678,240 +678,116 @@ input[readonly] {
     }
 }
 
-/* Mobile-First Responsive Design */
+/* Simplified Mobile Design */
 @media (max-width: 768px) {
     body {
-        font-size: 16px; /* Prevent zoom on iOS */
+        font-size: 14px;
         background: var(--gray-50);
     }
     
     .container {
-        padding: 1rem;
-        max-width: 100%;
+        padding: 0.5rem;
     }
     
     .header {
-        padding: 1rem 0;
+        padding: 0.5rem 0;
         background: white;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         margin-bottom: 0;
     }
     
     .header-brand {
         justify-content: center;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
+        padding: 0 0.5rem;
     }
     
     .header-brand h1 {
-        font-size: 1.5rem;
-        font-weight: 700;
+        font-size: 1.25rem;
+        font-weight: 600;
     }
     
     .nav {
-        gap: 0;
-        padding: 0;
+        display: flex;
         background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        border-bottom: 1px solid var(--gray-200);
+        margin: 0;
+        padding: 0 0.5rem;
+        gap: 2px;
     }
     
     .nav-btn {
-        padding: 1rem 0.5rem;
+        flex: 1;
+        padding: 0.75rem 0.25rem;
         font-size: 0.8rem;
-        min-width: auto;
-        border-radius: 0;
         border: none;
-        background: white;
+        border-radius: 0;
+        background: transparent;
         color: var(--gray-600);
         font-weight: 500;
-        transition: all 0.2s ease;
         text-align: center;
-        border-right: 1px solid var(--gray-200);
-    }
-    
-    .nav-btn:last-child {
-        border-right: none;
     }
     
     .nav-btn.active {
         background: var(--primary);
         color: white;
         font-weight: 600;
-    }
-    
-    .nav-btn:hover {
-        background: var(--gray-100);
-    }
-    
-    .nav-btn.active:hover {
-        background: var(--primary-dark);
-    }
-    
-    .section {
-        padding-top: 1.5rem;
+        border-radius: 4px;
     }
     
     .section-header {
-        margin-bottom: 1.5rem;
+        margin: 0.5rem 0;
+        padding: 0.75rem;
         background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        flex-wrap: wrap;
-        gap: 1rem;
+        border: 1px solid var(--gray-200);
     }
     
     .section-header h2 {
-        font-size: 1.5rem;
+        font-size: 1rem;
         margin: 0;
         color: var(--gray-900);
-        font-weight: 700;
-    }
-    
-    .section-header .btn {
-        flex-shrink: 0;
+        font-weight: 600;
     }
 }
 
-/* Mobile Card-Based Design (like Championship Leaderboard) */
+/* Simplified Mobile Table Design */
 @media (max-width: 768px) {
     .table-container {
-        background: transparent;
-        border-radius: 0;
-        box-shadow: none;
-        overflow: visible;
-    }
-    
-    /* Hide the traditional table structure on mobile */
-    .mobile-table {
-        display: none;
-    }
-    
-    /* Create custom card-based layout */
-    .mobile-card-list {
-        display: block;
-        background: transparent;
-    }
-    
-    .mobile-card {
         background: white;
-        border-radius: 16px;
-        margin-bottom: 12px;
-        padding: 16px 20px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        border: 1px solid rgba(0, 0, 0, 0.06);
-        transition: all 0.2s ease;
-        position: relative;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+        overflow: hidden;
+        margin: 0.5rem 0;
     }
     
-    .mobile-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        border-color: var(--primary);
-    }
-    
-    .mobile-card:active {
-        transform: translateY(0);
-    }
-    
-    /* Add subtle animation on load */
-    .mobile-card {
-        animation: fadeInUp 0.3s ease-out;
-    }
-    
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    /* Card header with main info */
-    .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-    }
-    
-    .card-title {
-        font-size: 18px;
-        font-weight: 700;
-        color: var(--gray-900);
+    .table {
+        width: 100%;
+        font-size: 14px;
+        border-collapse: collapse;
         margin: 0;
     }
     
-    .card-subtitle {
-        font-size: 14px;
+    .table th {
+        background: var(--gray-50);
+        padding: 0.75rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
         color: var(--gray-600);
-        margin-top: 2px;
-    }
-    
-    /* Card body with secondary info */
-    .card-body {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .card-info {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-    
-    .info-label {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--gray-500);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--gray-200);
     }
     
-    .info-value {
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--gray-800);
+    .table td {
+        padding: 0.75rem 0.5rem;
+        border-bottom: 1px solid var(--gray-100);
+        vertical-align: middle;
     }
     
-    /* Actions area */
-    .card-actions {
-        position: absolute;
-        top: 16px;
-        right: 16px;
-    }
-    
-    /* Delete button in card style */
-    .card-delete-btn {
-        width: 32px;
-        height: 32px;
-        border: none;
-        background: var(--gray-100);
-        color: var(--gray-500);
-        font-size: 16px;
-        font-weight: bold;
-        cursor: pointer;
-        border-radius: 50%;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .card-delete-btn:hover {
-        background: var(--error);
-        color: white;
-        transform: scale(1.1);
+    .table tbody tr:last-child td {
+        border-bottom: none;
     }
 }
 
@@ -1120,31 +996,21 @@ input[readonly] {
     }
 }
 
-/* Enhanced Button Styles */
+/* Minimal Button Styles */
 .btn {
-    border-radius: 8px;
+    border-radius: 6px;
     font-weight: 500;
-    transition: all 0.2s ease;
     border: none;
     cursor: pointer;
 }
 
-.btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.btn:active {
-    transform: translateY(0);
-}
-
 .btn-primary {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    background: var(--primary);
     color: white;
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+    background: var(--primary-dark);
 }
 
 /* Mobile Dashboard Styles */
@@ -1176,19 +1042,12 @@ input[readonly] {
 
 .stat-card {
     background: white;
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 1rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    transition: all 0.2s ease;
     border: 1px solid var(--gray-200);
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 .stat-icon {
@@ -1250,24 +1109,24 @@ input[readonly] {
     }
 }
 
-/* Enhanced Secondary Button */
+/* Simple Secondary Button */
 .btn-secondary {
-    background: linear-gradient(135deg, var(--gray-600) 0%, var(--gray-700) 100%);
+    background: var(--gray-600);
     color: white;
 }
 
 .btn-secondary:hover {
-    background: linear-gradient(135deg, var(--gray-700) 0%, var(--gray-800) 100%);
+    background: var(--gray-700);
 }
 
-/* Enhanced Success Button */
+/* Simple Success Button */
 .btn-success {
-    background: linear-gradient(135deg, var(--success) 0%, #16a34a 100%);
+    background: var(--success);
     color: white;
 }
 
 .btn-success:hover {
-    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    background: #16a34a;
 }
 
 /* Hide complex dashboard elements on mobile */
@@ -1282,20 +1141,14 @@ input[readonly] {
     }
 }
 
-/* Improved Touch Targets and Mobile-Specific Styles */
+/* Minimal Mobile Button Styles */
 @media (max-width: 768px) {
     .btn {
-        min-height: 48px; /* iOS recommended touch target */
-        padding: 1rem 1.5rem;
-        font-weight: 600;
-        font-size: 1rem;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-    
-    .btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        min-height: 44px;
+        padding: 0.75rem 1rem;
+        font-weight: 500;
+        font-size: 0.9rem;
+        border-radius: 6px;
     }
     
     .mobile-cell {
@@ -1308,12 +1161,12 @@ input[readonly] {
         min-height: 48px !important;
     }
     
-    /* Fuel entry tables for mobile */
+    /* Simple fuel entry tables for mobile */
     #vehicle-table,
     #driver-table {
         background: white;
-        border-radius: 12px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        border: 1px solid var(--gray-200);
         overflow: hidden;
     }
     
@@ -1321,7 +1174,7 @@ input[readonly] {
     #driver-table th,
     #vehicle-table td,
     #driver-table td {
-        padding: 1rem 0.75rem !important;
+        padding: 0.75rem 0.5rem !important;
         border-bottom: 1px solid var(--gray-100);
     }
     
@@ -1331,69 +1184,64 @@ input[readonly] {
         font-weight: 600;
         color: var(--gray-700);
         text-transform: uppercase;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         letter-spacing: 0.05em;
     }
     
     #vehicle-table .clickable,
     #driver-table .clickable {
-        transition: all 0.2s ease;
         cursor: pointer;
     }
     
     #vehicle-table .clickable:hover,
     #driver-table .clickable:hover {
-        background-color: var(--primary-light);
-        color: white;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        background-color: var(--gray-100);
     }
     
     #vehicle-table .selected,
     #driver-table .selected {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        background: var(--primary);
         color: white;
         font-weight: 600;
     }
     
-    /* Step indicators and form styling */
+    /* Simple step and form styling */
     .step {
         background: white;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        border: 1px solid var(--gray-200);
+        padding: 1rem;
+        margin-bottom: 0.5rem;
     }
     
     .step h2 {
         color: var(--gray-900);
-        font-size: 1.5rem;
+        font-size: 1.25rem;
         margin-bottom: 1rem;
-        font-weight: 700;
+        font-weight: 600;
     }
     
     .form-group {
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
     }
     
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;
-        font-weight: 600;
+        font-weight: 500;
         color: var(--gray-700);
-        font-size: 1rem;
+        font-size: 0.9rem;
     }
     
     .form-group input,
     .form-group select,
     .form-group textarea {
         width: 100%;
-        padding: 1rem;
-        border: 2px solid var(--gray-200);
-        border-radius: 8px;
-        font-size: 1rem;
+        padding: 0.75rem;
+        border: 1px solid var(--gray-300);
+        border-radius: 6px;
+        font-size: 0.9rem;
         background: white;
-        transition: all 0.2s ease;
     }
     
     .form-group input:focus,
@@ -1401,6 +1249,5 @@ input[readonly] {
     .form-group textarea:focus {
         outline: none;
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     }
 }
