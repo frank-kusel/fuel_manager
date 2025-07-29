@@ -147,13 +147,16 @@ body {
     background: var(--gray-600);
 }
 
-/* Vehicle Types */
-.vehicle-type-tractor { --type-color: #22c55e; }
-.vehicle-type-bakkie { --type-color: #3b82f6; }
-.vehicle-type-truck { --type-color: #f59e0b; }
-.vehicle-type-loader { --type-color: #8b5cf6; }
-.vehicle-type-utility { --type-color: #64748b; }
-.vehicle-type-other { --type-color: var(--gray-400); }
+/* Vehicle Types - Based on Supabase Data */
+.vehicle-type-excavator { --type-color: #dc2626; }
+.vehicle-type-ldv-4wd { --type-color: #2563eb; }
+.vehicle-type-loaders { --type-color: #7c3aed; }
+.vehicle-type-lorry-d-axle { --type-color: #ea580c; }
+.vehicle-type-lorry-s-axle { --type-color: #d97706; }
+.vehicle-type-tractor-2-wd { --type-color: #16a34a; }
+.vehicle-type-tractor-4-wd { --type-color: #15803d; }
+.vehicle-type-d-axle-lorry { --type-color: #c2410c; }
+.vehicle-type-other { --type-color: var(--gray-500); }
 
 .vehicle-type-indicator {
     width: 12px;
@@ -829,24 +832,36 @@ input[readonly] {
     }
 }
 
-.type-tractor { 
-    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); 
+.type-excavator { 
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); 
     color: white; 
 }
-.type-bakkie { 
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+.type-ldv-4wd { 
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
     color: white; 
 }
-.type-truck { 
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+.type-loaders { 
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); 
     color: white; 
 }
-.type-loader { 
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); 
+.type-lorry-d-axle { 
+    background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%); 
     color: white; 
 }
-.type-utility { 
-    background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); 
+.type-lorry-s-axle { 
+    background: linear-gradient(135deg, #d97706 0%, #c2410c 100%); 
+    color: white; 
+}
+.type-tractor-2-wd { 
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); 
+    color: white; 
+}
+.type-tractor-4-wd { 
+    background: linear-gradient(135deg, #15803d 0%, #166534 100%); 
+    color: white; 
+}
+.type-d-axle-lorry { 
+    background: linear-gradient(135deg, #c2410c 0%, #9a3412 100%); 
     color: white; 
 }
 .type-other { 

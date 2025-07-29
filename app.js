@@ -281,8 +281,9 @@ async function getSupabaseConfig() {
                 return;
             }
             tableBody.innerHTML = vehicles.map(vehicle => {
+                const typeClass = this.convertTypeToClassName(vehicle.type);
                 return `
-                <tr class="clickable vehicle-type-${vehicle.type}" data-id="${vehicle.id}">
+                <tr class="clickable vehicle-type-${typeClass}" data-id="${vehicle.id}">
                     <td><span class="vehicle-code-colored">${vehicle.code || ''}</span></td>
                     <td>${vehicle.name || ''}</td>
                     <td>${vehicle.registration || '-'}</td>
@@ -782,6 +783,16 @@ async function getSupabaseConfig() {
         return types.length > 0 ? types.join(',') : 'other';
     }
 
+    convertTypeToClassName(type) {
+        if (!type) return 'other';
+        return type.toLowerCase()
+            .replace(/\s+/g, '-')    // Replace spaces with hyphens
+            .replace(/\//g, '-')     // Replace slashes with hyphens
+            .replace(/[^a-z0-9-]/g, '') // Remove any other special characters
+            .replace(/-+/g, '-')     // Replace multiple hyphens with single hyphen
+            .replace(/^-|-$/g, '');  // Remove leading/trailing hyphens
+    }
+
     async fetchDriversFromSupabase() {
         // Return cached data if valid
         if (this.driversCache && this.isCacheValid()) {
@@ -859,16 +870,19 @@ async function getSupabaseConfig() {
             const vehicleTypes = this.getUniqueVehicleTypes(vehicles);
             
             // Simple table layout for all screen sizes
-            tableBody.innerHTML = vehiclesWithOdo.map(vehicle => `
+            tableBody.innerHTML = vehiclesWithOdo.map(vehicle => {
+                const typeClass = this.convertTypeToClassName(vehicle.type);
+                return `
                 <tr data-id="${vehicle.id}" class="mobile-row">
                     <td class="editable-cell mobile-cell" data-field="code" data-type="text">${vehicle.code || ''}</td>
                     <td class="editable-cell mobile-cell" data-field="type" data-type="select" data-options="${vehicleTypes}">
-                        <span class="type-badge type-${vehicle.type || 'other'}">${vehicle.type || 'other'}</span>
+                        <span class="type-badge type-${typeClass}">${vehicle.type || 'other'}</span>
                     </td>
                     <td class="editable-cell mobile-cell" data-field="name" data-type="text">${vehicle.name || ''}</td>
                     <td class="odo-cell">${(vehicle.currentOdo || 0).toFixed(2)}</td>
                 </tr>
-            `).join('');
+                `;
+            }).join('');
 
             // Add inline editing event listeners
             this.setupInlineEditing('vehicles');
