@@ -773,6 +773,15 @@ async function getSupabaseConfig() {
         return data;
     }
 
+    getUniqueVehicleTypes(vehicles) {
+        const types = vehicles
+            .map(vehicle => vehicle.type)
+            .filter(type => type && type.trim()) // Filter out null/empty types
+            .filter((type, index, arr) => arr.indexOf(type) === index) // Remove duplicates
+            .sort();
+        return types.length > 0 ? types.join(',') : 'other';
+    }
+
     async fetchDriversFromSupabase() {
         // Return cached data if valid
         if (this.driversCache && this.isCacheValid()) {
@@ -846,11 +855,14 @@ async function getSupabaseConfig() {
                 })
             );
 
+            // Get dynamic vehicle types from the data
+            const vehicleTypes = this.getUniqueVehicleTypes(vehicles);
+            
             // Simple table layout for all screen sizes
             tableBody.innerHTML = vehiclesWithOdo.map(vehicle => `
                 <tr data-id="${vehicle.id}" class="mobile-row">
                     <td class="editable-cell mobile-cell" data-field="code" data-type="text">${vehicle.code || ''}</td>
-                    <td class="editable-cell mobile-cell" data-field="type" data-type="select" data-options="tractor,bakkie,truck,loader,utility,other">
+                    <td class="editable-cell mobile-cell" data-field="type" data-type="select" data-options="${vehicleTypes}">
                         <span class="type-badge type-${vehicle.type || 'other'}">${vehicle.type || 'other'}</span>
                     </td>
                     <td class="editable-cell mobile-cell" data-field="name" data-type="text">${vehicle.name || ''}</td>
