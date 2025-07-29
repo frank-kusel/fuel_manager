@@ -846,54 +846,20 @@ async function getSupabaseConfig() {
                 })
             );
 
-            // Check if mobile view
-            const isMobile = window.innerWidth <= 768;
-            
-            if (isMobile) {
-                // Create mobile card layout
-                tableBody.innerHTML = `<div class="mobile-card-list">
-                    ${vehiclesWithOdo.map(vehicle => `
-                        <div class="mobile-card" data-id="${vehicle.id}">
-                            <div class="card-header">
-                                <div>
-                                    <div class="card-title editable-cell" data-field="code" data-type="text">${vehicle.code || ''}</div>
-                                    <div class="card-subtitle editable-cell" data-field="name" data-type="text">${vehicle.name || ''}</div>
-                                </div>
-                                <div class="card-actions">
-                                    <button class="card-delete-btn" onclick="app.deleteVehicle(${vehicle.id})" title="Delete">×</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="card-info">
-                                    <div class="info-label">Type</div>
-                                    <div class="info-value editable-cell" data-field="type" data-type="select" data-options="tractor,bakkie,truck,loader,utility,other">
-                                        <span class="type-badge type-${vehicle.type || 'other'}">${vehicle.type || 'other'}</span>
-                                    </div>
-                                </div>
-                                <div class="card-info">
-                                    <div class="info-label">ODO</div>
-                                    <div class="info-value odo-display">${(vehicle.currentOdo || 0).toFixed(0)} km</div>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>`;
-            } else {
-                // Desktop table layout
-                tableBody.innerHTML = vehiclesWithOdo.map(vehicle => `
-                    <tr data-id="${vehicle.id}" class="mobile-row">
-                        <td class="editable-cell mobile-cell" data-field="code" data-type="text">${vehicle.code || ''}</td>
-                        <td class="editable-cell mobile-cell" data-field="type" data-type="select" data-options="tractor,bakkie,truck,loader,utility,other">
-                            <span class="type-badge type-${vehicle.type || 'other'}">${vehicle.type || 'other'}</span>
-                        </td>
-                        <td class="editable-cell mobile-cell" data-field="name" data-type="text">${vehicle.name || ''}</td>
-                        <td class="odo-cell">${(vehicle.currentOdo || 0).toFixed(0)}</td>
-                        <td class="delete-cell">
-                            <button class="delete-btn" onclick="app.deleteVehicle(${vehicle.id})" title="Delete">×</button>
-                        </td>
-                    </tr>
-                `).join('');
-            }
+            // Simple table layout for all screen sizes
+            tableBody.innerHTML = vehiclesWithOdo.map(vehicle => `
+                <tr data-id="${vehicle.id}" class="mobile-row">
+                    <td class="editable-cell mobile-cell" data-field="code" data-type="text">${vehicle.code || ''}</td>
+                    <td class="editable-cell mobile-cell" data-field="type" data-type="select" data-options="tractor,bakkie,truck,loader,utility,other">
+                        <span class="type-badge type-${vehicle.type || 'other'}">${vehicle.type || 'other'}</span>
+                    </td>
+                    <td class="editable-cell mobile-cell" data-field="name" data-type="text">${vehicle.name || ''}</td>
+                    <td class="odo-cell">${(vehicle.currentOdo || 0).toFixed(0)}</td>
+                    <td class="delete-cell">
+                        <button class="delete-btn" onclick="app.deleteVehicle(${vehicle.id})" title="Delete">×</button>
+                    </td>
+                </tr>
+            `).join('');
 
             // Add inline editing event listeners
             this.setupInlineEditing('vehicles');
@@ -922,45 +888,17 @@ async function getSupabaseConfig() {
                 return;
             }
 
-            // Check if mobile view
-            const isMobile = window.innerWidth <= 768;
-            
-            if (isMobile) {
-                // Create mobile card layout
-                tableBody.innerHTML = `<div class="mobile-card-list">
-                    ${drivers.map(driver => `
-                        <div class="mobile-card" data-id="${driver.id}">
-                            <div class="card-header">
-                                <div>
-                                    <div class="card-title editable-cell" data-field="code" data-type="text">${driver.code || ''}</div>
-                                    <div class="card-subtitle editable-cell" data-field="name" data-type="text">${driver.name || ''}</div>
-                                </div>
-                                <div class="card-actions">
-                                    <button class="card-delete-btn" onclick="app.deleteDriver(${driver.id})" title="Delete">×</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <div class="card-info">
-                                    <div class="info-label">License</div>
-                                    <div class="info-value editable-cell" data-field="license" data-type="text">${driver.license || 'No license'}</div>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>`;
-            } else {
-                // Desktop table layout
-                tableBody.innerHTML = drivers.map(driver => `
-                    <tr data-id="${driver.id}" class="mobile-row">
-                        <td class="editable-cell mobile-cell" data-field="code" data-type="text">${driver.code || ''}</td>
-                        <td class="editable-cell mobile-cell" data-field="name" data-type="text">${driver.name || ''}</td>
-                        <td class="editable-cell mobile-cell" data-field="license" data-type="text">${driver.license || ''}</td>
-                        <td class="delete-cell">
-                            <button class="delete-btn" onclick="app.deleteDriver(${driver.id})" title="Delete">×</button>
-                        </td>
-                    </tr>
-                `).join('');
-            }
+            // Simple table layout for all screen sizes
+            tableBody.innerHTML = drivers.map(driver => `
+                <tr data-id="${driver.id}" class="mobile-row">
+                    <td class="editable-cell mobile-cell" data-field="code" data-type="text">${driver.code || ''}</td>
+                    <td class="editable-cell mobile-cell" data-field="name" data-type="text">${driver.name || ''}</td>
+                    <td class="editable-cell mobile-cell" data-field="license" data-type="text">${driver.license || ''}</td>
+                    <td class="delete-cell">
+                        <button class="delete-btn" onclick="app.deleteDriver(${driver.id})" title="Delete">×</button>
+                    </td>
+                </tr>
+            `).join('');
 
             // Add inline editing event listeners
             this.setupInlineEditing('drivers');
