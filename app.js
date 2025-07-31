@@ -158,10 +158,13 @@ async function getSupabaseConfig() {
         document.getElementById('litres-used').addEventListener('input', () => this.calculateConsumption());
         document.getElementById('gauge-broken').addEventListener('change', () => this.handleGaugeBroken());
 
-        // Bowser reading validation
-        document.getElementById('bowser-start').addEventListener('input', () => this.validateBowserReading());
-        document.getElementById('bowser-end').addEventListener('input', () => this.validateBowserReading());
-        document.getElementById('litres-used').addEventListener('input', () => this.validateBowserReading());
+        // Bowser reading validation and auto-calculation
+        document.getElementById('bowser-start').addEventListener('input', () => this.autoCalculateBowserEnd());
+        document.getElementById('bowser-end').addEventListener('input', () => {
+            this.markBowserEndAsManuallyModified();
+            this.validateBowserReading();
+        });
+        document.getElementById('litres-used').addEventListener('input', () => this.autoCalculateBowserEnd());
 
         // Export functionality
         document.getElementById('export-monthly').addEventListener('click', () => this.exportMonthlyReport());
@@ -632,8 +635,8 @@ async function getSupabaseConfig() {
                         <span>${gaugeBroken ? 'N/A (gauge broken)' : odoEnd.toFixed(1) + ' km'}</span>
                     </div>
                     <div class="review-row">
-                        <span class="review-label">Distance:</span>
-                        <span>${gaugeBroken ? 'N/A (gauge broken)' : distance.toFixed(1) + ' km'}</span>
+                        <span class="review-label">HrsKm:</span>
+                        <span>${gaugeBroken ? 'N/A (gauge broken)' : distance.toFixed(1)}</span>
                     </div>
                     <div class="review-row">
                         <span class="review-label">Fuel Used:</span>
@@ -741,6 +744,41 @@ async function getSupabaseConfig() {
         return true;
     }
 
+    autoCalculateBowserEnd() {
+        const bowserStart = parseFloat(document.getElementById('bowser-start').value);
+        const litresUsed = parseFloat(document.getElementById('litres-used').value);
+        const bowserEndElement = document.getElementById('bowser-end');
+        
+        // Only auto-calculate if both values are valid numbers
+        if (!isNaN(bowserStart) && !isNaN(litresUsed) && litresUsed > 0) {
+            const calculatedEnd = bowserStart + litresUsed;
+            
+            // Only update if the field hasn't been manually modified recently
+            // We'll track this with a data attribute
+            if (!bowserEndElement.dataset.manuallyModified) {
+                bowserEndElement.value = calculatedEnd.toFixed(2);
+                bowserEndElement.classList.add('auto-calculated');
+            }
+        }
+        
+        // Always validate after auto-calculation
+        this.validateBowserReading();
+        this.calculateConsumption();
+    }
+
+    markBowserEndAsManuallyModified() {
+        const bowserEndElement = document.getElementById('bowser-end');
+        bowserEndElement.dataset.manuallyModified = 'true';
+        bowserEndElement.classList.remove('auto-calculated');
+        bowserEndElement.classList.add('manually-modified');
+        
+        // Clear the manual flag after 5 seconds to allow auto-calculation again
+        setTimeout(() => {
+            delete bowserEndElement.dataset.manuallyModified;
+            bowserEndElement.classList.remove('manually-modified');
+        }, 5000);
+    }
+
     async saveFuelRecord() {
         try {
             const activity = document.getElementById('activity').value;
@@ -761,6 +799,11 @@ async function getSupabaseConfig() {
             
             const distance = gaugeBroken ? 0 : (odoEnd - odoStart);
             const consumption = distance > 0 ? (litresUsed / distance) * 100 : 0;
+            
+            // Check for bowser discrepancy
+            const bowserDispensed = bowserEnd - bowserStart;
+            const discrepancy = Math.abs(bowserDispensed - litresUsed);
+            const hasDiscrepancy = discrepancy > 0.1; // 0.1L tolerance
             
             // Get the default bowser (assuming first bowser for now)
             const bowsers = await this.fetchBowsersFromSupabase();
@@ -784,6 +827,8 @@ async function getSupabaseConfig() {
                 bowser_start: bowserStart,
                 bowser_end: bowserEnd,
                 HrsKm: distance,
+                has_discrepancy: hasDiscrepancy,
+                discrepancy_amount: hasDiscrepancy ? discrepancy : 0,
                 timestamp: new Date().toISOString()
             };
             
@@ -1491,8 +1536,9 @@ async function getSupabaseConfig() {
             }
 
             const totalFuel = fuelEntries.reduce((sum, entry) => sum + (entry.fuel_amount || 0), 0);
-            const totalDistance = fuelEntries.reduce((sum, entry) => sum + (entry.distance || 0), 0);
-            const avgConsumption = totalDistance > 0 ? (totalFuel / totalDistance) * 100 : 0;
+            const totalHrsKm = fuelEntries.reduce((sum, entry) => sum + (entry.HrsKm || 0), 0);
+            const avgConsumption = totalHrsKm > 0 ? (totalFuel / totalHrsKm) * 100 : 0;
+            const discrepancyCount = fuelEntries.filter(entry => entry.has_discrepancy).length;
 
             const { data: vehicles, error: vehicleError } = await window.supabaseClient
                 .from('vehicles')
@@ -1500,12 +1546,79 @@ async function getSupabaseConfig() {
                 
             const activeVehicles = vehicleError ? 0 : vehicles.length;
 
+            // Get bowser information
+            const bowsers = await this.fetchBowsersFromSupabase();
+            const primaryBowser = bowsers.length > 0 ? bowsers[0] : null;
+            
             document.getElementById('total-fuel').textContent = `${totalFuel.toFixed(1)} L`;
-            document.getElementById('total-distance').textContent = `${totalDistance.toFixed(1)} km`;
+            document.getElementById('total-distance').textContent = `${totalHrsKm.toFixed(1)}`;
             document.getElementById('avg-consumption').textContent = `${avgConsumption.toFixed(2)} L/100km`;
             document.getElementById('active-vehicles').textContent = activeVehicles;
+
+            // Update bowser info
+            await this.updateBowserDashboard(primaryBowser, discrepancyCount);
         } catch (error) {
             console.error('Error calculating stats:', error);
+        }
+    }
+
+    async updateBowserDashboard(bowser, discrepancyCount) {
+        if (!bowser) return;
+
+        const currentLevel = bowser.current_reading || 0;
+        const capacity = bowser.capacity || 10000;
+        const percentage = (currentLevel / capacity) * 100;
+        const isLowFuel = currentLevel < 2500;
+
+        // Find when the bowser was last topped up (large increase in reading)
+        const { data: entries, error } = await window.supabaseClient
+            .from('fuel_entries')
+            .select('date, bowser_start, bowser_end')
+            .eq('bowser_id', bowser.id)
+            .order('date', { ascending: false })
+            .limit(50);
+
+        let lastToppedUp = 'Unknown';
+        if (!error && entries) {
+            // Look for entries where bowser end > bowser start + 100L (indicating a top-up)
+            const topUpEntry = entries.find(entry => 
+                (entry.bowser_end - entry.bowser_start) > 100
+            );
+            if (topUpEntry) {
+                lastToppedUp = new Date(topUpEntry.date).toLocaleDateString();
+            }
+        }
+
+        // Update dashboard elements (create if they don't exist)
+        let bowserInfoElement = document.getElementById('bowser-info');
+        if (!bowserInfoElement) {
+            const dashboardContainer = document.querySelector('.dashboard-container');
+            if (dashboardContainer) {
+                const bowserSection = document.createElement('div');
+                bowserSection.innerHTML = `
+                    <div class="bowser-status">
+                        <h3>Fuel Tank Status</h3>
+                        <div id="bowser-info"></div>
+                        ${discrepancyCount > 0 ? `<div class="low-fuel-warning">⚠️ ${discrepancyCount} records have discrepancies - requires attention</div>` : ''}
+                    </div>
+                `;
+                dashboardContainer.appendChild(bowserSection);
+                bowserInfoElement = document.getElementById('bowser-info');
+            }
+        }
+
+        if (bowserInfoElement) {
+            bowserInfoElement.innerHTML = `
+                <div class="stat-card ${isLowFuel ? 'low-fuel' : ''}">
+                    <div class="stat-icon">${isLowFuel ? '⚠️' : '⛽'}</div>
+                    <div class="stat-content">
+                        <div class="stat-value">${currentLevel.toFixed(0)}L</div>
+                        <div class="stat-label">${bowser.name} - ${percentage.toFixed(1)}% Full</div>
+                        <div class="stat-detail">Last topped up: ${lastToppedUp}</div>
+                        ${isLowFuel ? '<div class="stat-warning">Low fuel level!</div>' : ''}
+                    </div>
+                </div>
+            `;
         }
     }
 
@@ -1538,7 +1651,7 @@ async function getSupabaseConfig() {
                 }
                 
                 vehicleStats[vehicleKey].totalFuel += entry.fuel_amount || 0;
-                vehicleStats[vehicleKey].totalDistance += entry.distance || 0;
+                vehicleStats[vehicleKey].totalDistance += entry.HrsKm || 0;
                 vehicleStats[vehicleKey].recordCount++;
             });
 
@@ -1577,7 +1690,8 @@ async function getSupabaseConfig() {
                 .select(`
                     *,
                     vehicles (code, name),
-                    drivers (code, name)
+                    drivers (code, name),
+                    bowsers (name)
                 `)
                 .order('date', { ascending: false })
                 .limit(10);
@@ -1600,21 +1714,25 @@ async function getSupabaseConfig() {
                             <tr>
                                 <th>Date</th>
                                 <th>Vehicle</th>
-                                <th>Driver</th>
-                                <th>Activity</th>
+                                <th>Bowser</th>
                                 <th>Fuel</th>
-                                <th>Distance</th>
+                                <th>B.Start</th>
+                                <th>B.End</th>
+                                <th>HrsKm</th>
+                                <th>Flag</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${recentEntries.map(entry => `
-                                <tr>
+                                <tr class="${entry.has_discrepancy ? 'discrepancy-row' : ''}">
                                     <td>${new Date(entry.date).toLocaleDateString()}</td>
                                     <td>${entry.vehicles?.code || 'N/A'}</td>
-                                    <td>${entry.drivers?.code || 'N/A'}</td>
-                                    <td>${entry.activity?.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}</td>
+                                    <td>${entry.bowsers?.name || 'Tank A'}</td>
                                     <td>${entry.fuel_amount?.toFixed(1) || 0}L</td>
-                                    <td>${entry.distance?.toFixed(1) || 0}km</td>
+                                    <td>${entry.bowser_start?.toFixed(1) || 0}</td>
+                                    <td>${entry.bowser_end?.toFixed(1) || 0}</td>
+                                    <td>${entry.HrsKm?.toFixed(1) || 0}</td>
+                                    <td>${entry.has_discrepancy ? '⚠️' : '✅'}</td>
                                 </tr>
                             `).join('')}
                         </tbody>

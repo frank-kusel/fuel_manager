@@ -30,10 +30,21 @@ CREATE INDEX IF NOT EXISTS idx_fuel_entries_date_bowser ON fuel_entries(date, bo
 -- 5. Enable Row Level Security (optional but recommended)
 ALTER TABLE bowsers ENABLE ROW LEVEL SECURITY;
 
--- 6. Create RLS policies (adjust as needed for your authentication setup)
--- This allows all authenticated users to read and write bowser data
-CREATE POLICY "Allow all operations for authenticated users" ON bowsers
-    FOR ALL USING (auth.role() = 'authenticated');
+-- 6. Create RLS policies (choose ONE of the options below based on your setup)
+
+-- OPTION A: Disable RLS entirely (simplest for development/single-user)
+-- ALTER TABLE bowsers DISABLE ROW LEVEL SECURITY;
+
+-- OPTION B: Allow all operations without authentication (for development)
+CREATE POLICY "Allow all operations" ON bowsers FOR ALL USING (true);
+
+-- OPTION C: Allow authenticated users (if you have Supabase auth set up)
+-- CREATE POLICY "Allow all operations for authenticated users" ON bowsers
+--     FOR ALL USING (auth.role() = 'authenticated');
+
+-- OPTION D: Allow specific user (replace with your actual user ID)
+-- CREATE POLICY "Allow operations for specific user" ON bowsers
+--     FOR ALL USING (auth.uid() = 'your-user-id-here');
 
 -- 7. Update timestamp trigger for bowsers table
 CREATE OR REPLACE FUNCTION update_updated_at_column()
