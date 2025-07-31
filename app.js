@@ -2091,11 +2091,26 @@ async function getSupabaseConfig() {
 
             const calendarGrid = document.getElementById('activity-calendar-grid');
             if (calendarGrid) {
-                // Generate last 90 days
+                // Generate rolling 12-month calendar like GitHub
+                const today = new Date();
+                const endDate = new Date(today);
+                
+                // Start from 12 months ago, beginning of week (Sunday)
+                const startDate = new Date(today);
+                startDate.setFullYear(today.getFullYear() - 1);
+                startDate.setMonth(today.getMonth());
+                startDate.setDate(today.getDate());
+                
+                // Find the Sunday before the start date
+                const dayOfWeek = startDate.getDay();
+                startDate.setDate(startDate.getDate() - dayOfWeek);
+                
+                // Generate all days from start to end
                 const days = [];
-                for (let i = 89; i >= 0; i--) {
-                    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-                    const dateStr = date.toISOString().split('T')[0];
+                const currentDate = new Date(startDate);
+                
+                while (currentDate <= endDate) {
+                    const dateStr = currentDate.toISOString().split('T')[0];
                     const count = activityCounts[dateStr] || 0;
                     
                     let level = 0;
@@ -2105,12 +2120,55 @@ async function getSupabaseConfig() {
                     else if (count >= 1) level = 1;
                     
                     days.push(`<div class="calendar-cell level-${level}" title="${dateStr}: ${count} records"></div>`);
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                // Fill remaining cells to complete the last week if needed
+                const remainingCells = 7 - (days.length % 7);
+                if (remainingCells < 7) {
+                    for (let i = 0; i < remainingCells; i++) {
+                        const nextDate = new Date(currentDate);
+                        nextDate.setDate(currentDate.getDate() + i);
+                        const dateStr = nextDate.toISOString().split('T')[0];
+                        days.push(`<div class="calendar-cell" title="${dateStr}: Future"></div>`);
+                    }
                 }
                 
                 calendarGrid.innerHTML = days.join('');
+                
+                // Update month labels dynamically
+                this.updateCalendarMonthLabels();
             }
         } catch (error) {
             console.error('Error rendering activity calendar:', error);
+        }
+    }
+
+    updateCalendarMonthLabels() {
+        try {
+            const monthsContainer = document.querySelector('.calendar-months');
+            if (!monthsContainer) return;
+            
+            const today = new Date();
+            const months = [];
+            
+            // Generate 12 months ending with current month
+            for (let i = 11; i >= 0; i--) {
+                const date = new Date(today);
+                date.setMonth(today.getMonth() - i);
+                const monthName = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+                months.push(monthName);
+            }
+            
+            // Update month labels
+            const monthElements = monthsContainer.querySelectorAll('.calendar-month');
+            monthElements.forEach((element, index) => {
+                if (months[index]) {
+                    element.textContent = months[index];
+                }
+            });
+        } catch (error) {
+            console.error('Error updating calendar month labels:', error);
         }
     }
 
