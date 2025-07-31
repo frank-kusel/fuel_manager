@@ -2136,40 +2136,51 @@ async function getSupabaseConfig() {
                 
                 calendarGrid.innerHTML = days.join('');
                 
-                // Update month labels dynamically
-                this.updateCalendarMonthLabels();
+                // Update week number labels
+                this.updateCalendarWeekLabels(startDate, days.length);
             }
         } catch (error) {
             console.error('Error rendering activity calendar:', error);
         }
     }
 
-    updateCalendarMonthLabels() {
+    updateCalendarWeekLabels(startDate, totalDays) {
         try {
-            const monthsContainer = document.querySelector('.calendar-months');
-            if (!monthsContainer) return;
+            const weeksContainer = document.getElementById('calendar-weeks');
+            if (!weeksContainer) return;
             
-            const today = new Date();
-            const months = [];
+            const totalWeeks = Math.ceil(totalDays / 7);
+            const weekLabels = [];
             
-            // Generate 12 months ending with current month
-            for (let i = 11; i >= 0; i--) {
-                const date = new Date(today);
-                date.setMonth(today.getMonth() - i);
-                const monthName = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-                months.push(monthName);
+            // Generate week number labels every 5 weeks
+            for (let week = 0; week < totalWeeks; week++) {
+                if (week % 5 === 0) {
+                    const weekDate = new Date(startDate);
+                    weekDate.setDate(startDate.getDate() + (week * 7));
+                    
+                    // Get ISO week number
+                    const weekNumber = this.getISOWeekNumber(weekDate);
+                    weekLabels.push(`<div class="calendar-week-label" style="grid-column: ${week + 1};">W${weekNumber}</div>`);
+                } else {
+                    weekLabels.push(`<div class="calendar-week-label" style="grid-column: ${week + 1};"></div>`);
+                }
             }
             
-            // Update month labels
-            const monthElements = monthsContainer.querySelectorAll('.calendar-month');
-            monthElements.forEach((element, index) => {
-                if (months[index]) {
-                    element.textContent = months[index];
-                }
-            });
+            weeksContainer.innerHTML = weekLabels.join('');
         } catch (error) {
-            console.error('Error updating calendar month labels:', error);
+            console.error('Error updating calendar week labels:', error);
         }
+    }
+    
+    getISOWeekNumber(date) {
+        const tempDate = new Date(date.getTime());
+        tempDate.setHours(0, 0, 0, 0);
+        // Thursday in current week decides the year
+        tempDate.setDate(tempDate.getDate() + 3 - (tempDate.getDay() + 6) % 7);
+        // January 4 is always in week 1
+        const week1 = new Date(tempDate.getFullYear(), 0, 4);
+        // Adjust to Thursday in week 1 and count weeks from there
+        return 1 + Math.round(((tempDate.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
     }
 
     // Export Methods
