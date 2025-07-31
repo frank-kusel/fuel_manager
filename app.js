@@ -1528,99 +1528,106 @@ async function getSupabaseConfig() {
         try {
             const { data: fuelEntries, error } = await window.supabaseClient
                 .from('fuel_entries')
-                .select('*');
+                .select(`
+                    *,
+                    vehicles (code, name)
+                `);
                 
             if (error) {
                 console.error('Error fetching fuel entries for stats:', error);
                 return;
             }
 
-            const totalFuel = fuelEntries.reduce((sum, entry) => sum + (entry.fuel_amount || 0), 0);
-            const totalHrsKm = fuelEntries.reduce((sum, entry) => sum + (entry.HrsKm || 0), 0);
-            const avgConsumption = totalHrsKm > 0 ? (totalFuel / totalHrsKm) * 100 : 0;
+            // Get date ranges
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+
+            // Filter entries
+            const todayEntries = fuelEntries.filter(entry => entry.date === todayStr);
+            const monthEntries = fuelEntries.filter(entry => {
+                const entryDate = new Date(entry.date);
+                return entryDate.getMonth() === currentMonth && entryDate.getFullYear() === currentYear;
+            });
+
+            // Calculate metrics
+            const monthlyFuel = monthEntries.reduce((sum, entry) => sum + (entry.fuel_amount || 0), 0);
+            const dailyFuel = todayEntries.reduce((sum, entry) => sum + (entry.fuel_amount || 0), 0);
+            const vehiclesRefueledToday = new Set(todayEntries.map(entry => entry.vehicle_id)).size;
             const discrepancyCount = fuelEntries.filter(entry => entry.has_discrepancy).length;
 
-            const { data: vehicles, error: vehicleError } = await window.supabaseClient
-                .from('vehicles')
-                .select('id');
+            // Find worst performer (highest consumption)
+            const vehicleConsumption = {};
+            fuelEntries.forEach(entry => {
+                if (!entry.vehicles || !entry.HrsKm || entry.HrsKm <= 0) return;
                 
-            const activeVehicles = vehicleError ? 0 : vehicles.length;
+                const vehicleKey = entry.vehicle_id;
+                if (!vehicleConsumption[vehicleKey]) {
+                    vehicleConsumption[vehicleKey] = {
+                        code: entry.vehicles.code,
+                        totalFuel: 0,
+                        totalHrsKm: 0
+                    };
+                }
+                vehicleConsumption[vehicleKey].totalFuel += entry.fuel_amount || 0;
+                vehicleConsumption[vehicleKey].totalHrsKm += entry.HrsKm || 0;
+            });
+
+            let worstPerformer = '-';
+            let highestConsumption = 0;
+            Object.values(vehicleConsumption).forEach(vehicle => {
+                if (vehicle.totalHrsKm > 0) {
+                    const consumption = (vehicle.totalFuel / vehicle.totalHrsKm) * 100;
+                    if (consumption > highestConsumption) {
+                        highestConsumption = consumption;
+                        worstPerformer = `${vehicle.code} (${consumption.toFixed(1)})`;
+                    }
+                }
+            });
 
             // Get bowser information
             const bowsers = await this.fetchBowsersFromSupabase();
             const primaryBowser = bowsers.length > 0 ? bowsers[0] : null;
             
-            document.getElementById('total-fuel').textContent = `${totalFuel.toFixed(1)} L`;
-            document.getElementById('total-distance').textContent = `${totalHrsKm.toFixed(1)}`;
-            document.getElementById('avg-consumption').textContent = `${avgConsumption.toFixed(2)} L/100km`;
-            document.getElementById('active-vehicles').textContent = activeVehicles;
+            // Update dashboard elements
+            document.getElementById('monthly-fuel').textContent = `${monthlyFuel.toFixed(1)} L`;
+            document.getElementById('daily-fuel').textContent = `${dailyFuel.toFixed(1)} L`;
+            document.getElementById('vehicles-refueled-today').textContent = vehiclesRefueledToday;
+            document.getElementById('discrepancy-count').textContent = discrepancyCount;
+            document.getElementById('worst-performer').textContent = worstPerformer;
 
-            // Update bowser info
-            await this.updateBowserDashboard(primaryBowser, discrepancyCount);
+            // Update tank level and status
+            if (primaryBowser) {
+                const tankLevel = primaryBowser.current_reading || 0;
+                const isLowFuel = tankLevel < 2500;
+                const tankCard = document.getElementById('tank-status-card');
+                
+                document.getElementById('tank-level').textContent = `${tankLevel.toFixed(0)} L`;
+                
+                if (isLowFuel) {
+                    tankCard.classList.add('low-fuel-warning');
+                    document.getElementById('tank-level').style.color = 'var(--error)';
+                } else {
+                    tankCard.classList.remove('low-fuel-warning');
+                    document.getElementById('tank-level').style.color = '';
+                }
+                
+                // Set discrepancy count color
+                const discrepancyCard = document.getElementById('discrepancy-count');
+                if (discrepancyCount > 0) {
+                    discrepancyCard.style.color = 'var(--error)';
+                } else {
+                    discrepancyCard.style.color = 'var(--success)';
+                }
+            }
+
         } catch (error) {
             console.error('Error calculating stats:', error);
         }
     }
 
-    async updateBowserDashboard(bowser, discrepancyCount) {
-        if (!bowser) return;
-
-        const currentLevel = bowser.current_reading || 0;
-        const capacity = bowser.capacity || 10000;
-        const percentage = (currentLevel / capacity) * 100;
-        const isLowFuel = currentLevel < 2500;
-
-        // Find when the bowser was last topped up (large increase in reading)
-        const { data: entries, error } = await window.supabaseClient
-            .from('fuel_entries')
-            .select('date, bowser_start, bowser_end')
-            .eq('bowser_id', bowser.id)
-            .order('date', { ascending: false })
-            .limit(50);
-
-        let lastToppedUp = 'Unknown';
-        if (!error && entries) {
-            // Look for entries where bowser end > bowser start + 100L (indicating a top-up)
-            const topUpEntry = entries.find(entry => 
-                (entry.bowser_end - entry.bowser_start) > 100
-            );
-            if (topUpEntry) {
-                lastToppedUp = new Date(topUpEntry.date).toLocaleDateString();
-            }
-        }
-
-        // Update dashboard elements (create if they don't exist)
-        let bowserInfoElement = document.getElementById('bowser-info');
-        if (!bowserInfoElement) {
-            const dashboardContainer = document.querySelector('.dashboard-container');
-            if (dashboardContainer) {
-                const bowserSection = document.createElement('div');
-                bowserSection.innerHTML = `
-                    <div class="bowser-status">
-                        <h3>Fuel Tank Status</h3>
-                        <div id="bowser-info"></div>
-                        ${discrepancyCount > 0 ? `<div class="low-fuel-warning">⚠️ ${discrepancyCount} records have discrepancies - requires attention</div>` : ''}
-                    </div>
-                `;
-                dashboardContainer.appendChild(bowserSection);
-                bowserInfoElement = document.getElementById('bowser-info');
-            }
-        }
-
-        if (bowserInfoElement) {
-            bowserInfoElement.innerHTML = `
-                <div class="stat-card ${isLowFuel ? 'low-fuel' : ''}">
-                    <div class="stat-icon">${isLowFuel ? '⚠️' : '⛽'}</div>
-                    <div class="stat-content">
-                        <div class="stat-value">${currentLevel.toFixed(0)}L</div>
-                        <div class="stat-label">${bowser.name} - ${percentage.toFixed(1)}% Full</div>
-                        <div class="stat-detail">Last topped up: ${lastToppedUp}</div>
-                        ${isLowFuel ? '<div class="stat-warning">Low fuel level!</div>' : ''}
-                    </div>
-                </div>
-            `;
-        }
-    }
+    // Removed updateBowserDashboard - tank status now integrated in main stats
 
     async renderVehicleSummary() {
         try {
@@ -1655,28 +1662,24 @@ async function getSupabaseConfig() {
                 vehicleStats[vehicleKey].recordCount++;
             });
 
-            const summaryTable = document.getElementById('vehicle-summary-table');
-            if (summaryTable) {
+            const summaryTableBody = document.getElementById('vehicle-summary-body');
+            if (summaryTableBody) {
                 const summaryHTML = Object.values(vehicleStats).map(stat => {
                     const avgConsumption = stat.totalDistance > 0 ? 
                         (stat.totalFuel / stat.totalDistance) * 100 : 0;
                     
                     return `
-                        <div class="summary-row">
-                            <div class="summary-vehicle">
-                                <strong>${stat.vehicle.code}</strong> - ${stat.vehicle.name}
-                            </div>
-                            <div class="summary-stats">
-                                <span>${stat.totalFuel.toFixed(1)}L</span>
-                                <span>${stat.totalDistance.toFixed(1)}km</span>
-                                <span>${avgConsumption.toFixed(2)}L/100km</span>
-                                <span class="badge">${stat.recordCount}</span>
-                            </div>
-                        </div>
+                        <tr>
+                            <td><strong>${stat.vehicle.code}</strong> - ${stat.vehicle.name}</td>
+                            <td>${stat.totalFuel.toFixed(1)}</td>
+                            <td>${stat.totalDistance.toFixed(1)}</td>
+                            <td>${avgConsumption.toFixed(2)}</td>
+                            <td>${stat.recordCount}</td>
+                        </tr>
                     `;
                 }).join('');
                 
-                summaryTable.innerHTML = summaryHTML || '<p>No vehicle data available.</p>';
+                summaryTableBody.innerHTML = summaryHTML || '<tr><td colspan="5">No vehicle data available.</td></tr>';
             }
         } catch (error) {
             console.error('Error rendering vehicle summary:', error);
@@ -1709,34 +1712,40 @@ async function getSupabaseConfig() {
                 }
                 
                 const tableHTML = `
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Vehicle</th>
-                                <th>Bowser</th>
-                                <th>Fuel</th>
-                                <th>B.Start</th>
-                                <th>B.End</th>
-                                <th>HrsKm</th>
-                                <th>Flag</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${recentEntries.map(entry => `
-                                <tr class="${entry.has_discrepancy ? 'discrepancy-row' : ''}">
-                                    <td>${new Date(entry.date).toLocaleDateString()}</td>
-                                    <td>${entry.vehicles?.code || 'N/A'}</td>
-                                    <td>${entry.bowsers?.name || 'Tank A'}</td>
-                                    <td>${entry.fuel_amount?.toFixed(1) || 0}L</td>
-                                    <td>${entry.bowser_start?.toFixed(1) || 0}</td>
-                                    <td>${entry.bowser_end?.toFixed(1) || 0}</td>
-                                    <td>${entry.HrsKm?.toFixed(1) || 0}</td>
-                                    <td>${entry.has_discrepancy ? '⚠️' : '✅'}</td>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Vehicle</th>
+                                    <th>Tank</th>
+                                    <th>Fuel</th>
+                                    <th>ODO Start</th>
+                                    <th>ODO End</th>
+                                    <th>HrsKm</th>
+                                    <th>Tank Start</th>
+                                    <th>Tank End</th>
+                                    <th>Flag</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                ${recentEntries.map(entry => `
+                                    <tr class="${entry.has_discrepancy ? 'discrepancy-row' : ''}">
+                                        <td>${new Date(entry.date).toLocaleDateString()}</td>
+                                        <td>${entry.vehicles?.code || 'N/A'}</td>
+                                        <td>${entry.bowsers?.name || 'Tank A'}</td>
+                                        <td>${entry.fuel_amount?.toFixed(1) || 0}L</td>
+                                        <td>${entry.odo_start?.toFixed(1) || 0}</td>
+                                        <td>${entry.odo_end?.toFixed(1) || 0}</td>
+                                        <td>${entry.HrsKm?.toFixed(1) || 0}</td>
+                                        <td>${entry.bowser_start?.toFixed(1) || 0}</td>
+                                        <td>${entry.bowser_end?.toFixed(1) || 0}</td>
+                                        <td>${entry.has_discrepancy ? '⚠️' : '✅'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 `;
                 
                 recentTable.innerHTML = tableHTML;

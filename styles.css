@@ -1233,15 +1233,76 @@ input[readonly] {
     background: #16a34a;
 }
 
-/* Hide complex dashboard elements on mobile */
+/* Calendar Legend Styling */
+.calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    color: var(--gray-600);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+/* Calendar Grid Mobile Fix */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12px, 1fr));
+    gap: 2px;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* Dashboard Mobile Improvements */
 @media (max-width: 768px) {
-    .plot-container,
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+    
     .activity-calendar {
-        display: none;
+        margin: 1rem 0;
+        padding: 1rem;
+        background: white;
+        border-radius: 12px;
+        border: 1px solid var(--gray-200);
+    }
+    
+    .calendar-grid {
+        grid-template-columns: repeat(13, 1fr);
+        max-width: 100%;
+        margin: 1rem 0;
+    }
+    
+    .calendar-legend {
+        flex-direction: column;
+        gap: 0.5rem;
+        font-size: 0.7rem;
+    }
+    
+    .legend-item {
+        justify-content: flex-start;
     }
     
     .dashboard-container {
         padding-bottom: 2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .calendar-grid {
+        grid-template-columns: repeat(7, 1fr);
     }
 }
 
@@ -1459,5 +1520,47 @@ input[readonly] {
     #bowsers-management-table td:nth-child(4) { /* Status */
         width: 20%;
         text-align: center;
+    }
+
+    /* Recent Records Table Mobile Responsive */
+    .recent-records .table {
+        font-size: 11px;
+        min-width: 800px; /* Force horizontal scroll on mobile */
+    }
+    
+    .recent-records .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+    }
+    
+    .recent-records .table th,
+    .recent-records .table td {
+        padding: 0.4rem 0.3rem;
+        white-space: nowrap;
+        font-size: 10px;
+    }
+    
+    .recent-records .table th:first-child,
+    .recent-records .table td:first-child { /* Date */
+        position: sticky;
+        left: 0;
+        background: white;
+        z-index: 2;
+        border-right: 2px solid var(--gray-200);
+        min-width: 60px;
+    }
+    
+    .recent-records .table th:nth-child(2),
+    .recent-records .table td:nth-child(2) { /* Vehicle */
+        font-weight: 600;
+        color: var(--primary);
+        min-width: 50px;
+    }
+    
+    .recent-records .discrepancy-row th:first-child,
+    .recent-records .discrepancy-row td:first-child {
+        background: rgba(245, 158, 11, 0.1);
     }
 }

@@ -272,35 +272,51 @@
                     </div>
                     
                     <div class="stats-grid">
+                        <div class="stat-card" id="tank-status-card">
+                            <div class="stat-icon">🛢️</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="tank-level">0 L</div>
+                                <div class="stat-label">Tank Level</div>
+                            </div>
+                        </div>
+                        
                         <div class="stat-card">
                             <div class="stat-icon">⛽</div>
                             <div class="stat-content">
-                                <div class="stat-value" id="total-fuel">0 L</div>
-                                <div class="stat-label">Total Fuel</div>
+                                <div class="stat-value" id="monthly-fuel">0 L</div>
+                                <div class="stat-label">Fuel This Month</div>
                             </div>
                         </div>
                         
                         <div class="stat-card">
-                            <div class="stat-icon">📏</div>
+                            <div class="stat-icon">📅</div>
                             <div class="stat-content">
-                                <div class="stat-value" id="total-distance">0</div>
-                                <div class="stat-label">HrsKm</div>
-                            </div>
-                        </div>
-                        
-                        <div class="stat-card">
-                            <div class="stat-icon">📊</div>
-                            <div class="stat-content">
-                                <div class="stat-value" id="avg-consumption">0 L/100km</div>
-                                <div class="stat-label">Avg Consumption</div>
+                                <div class="stat-value" id="daily-fuel">0 L</div>
+                                <div class="stat-label">Fuel Today</div>
                             </div>
                         </div>
                         
                         <div class="stat-card">
                             <div class="stat-icon">🚛</div>
                             <div class="stat-content">
-                                <div class="stat-value" id="active-vehicles">0</div>
-                                <div class="stat-label">Vehicles</div>
+                                <div class="stat-value" id="vehicles-refueled-today">0</div>
+                                <div class="stat-label">Vehicles Today</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">⚠️</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="discrepancy-count">0</div>
+                                <div class="stat-label">Discrepancies</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="worst-performer">-</div>
+                                <div class="stat-label">Highest Consumer</div>
                             </div>
                         </div>
                     </div>
@@ -311,44 +327,47 @@
                         <button id="export-canepro" class="btn btn-success btn-compact">📊 CanePro</button>
                     </div>
                     
-                    <div class="plot-container">
-                        <h3 class="mb-2">Vehicle Fuel Consumption Comparison</h3>
-                        <canvas id="comparison-chart" width="400" height="200"></canvas>
-                    </div>
-                    
-                    <div class="plot-container">
-                        <h3 class="mb-2">Fuel Consumption Trend Over Time</h3>
-                        <canvas id="consumption-chart" width="400" height="200"></canvas>
-                    </div>
-                    
                     <div class="activity-calendar">
-                        <h3 class="mb-2">Fleet Activity Overview</h3>
+                        <h3>Fleet Activity Overview</h3>
                         <div id="activity-calendar-grid" class="calendar-grid">
                             <!-- Activity calendar will be populated by JavaScript -->
                         </div>
-                        <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--gray-600);">
-                            <span style="display: inline-flex; align-items: center; margin-right: 1rem;">
-                                <div class="calendar-cell" style="margin-right: 0.25rem;"></div> No activity
+                        <div class="calendar-legend">
+                            <span class="legend-item">
+                                <div class="calendar-cell"></div> No activity
                             </span>
-                            <span style="display: inline-flex; align-items: center; margin-right: 1rem;">
-                                <div class="calendar-cell level-1" style="margin-right: 0.25rem;"></div> 1-2 records
+                            <span class="legend-item">
+                                <div class="calendar-cell level-1"></div> 1-2 records
                             </span>
-                            <span style="display: inline-flex; align-items: center; margin-right: 1rem;">
-                                <div class="calendar-cell level-2" style="margin-right: 0.25rem;"></div> 3-4 records
+                            <span class="legend-item">
+                                <div class="calendar-cell level-2"></div> 3-4 records
                             </span>
-                            <span style="display: inline-flex; align-items: center; margin-right: 1rem;">
-                                <div class="calendar-cell level-3" style="margin-right: 0.25rem;"></div> 5-6 records
+                            <span class="legend-item">
+                                <div class="calendar-cell level-3"></div> 5-6 records
                             </span>
-                            <span style="display: inline-flex; align-items: center;">
-                                <div class="calendar-cell level-4" style="margin-right: 0.25rem;"></div> 7+ records
+                            <span class="legend-item">
+                                <div class="calendar-cell level-4"></div> 7+ records
                             </span>
                         </div>
                     </div>
                     
                     <div class="vehicle-summary">
                         <h3>Vehicle Summary</h3>
-                        <div id="vehicle-summary-table">
-                            <!-- Table will be populated by JavaScript -->
+                        <div class="table-container">
+                            <table class="table" id="vehicle-summary-table">
+                                <thead>
+                                    <tr>
+                                        <th>Vehicle</th>
+                                        <th>Fuel (L)</th>
+                                        <th>HrsKm</th>
+                                        <th>L/100km</th>
+                                        <th>Records</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vehicle-summary-body">
+                                    <!-- Table will be populated by JavaScript -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                     
