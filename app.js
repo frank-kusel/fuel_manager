@@ -647,53 +647,55 @@ async function getSupabaseConfig() {
             reviewSummary.innerHTML = `
                 <div class="review-card">
                     <h3>Record Summary</h3>
-                    <div class="review-row">
-                        <span class="review-label">Vehicle:</span>
-                        <span>${this.currentVehicle.code} - ${this.currentVehicle.name}</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Driver:</span>
-                        <span>${this.currentDriver.code} - ${this.currentDriver.name}</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Activity:</span>
-                        <span>${activity.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Location:</span>
-                        <span>${fieldName}</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Odometer Start:</span>
-                        <span>${odoStart.toFixed(1)} km</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Odometer End:</span>
-                        <span>${gaugeBroken ? 'N/A (gauge broken)' : odoEnd.toFixed(1) + ' km'}</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">HrsKm:</span>
-                        <span>${gaugeBroken ? 'N/A (gauge broken)' : distance.toFixed(1)}</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Fuel Used:</span>
-                        <span>${litresUsed.toFixed(2)} L</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Bowser Start:</span>
-                        <span>${bowserStart.toFixed(2)} L</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Bowser End:</span>
-                        <span>${bowserEnd.toFixed(2)} L</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Bowser Dispensed:</span>
-                        <span>${bowserDispensed.toFixed(2)} L</span>
-                    </div>
-                    <div class="review-row">
-                        <span class="review-label">Consumption:</span>
-                        <span>${fuelConsumption || 'N/A'}</span>
+                    <div class="review-grid">
+                        <div class="review-item">
+                            <span class="review-label">Vehicle</span>
+                            <span class="review-value review-highlight">${this.currentVehicle.code} - ${this.currentVehicle.name}</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Driver</span>
+                            <span class="review-value">${this.currentDriver.code} - ${this.currentDriver.name}</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Activity</span>
+                            <span class="review-value">${activity.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Location</span>
+                            <span class="review-value">${fieldName}</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Odometer Start</span>
+                            <span class="review-value">${odoStart.toFixed(1)} km</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Odometer End</span>
+                            <span class="review-value">${gaugeBroken ? 'N/A (gauge broken)' : odoEnd.toFixed(1) + ' km'}</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Distance</span>
+                            <span class="review-value">${gaugeBroken ? 'N/A (gauge broken)' : distance.toFixed(1) + ' km'}</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Fuel Used</span>
+                            <span class="review-value review-highlight">${litresUsed.toFixed(2)} L</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Bowser Start</span>
+                            <span class="review-value">${bowserStart.toFixed(2)} L</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Bowser End</span>
+                            <span class="review-value">${bowserEnd.toFixed(2)} L</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Bowser Dispensed</span>
+                            <span class="review-value">${bowserDispensed.toFixed(2)} L</span>
+                        </div>
+                        <div class="review-item">
+                            <span class="review-label">Consumption</span>
+                            <span class="review-value">${fuelConsumption || 'N/A'}</span>
+                        </div>
                     </div>
                 </div>
             `;
