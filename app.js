@@ -151,6 +151,11 @@ async function getSupabaseConfig() {
 
         // Bowser management
         document.getElementById('add-bowser').addEventListener('click', () => this.addNewBowser());
+        document.getElementById('add-refill').addEventListener('click', () => this.addBowserRefill());
+        document.getElementById('reconcile-month').addEventListener('click', () => this.reconcileMonth());
+
+        // Toggle button functionality
+        this.setupToggleButtons();
 
         // Fuel consumption calculation and gauge broken functionality
         document.getElementById('odo-start').addEventListener('input', () => this.calculateConsumption());
@@ -212,11 +217,43 @@ async function getSupabaseConfig() {
             this.renderDriverManagement();
         } else if (section === 'bowsers') {
             this.renderBowserManagement();
+            this.renderRefillHistory();
+            this.updateReconciliationStatus();
         } else if (section === 'fuel-entry') {
             // Ensure vehicles are rendered for fuel entry
             this.renderVehicles();
             this.renderDrivers();
         }
+    }
+
+    setupToggleButtons() {
+        // Vehicle summary toggle buttons
+        const vehicleToggleBtns = document.querySelectorAll('.vehicle-summary .toggle-btn');
+        vehicleToggleBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // Remove active class from all buttons in this group
+                vehicleToggleBtns.forEach(b => b.classList.remove('active'));
+                // Add active class to clicked button
+                e.target.classList.add('active');
+                // Re-render vehicle summary with new period
+                const period = e.target.dataset.period;
+                this.renderVehicleSummary(period);
+            });
+        });
+
+        // Recent records toggle buttons
+        const recordsToggleBtns = document.querySelectorAll('.recent-records .toggle-btn');
+        recordsToggleBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // Remove active class from all buttons in this group
+                recordsToggleBtns.forEach(b => b.classList.remove('active'));
+                // Add active class to clicked button
+                e.target.classList.add('active');
+                // Re-render recent records with new period
+                const period = e.target.dataset.period;
+                this.renderRecentRecords(period);
+            });
+        });
     }
 
     showStep(step) {
@@ -1429,6 +1466,229 @@ async function getSupabaseConfig() {
         }
     }
 
+    async addBowserRefill() {
+        const bowsers = await this.fetchBowsersFromSupabase();
+        if (bowsers.length === 0) {
+            alert('No bowsers found. Please add a bowser first.');
+            return;
+        }
+
+        const bowserOptions = bowsers.map(b => `${b.id}:${b.name}`).join(',');
+        const bowserId = prompt(`Select bowser (${bowsers.map(b => `${b.id}=${b.name}`).join(', ')}):`);
+        if (!bowserId || isNaN(parseInt(bowserId))) return;
+
+        const selectedBowser = bowsers.find(b => b.id === parseInt(bowserId));
+        if (!selectedBowser) {
+            alert('Invalid bowser selection.');
+            return;
+        }
+
+        const supplier = prompt('Enter supplier name:');
+        if (!supplier || !supplier.trim()) return;
+
+        const amount = prompt('Enter fuel amount delivered (L):');
+        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+            alert('Please enter a valid fuel amount.');
+            return;
+        }
+
+        const cost = prompt('Enter total cost (optional):', '0');
+        const costValue = cost && !isNaN(parseFloat(cost)) ? parseFloat(cost) : 0;
+
+        const date = prompt('Enter delivery date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+        if (!date) return;
+
+        try {
+            const readingBefore = selectedBowser.current_reading || 0;
+            const readingAfter = readingBefore + parseFloat(amount);
+
+            // Create refill record
+            const refillData = {
+                bowser_id: selectedBowser.id,
+                date: date,
+                supplier: supplier.trim(),
+                amount: parseFloat(amount),
+                reading_before: readingBefore,
+                reading_after: readingAfter,
+                cost: costValue,
+                timestamp: new Date().toISOString()
+            };
+
+            const { error: refillError } = await window.supabaseClient
+                .from('bowser_refills')
+                .insert([refillData]);
+
+            if (refillError) {
+                console.error('Error adding refill record:', refillError);
+                alert('Error adding refill record: ' + refillError.message);
+                return;
+            }
+
+            // Update bowser current reading
+            const { error: bowserError } = await window.supabaseClient
+                .from('bowsers')
+                .update({ current_reading: readingAfter })
+                .eq('id', selectedBowser.id);
+
+            if (bowserError) {
+                console.error('Error updating bowser reading:', bowserError);
+                alert('Refill recorded but failed to update bowser reading.');
+            }
+
+            alert('Bowser refill recorded successfully!');
+            this.invalidateCache();
+            await this.renderRefillHistory();
+            await this.renderBowserManagement();
+
+        } catch (error) {
+            console.error('Error adding bowser refill:', error);
+            alert('Error adding bowser refill. Please try again.');
+        }
+    }
+
+    async renderRefillHistory() {
+        try {
+            const { data: refills, error } = await window.supabaseClient
+                .from('bowser_refills')
+                .select(`
+                    *,
+                    bowsers (name)
+                `)
+                .order('date', { ascending: false })
+                .limit(20);
+
+            const tableBody = document.getElementById('refill-history-body');
+            if (!tableBody) return;
+
+            if (error || !refills) {
+                console.error('Error fetching refill history:', error);
+                tableBody.innerHTML = '<tr><td colspan="7">Error loading refill history.</td></tr>';
+                return;
+            }
+
+            if (refills.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 1rem; color: #64748b;">No refill records found.</td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = refills.map(refill => `
+                <tr>
+                    <td>${new Date(refill.date).toLocaleDateString()}</td>
+                    <td>${refill.bowsers?.name || 'Unknown'}</td>
+                    <td>${refill.supplier || 'N/A'}</td>
+                    <td>${refill.amount?.toFixed(1) || 0}L</td>
+                    <td>${refill.reading_before?.toFixed(1) || 0}</td>
+                    <td>${refill.reading_after?.toFixed(1) || 0}</td>
+                    <td>R${refill.cost?.toFixed(2) || '0.00'}</td>
+                </tr>
+            `).join('');
+
+        } catch (error) {
+            console.error('Error rendering refill history:', error);
+        }
+    }
+
+    async reconcileMonth() {
+        try {
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+            // Get all fuel entries for current month
+            const startDate = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+            const endDate = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+
+            const { data: fuelEntries, error: fuelError } = await window.supabaseClient
+                .from('fuel_entries')
+                .select('*')
+                .gte('date', startDate)
+                .lte('date', endDate);
+
+            // Get all refills for current month
+            const { data: refills, error: refillError } = await window.supabaseClient
+                .from('bowser_refills')
+                .select('*')
+                .gte('date', startDate)
+                .lte('date', endDate);
+
+            if (fuelError || refillError) {
+                alert('Error fetching reconciliation data.');
+                return;
+            }
+
+            const totalFuelDispensed = fuelEntries.reduce((sum, entry) => sum + (entry.fuel_amount || 0), 0);
+            const totalFuelReceived = refills.reduce((sum, refill) => sum + (refill.amount || 0), 0);
+            const discrepancyCount = fuelEntries.filter(entry => entry.has_discrepancy).length;
+            const totalCost = refills.reduce((sum, refill) => sum + (refill.cost || 0), 0);
+
+            // Create reconciliation record
+            const reconciliationData = {
+                month: `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`,
+                fuel_dispensed: totalFuelDispensed,
+                fuel_received: totalFuelReceived,
+                discrepancy_count: discrepancyCount,
+                total_cost: totalCost,
+                status: 'completed',
+                reconciled_date: new Date().toISOString(),
+                notes: `Reconciliation for ${monthName}`
+            };
+
+            const { error: recError } = await window.supabaseClient
+                .from('monthly_reconciliations')
+                .upsert([reconciliationData], { onConflict: 'month' });
+
+            if (recError) {
+                console.error('Error saving reconciliation:', recError);
+                alert('Error saving reconciliation record.');
+                return;
+            }
+
+            alert(`Reconciliation completed for ${monthName}!\n\nFuel Received: ${totalFuelReceived.toFixed(1)}L\nFuel Dispensed: ${totalFuelDispensed.toFixed(1)}L\nDiscrepancies: ${discrepancyCount}\nTotal Cost: R${totalCost.toFixed(2)}`);
+            
+            await this.updateReconciliationStatus();
+
+        } catch (error) {
+            console.error('Error during reconciliation:', error);
+            alert('Error during reconciliation process.');
+        }
+    }
+
+    async updateReconciliationStatus() {
+        try {
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+
+            const { data: reconciliation, error } = await window.supabaseClient
+                .from('monthly_reconciliations')
+                .select('*')
+                .eq('month', currentMonth)
+                .single();
+
+            const statusElement = document.getElementById('reconciliation-status');
+            if (!statusElement) return;
+
+            if (error || !reconciliation) {
+                statusElement.innerHTML = `
+                    <div style="color: var(--warning); padding: 1rem; background: #fef3c7; border-radius: 6px;">
+                        ⏳ ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} reconciliation pending
+                    </div>
+                `;
+            } else {
+                statusElement.innerHTML = `
+                    <div style="color: var(--success); padding: 1rem; background: #dcfce7; border-radius: 6px;">
+                        ✅ ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} reconciliation completed
+                        <br><small>Reconciled on ${new Date(reconciliation.reconciled_date).toLocaleDateString()}</small>
+                        <br><small>Fuel received: ${reconciliation.fuel_received?.toFixed(1)}L | Dispensed: ${reconciliation.fuel_dispensed?.toFixed(1)}L</small>
+                    </div>
+                `;
+            }
+
+        } catch (error) {
+            console.error('Error updating reconciliation status:', error);
+        }
+    }
+
     // Vehicle Modal Methods (REMOVED - using inline editing now)
 
     async deleteVehicle(vehicleId) {
@@ -1629,14 +1889,34 @@ async function getSupabaseConfig() {
 
     // Removed updateBowserDashboard - tank status now integrated in main stats
 
-    async renderVehicleSummary() {
+    async renderVehicleSummary(period = 'week') {
         try {
-            const { data: fuelEntries, error } = await window.supabaseClient
+            // Calculate date range based on period
+            const now = new Date();
+            let startDate;
+            
+            if (period === 'week') {
+                const dayOfWeek = now.getDay();
+                const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 0, Monday = 1
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - daysToMonday);
+                startDate.setHours(0, 0, 0, 0);
+            } else if (period === 'month') {
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            }
+
+            let query = window.supabaseClient
                 .from('fuel_entries')
                 .select(`
                     *,
                     vehicles (code, name, registration, type, description, license)
                 `);
+
+            if (startDate) {
+                query = query.gte('date', startDate.toISOString().split('T')[0]);
+            }
+
+            const { data: fuelEntries, error } = await query;
                 
             if (error) {
                 console.error('Error fetching fuel entries for vehicle summary:', error);
@@ -1686,9 +1966,32 @@ async function getSupabaseConfig() {
         }
     }
 
-    async renderRecentRecords() {
+    async renderRecentRecords(period = 'week') {
         try {
-            const { data: recentEntries, error } = await window.supabaseClient
+            // Calculate date range and limit based on period
+            const now = new Date();
+            let startDate, limit = 50;
+            
+            if (period === 'today') {
+                startDate = new Date(now);
+                startDate.setHours(0, 0, 0, 0);
+                limit = 20;
+            } else if (period === 'week') {
+                const dayOfWeek = now.getDay();
+                const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - daysToMonday);
+                startDate.setHours(0, 0, 0, 0);
+                limit = 30;
+            } else if (period === 'month') {
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                limit = 100;
+            } else if (period === 'all') {
+                startDate = null;
+                limit = 200;
+            }
+
+            let query = window.supabaseClient
                 .from('fuel_entries')
                 .select(`
                     *,
@@ -1697,7 +2000,13 @@ async function getSupabaseConfig() {
                     bowsers (name)
                 `)
                 .order('date', { ascending: false })
-                .limit(10);
+                .limit(limit);
+
+            if (startDate) {
+                query = query.gte('date', startDate.toISOString().split('T')[0]);
+            }
+
+            const { data: recentEntries, error } = await query;
                 
             if (error) {
                 console.error('Error fetching recent records:', error);

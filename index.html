@@ -352,7 +352,13 @@
                     </div>
                     
                     <div class="vehicle-summary">
-                        <h3>Vehicle Summary</h3>
+                        <div class="section-header-with-toggle">
+                            <h3>Vehicle Summary</h3>
+                            <div class="toggle-buttons">
+                                <button class="toggle-btn active" data-period="week">This Week</button>
+                                <button class="toggle-btn" data-period="month">This Month</button>
+                            </div>
+                        </div>
                         <div class="table-container">
                             <table class="table" id="vehicle-summary-table">
                                 <thead>
@@ -372,7 +378,15 @@
                     </div>
                     
                     <div class="recent-records">
-                        <h3>Recent Fuel Records</h3>
+                        <div class="section-header-with-toggle">
+                            <h3>Recent Fuel Records</h3>
+                            <div class="toggle-buttons">
+                                <button class="toggle-btn" data-period="today">Today</button>
+                                <button class="toggle-btn active" data-period="week">This Week</button>
+                                <button class="toggle-btn" data-period="month">This Month</button>
+                                <button class="toggle-btn" data-period="all">All</button>
+                            </div>
+                        </div>
                         <div id="recent-records-table">
                             <!-- Table will be populated by JavaScript -->
                         </div>
@@ -401,6 +415,41 @@
                                 <!-- Bowser management list will be populated by JavaScript -->
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="bowser-refill-section">
+                        <div class="section-header">
+                            <h3>Tank Refill History</h3>
+                            <button id="add-refill" class="btn btn-success">+ Record Refill</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="table" id="refill-history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Bowser</th>
+                                        <th>Supplier</th>
+                                        <th>Amount (L)</th>
+                                        <th>Reading Before</th>
+                                        <th>Reading After</th>
+                                        <th>Cost</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="refill-history-body">
+                                    <!-- Refill history will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="reconciliation-section">
+                        <div class="section-header">
+                            <h3>Monthly Reconciliation</h3>
+                            <button id="reconcile-month" class="btn btn-warning">📊 Reconcile Current Month</button>
+                        </div>
+                        <div id="reconciliation-status">
+                            <!-- Reconciliation status will be populated by JavaScript -->
+                        </div>
                     </div>
                 </div>
             </section>
