@@ -23,6 +23,7 @@
                 <button id="nav-dashboard" class="nav-btn">Dashboard</button>
                 <button id="nav-vehicles" class="nav-btn">Vehicles</button>
                 <button id="nav-drivers" class="nav-btn">Drivers</button>
+                <button id="nav-bowsers" class="nav-btn">Bowsers</button>
             </nav>
         </header>
 
@@ -156,6 +157,18 @@
                             <div class="form-group">
                                 <label for="litres-used">Litres Used *</label>
                                 <input type="number" id="litres-used" required min="0" step="0.01">
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="bowser-start">Bowser Start Reading (L) *</label>
+                                    <input type="number" id="bowser-start" required min="0" step="0.01">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="bowser-end">Bowser End Reading (L) *</label>
+                                    <input type="number" id="bowser-end" required min="0" step="0.01">
+                                </div>
                             </div>
                             
                             <div class="form-group">
@@ -344,6 +357,31 @@
                         <div id="recent-records-table">
                             <!-- Table will be populated by JavaScript -->
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bowser Management Section -->
+            <section id="bowsers-section" class="section">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Bowser Management</h2>
+                        <button id="add-bowser" class="btn btn-primary">+ Add Bowser</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="table compact-table mobile-table" id="bowsers-management-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Capacity (L)</th>
+                                    <th>Current Reading (L)</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bowsers-management-body">
+                                <!-- Bowser management list will be populated by JavaScript -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>

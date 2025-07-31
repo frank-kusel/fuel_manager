@@ -1,6 +1,6 @@
-# Fleet Manager - SARS Compliant Fuel Record PWA
+# FarmTrack - Fleet & Fuel Manager
 
-A Progressive Web Application for managing vehicle fuel records with SARS compliance for South African businesses.
+A Progressive Web Application (PWA) designed for South African agricultural businesses to manage fleet fuel records with full SARS compliance. Built specifically for farming operations and vehicle fleet management.
 
 ## 🚀 Quick Start
 
@@ -78,14 +78,26 @@ window.fleetDebug.clearAllData()
 
 ## 📱 Features
 
-- **Vehicle Management**: Add, edit, and track multiple vehicles
-- **Driver Management**: Manage driver information and licenses
-- **Fuel Record Entry**: Step-by-step fuel logging process
-- **SARS Compliance**: Export monthly/annual reports
-- **Dashboard**: Fuel consumption analytics and trends
-- **Activity Calendar**: GitHub-style contribution calendar
-- **Offline Support**: Works without internet connection
-- **Mobile Friendly**: Responsive design for all devices
+### Core Functionality
+- **Vehicle Fleet Management**: Add, edit, and track multiple agricultural vehicles (tractors, bakkies, trucks, loaders)
+- **Driver Management**: Manage driver information, codes, and license details
+- **Step-by-Step Fuel Entry**: Guided fuel logging process with validation
+- **Real-time Fuel Consumption**: Automatic L/100km calculations
+- **Odometer Tracking**: Track vehicle mileage and maintenance schedules
+
+### SARS Compliance & Reporting
+- **SARS-Compliant Records**: All entries include required business purpose and location data
+- **Monthly/Annual Reports**: Export detailed PDF reports for tax purposes
+- **CanePro Integration**: Export data in CanePro format for agricultural management systems
+- **CSV Export**: Compatible with SARS reporting requirements
+
+### Technical Features
+- **Cloud Database**: Supabase backend for secure, synchronized data storage
+- **Progressive Web App**: Install as a mobile/desktop app
+- **Offline Capable**: Works without internet connection with local storage fallback
+- **Responsive Design**: Optimized for mobile, tablet, and desktop use
+- **Real-time Dashboard**: Fuel consumption analytics and vehicle summaries
+- **Activity Calendar**: Visual tracking of fuel entry patterns
 
 ## 🔧 Troubleshooting
 
@@ -106,24 +118,40 @@ window.fleetDebug.clearAllData()
 ## 📂 File Structure
 
 ```
-fleet_manager/
-├── index.html          # Main application
-├── app.js              # Application logic
-├── styles.css          # Styling
-├── manifest.json       # PWA manifest
-├── sw.js              # Service worker
-├── server.py          # Python development server
-├── server.js          # Node.js development server
-├── start-server.bat   # Windows batch file
-└── README.md          # This file
+fuel_manager/
+├── index.html              # Main application HTML
+├── app.js                  # Core application logic with Supabase integration
+├── styles.css              # Application styling and responsive design
+├── manifest.json           # PWA manifest for app installation
+├── sw.js                   # Service worker for offline functionality
+├── supabase_config.js      # Supabase configuration loader
+├── server.py              # Python development server (recommended)
+├── server.js              # Node.js development server
+├── start-server.bat       # Windows batch script for easy startup
+├── verify.js              # Application verification utilities
+├── netlify/
+│   └── functions/
+│       └── config.js      # Netlify function for secure config loading
+└── README.md              # This documentation
 ```
 
-## 🔒 Data Privacy
+## 🔒 Data Storage & Privacy
 
-- All data is stored locally in your browser
-- No data is sent to external servers
-- Export your data regularly as backup
-- Clear browser data will remove all records
+### Primary Storage
+- **Supabase Cloud Database**: Secure, encrypted cloud storage for synchronized access across devices
+- **Real-time Sync**: Changes sync instantly across all your devices
+- **Secure Authentication**: Industry-standard security protocols
+
+### Local Storage Backup
+- **Browser IndexedDB**: Local backup for offline functionality
+- **localStorage**: Secondary backup for smaller datasets
+- **Data Export**: Regular backup capabilities with .db file downloads
+
+### Privacy Protection
+- **Business Data Only**: Only fuel, vehicle, and driver business records are stored
+- **No Personal Tracking**: No location tracking or personal data collection
+- **Export Control**: Full control over your data with export/import capabilities
+- **GDPR Compliant**: Designed with privacy regulations in mind
 
 ## 📊 SARS Compliance
 
@@ -145,3 +173,87 @@ Export formats: CSV files compatible with SARS requirements.
 - Edge 79+
 
 IndexedDB and localStorage are required for data persistence.
+
+## 🛠️ Technology Stack
+
+- **Frontend**: Vanilla JavaScript, HTML5, CSS3
+- **Database**: Supabase (PostgreSQL)
+- **Storage**: IndexedDB, localStorage (offline backup)
+- **Export Libraries**: 
+  - jsPDF for PDF report generation
+  - SheetJS (XLSX) for Excel export compatibility
+- **PWA**: Service Worker for offline functionality
+- **Deployment**: Netlify with serverless functions
+
+## 🚀 Installation & Setup
+
+### For Development
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/fuel_manager.git
+   cd fuel_manager
+   ```
+
+2. **Set up Supabase**
+   - Create a new project at [supabase.com](https://supabase.com)
+   - Create the required tables: `vehicles`, `drivers`, `fuel_entries`
+   - Update `netlify/functions/config.js` with your Supabase credentials
+
+3. **Run locally**
+   ```bash
+   python server.py
+   ```
+   
+4. **Access the application**
+   - Open http://localhost:8000 in your browser
+
+### For Production Deployment
+
+1. **Deploy to Netlify**
+   - Connect your GitHub repository to Netlify
+   - Set environment variables for Supabase in Netlify dashboard
+   - Deploy automatically on push to main branch
+
+2. **Install as PWA**
+   - Visit your deployed URL
+   - Click "Install" or "Add to Home Screen" in browser
+   - Use as a native app on mobile/desktop
+
+## 📈 Usage Guide
+
+### Getting Started
+1. **Add Vehicles**: Navigate to Vehicles section and add your fleet
+2. **Add Drivers**: Navigate to Drivers section and add driver information
+3. **Record Fuel**: Use the step-by-step fuel entry process
+4. **Generate Reports**: Export monthly/annual reports for SARS compliance
+
+### Best Practices
+- Enter fuel records daily for accurate tracking
+- Regularly export backups of your data
+- Use consistent naming for fields and activities
+- Review reports before submitting to SARS
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 📞 Support
+
+For support, please create an issue on GitHub or contact the development team.
+
+## 🙏 Acknowledgments
+
+- Built for South African agricultural businesses
+- Designed with SARS compliance requirements in mind
+- Optimized for farming operations and fleet management

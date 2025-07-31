@@ -29,6 +29,7 @@ async function getSupabaseConfig() {
         // Cache for database data
         this.vehiclesCache = null;
         this.driversCache = null;
+        this.bowsersCache = null;
         this.cacheTimestamp = null;
         this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
         this.init();
@@ -73,10 +74,11 @@ async function getSupabaseConfig() {
     }
 
     async loadInitialData() {
-        // Preload vehicles and drivers data in parallel to populate cache
-        const [vehicles, drivers] = await Promise.all([
+        // Preload vehicles, drivers, and bowsers data in parallel to populate cache
+        const [vehicles, drivers, bowsers] = await Promise.all([
             this.fetchVehiclesFromSupabase(),
-            this.fetchDriversFromSupabase()
+            this.fetchDriversFromSupabase(),
+            this.fetchBowsersFromSupabase()
         ]);
         
         // Now render everything using cached data
@@ -84,7 +86,8 @@ async function getSupabaseConfig() {
             this.renderVehicles(),
             this.renderDrivers(),
             this.renderVehicleManagement(),
-            this.renderDriverManagement()
+            this.renderDriverManagement(),
+            this.renderBowserManagement()
         ]);
         
         await this.updateDashboard();
@@ -98,7 +101,8 @@ async function getSupabaseConfig() {
             { id: 'nav-fuel-entry', section: 'fuel-entry' },
             { id: 'nav-dashboard', section: 'dashboard' },
             { id: 'nav-vehicles', section: 'vehicles' },
-            { id: 'nav-drivers', section: 'drivers' }
+            { id: 'nav-drivers', section: 'drivers' },
+            { id: 'nav-bowsers', section: 'bowsers' }
         ];
         
         navElements.forEach(({ id, section }) => {
@@ -145,11 +149,19 @@ async function getSupabaseConfig() {
         // Driver management
         document.getElementById('add-driver').addEventListener('click', () => this.addNewDriver());
 
+        // Bowser management
+        document.getElementById('add-bowser').addEventListener('click', () => this.addNewBowser());
+
         // Fuel consumption calculation and gauge broken functionality
         document.getElementById('odo-start').addEventListener('input', () => this.calculateConsumption());
         document.getElementById('odo-end').addEventListener('input', () => this.calculateConsumption());
         document.getElementById('litres-used').addEventListener('input', () => this.calculateConsumption());
         document.getElementById('gauge-broken').addEventListener('change', () => this.handleGaugeBroken());
+
+        // Bowser reading validation
+        document.getElementById('bowser-start').addEventListener('input', () => this.validateBowserReading());
+        document.getElementById('bowser-end').addEventListener('input', () => this.validateBowserReading());
+        document.getElementById('litres-used').addEventListener('input', () => this.validateBowserReading());
 
         // Export functionality
         document.getElementById('export-monthly').addEventListener('click', () => this.exportMonthlyReport());
@@ -195,6 +207,8 @@ async function getSupabaseConfig() {
             this.renderVehicleManagement();
         } else if (section === 'drivers') {
             this.renderDriverManagement();
+        } else if (section === 'bowsers') {
+            this.renderBowserManagement();
         } else if (section === 'fuel-entry') {
             // Ensure vehicles are rendered for fuel entry
             this.renderVehicles();
@@ -467,6 +481,20 @@ async function getSupabaseConfig() {
                 console.warn('Could not set default odometer value:', odoError);
             }
             
+            // Set default bowser start value to current reading
+            try {
+                const bowsers = await this.fetchBowsersFromSupabase();
+                if (bowsers.length > 0) {
+                    const defaultBowser = bowsers[0];
+                    const bowserStartElement = document.getElementById('bowser-start');
+                    if (bowserStartElement) {
+                        bowserStartElement.value = defaultBowser.current_reading || 0;
+                    }
+                }
+            } catch (bowserError) {
+                console.warn('Could not set default bowser value:', bowserError);
+            }
+            
             this.showStep('activity');
             
         } catch (error) {
@@ -514,6 +542,8 @@ async function getSupabaseConfig() {
         const odoStart = parseFloat(document.getElementById('odo-start').value);
         const odoEnd = parseFloat(document.getElementById('odo-end').value);
         const litresUsed = parseFloat(document.getElementById('litres-used').value);
+        const bowserStart = parseFloat(document.getElementById('bowser-start').value);
+        const bowserEnd = parseFloat(document.getElementById('bowser-end').value);
         const gaugeBroken = document.getElementById('gauge-broken').checked;
         
         if (isNaN(odoStart) || odoStart < 0) {
@@ -531,9 +561,27 @@ async function getSupabaseConfig() {
             return;
         }
         
+        if (isNaN(bowserStart) || bowserStart < 0) {
+            alert('Please enter a valid bowser start reading.');
+            return;
+        }
+        
+        if (isNaN(bowserEnd) || bowserEnd < 0) {
+            alert('Please enter a valid bowser end reading.');
+            return;
+        }
+        
         if (!gaugeBroken && odoEnd < odoStart) {
             alert('End odometer reading cannot be less than start reading.');
             return;
+        }
+        
+        // Validate bowser readings
+        if (!this.validateBowserReading()) {
+            const proceed = confirm('Bowser readings do not match fuel amount. Do you want to proceed anyway?');
+            if (!proceed) {
+                return;
+            }
         }
         
         this.generateReviewSummary();
@@ -546,10 +594,13 @@ async function getSupabaseConfig() {
         const odoStart = parseFloat(document.getElementById('odo-start').value);
         const odoEnd = parseFloat(document.getElementById('odo-end').value);
         const litresUsed = parseFloat(document.getElementById('litres-used').value);
+        const bowserStart = parseFloat(document.getElementById('bowser-start').value);
+        const bowserEnd = parseFloat(document.getElementById('bowser-end').value);
         const gaugeBroken = document.getElementById('gauge-broken').checked;
         const fuelConsumption = document.getElementById('fuel-consumption').value;
         
         const distance = gaugeBroken ? 0 : (odoEnd - odoStart);
+        const bowserDispensed = bowserEnd - bowserStart;
         
         const reviewSummary = document.getElementById('review-summary');
         if (reviewSummary) {
@@ -587,6 +638,18 @@ async function getSupabaseConfig() {
                     <div class="review-row">
                         <span class="review-label">Fuel Used:</span>
                         <span>${litresUsed.toFixed(2)} L</span>
+                    </div>
+                    <div class="review-row">
+                        <span class="review-label">Bowser Start:</span>
+                        <span>${bowserStart.toFixed(2)} L</span>
+                    </div>
+                    <div class="review-row">
+                        <span class="review-label">Bowser End:</span>
+                        <span>${bowserEnd.toFixed(2)} L</span>
+                    </div>
+                    <div class="review-row">
+                        <span class="review-label">Bowser Dispensed:</span>
+                        <span>${bowserDispensed.toFixed(2)} L</span>
                     </div>
                     <div class="review-row">
                         <span class="review-label">Consumption:</span>
@@ -633,6 +696,51 @@ async function getSupabaseConfig() {
         this.calculateConsumption();
     }
 
+    validateBowserReading() {
+        const bowserStart = parseFloat(document.getElementById('bowser-start').value);
+        const bowserEnd = parseFloat(document.getElementById('bowser-end').value);
+        const litresUsed = parseFloat(document.getElementById('litres-used').value);
+        
+        if (isNaN(bowserStart) || isNaN(bowserEnd) || isNaN(litresUsed)) {
+            return; // Not all fields filled yet
+        }
+        
+        const expectedEnd = bowserStart + litresUsed;
+        const tolerance = 0.1; // 0.1 litre tolerance
+        
+        const bowserEndElement = document.getElementById('bowser-end');
+        const bowserStartElement = document.getElementById('bowser-start');
+        const litresUsedElement = document.getElementById('litres-used');
+        
+        // Remove any previous validation styling
+        [bowserEndElement, bowserStartElement, litresUsedElement].forEach(el => {
+            el.classList.remove('validation-error', 'validation-warning');
+            el.title = '';
+        });
+        
+        if (bowserEnd < bowserStart) {
+            bowserEndElement.classList.add('validation-error');
+            bowserEndElement.title = 'End reading cannot be less than start reading';
+            return false;
+        }
+        
+        const actualDispensed = bowserEnd - bowserStart;
+        const difference = Math.abs(actualDispensed - litresUsed);
+        
+        if (difference > tolerance) {
+            bowserEndElement.classList.add('validation-warning');
+            litresUsedElement.classList.add('validation-warning');
+            
+            const warningMsg = `Warning: Bowser reading shows ${actualDispensed.toFixed(2)}L dispensed, but fuel used is ${litresUsed.toFixed(2)}L (difference: ${difference.toFixed(2)}L)`;
+            bowserEndElement.title = warningMsg;
+            litresUsedElement.title = warningMsg;
+            
+            return false;
+        }
+        
+        return true;
+    }
+
     async saveFuelRecord() {
         try {
             const activity = document.getElementById('activity').value;
@@ -640,6 +748,8 @@ async function getSupabaseConfig() {
             const odoStart = parseFloat(document.getElementById('odo-start').value);
             const odoEnd = parseFloat(document.getElementById('odo-end').value);
             const litresUsed = parseFloat(document.getElementById('litres-used').value);
+            const bowserStart = parseFloat(document.getElementById('bowser-start').value);
+            const bowserEnd = parseFloat(document.getElementById('bowser-end').value);
             const gaugeBroken = document.getElementById('gauge-broken').checked;
             const date = document.getElementById('date').value;
             const needsReview = document.getElementById('needs-review').checked;
@@ -652,15 +762,27 @@ async function getSupabaseConfig() {
             const distance = gaugeBroken ? 0 : (odoEnd - odoStart);
             const consumption = distance > 0 ? (litresUsed / distance) * 100 : 0;
             
+            // Get the default bowser (assuming first bowser for now)
+            const bowsers = await this.fetchBowsersFromSupabase();
+            const defaultBowser = bowsers.length > 0 ? bowsers[0] : null;
+            
+            if (!defaultBowser) {
+                alert('No bowser found. Please add a bowser first.');
+                return;
+            }
+            
             const fuelEntry = {
                 vehicle_id: this.currentVehicle.id,
                 driver_id: this.currentDriver.id,
+                bowser_id: defaultBowser.id,
                 date: date,
                 activity: activity,
                 field_name: fieldName,
                 odo_start: odoStart,
                 odo_end: gaugeBroken ? odoStart : odoEnd,
                 fuel_amount: litresUsed,
+                bowser_start: bowserStart,
+                bowser_end: bowserEnd,
                 HrsKm: distance,
                 timestamp: new Date().toISOString()
             };
@@ -674,6 +796,17 @@ async function getSupabaseConfig() {
                 console.error('Error saving fuel record:', error);
                 alert('Error saving fuel record. Please try again.');
                 return;
+            }
+            
+            // Update bowser current reading
+            const { error: bowserError } = await window.supabaseClient
+                .from('bowsers')
+                .update({ current_reading: bowserEnd })
+                .eq('id', defaultBowser.id);
+                
+            if (bowserError) {
+                console.error('Error updating bowser reading:', bowserError);
+                alert('Fuel record saved but failed to update bowser reading.');
             }
             
             console.log('Fuel record saved successfully:', data);
@@ -699,6 +832,8 @@ async function getSupabaseConfig() {
         document.getElementById('odo-start').value = '';
         document.getElementById('odo-end').value = '';
         document.getElementById('litres-used').value = '';
+        document.getElementById('bowser-start').value = '';
+        document.getElementById('bowser-end').value = '';
         document.getElementById('fuel-consumption').value = '';
         document.getElementById('gauge-broken').checked = false;
         document.getElementById('needs-review').checked = false;
@@ -750,6 +885,7 @@ async function getSupabaseConfig() {
     invalidateCache() {
         this.vehiclesCache = null;
         this.driversCache = null;
+        this.bowsersCache = null;
         this.cacheTimestamp = null;
     }
 
@@ -810,6 +946,27 @@ async function getSupabaseConfig() {
         
         // Update cache
         this.driversCache = data;
+        this.cacheTimestamp = Date.now();
+        return data;
+    }
+
+    async fetchBowsersFromSupabase() {
+        // Return cached data if valid
+        if (this.bowsersCache && this.isCacheValid()) {
+            return this.bowsersCache;
+        }
+
+        const { data, error } = await window.supabaseClient
+            .from('bowsers')
+            .select('*')
+            .order('name', { ascending: true });
+        if (error) {
+            console.error('Error fetching bowsers:', error);
+            return [];
+        }
+        
+        // Update cache
+        this.bowsersCache = data;
         this.cacheTimestamp = Date.now();
         return data;
     }
@@ -1059,6 +1216,8 @@ async function getSupabaseConfig() {
                 this.renderVehicles();
             } else if (tableType === 'drivers') {
                 this.renderDrivers();
+            } else if (tableType === 'bowsers') {
+                // No need to refresh fuel entry tables for bowsers
             }
 
             return true;
@@ -1140,6 +1299,88 @@ async function getSupabaseConfig() {
         } catch (error) {
             console.error('Error adding driver:', error);
             alert('Error adding driver. Please try again.');
+        }
+    }
+
+    // Bowser Management Methods
+    async renderBowserManagement() {
+        try {
+            const bowsers = await this.fetchBowsersFromSupabase();
+            const tableBody = document.getElementById('bowsers-management-body');
+            
+            if (!tableBody) {
+                console.error('Bowser management table body not found');
+                return;
+            }
+
+            if (bowsers.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No bowsers found. Tap + to add.</td></tr>';
+                return;
+            }
+
+            // Simple table layout for all screen sizes
+            tableBody.innerHTML = bowsers.map(bowser => `
+                <tr data-id="${bowser.id}" class="mobile-row">
+                    <td class="editable-cell mobile-cell" data-field="name" data-type="text">${bowser.name || ''}</td>
+                    <td class="editable-cell mobile-cell" data-field="capacity" data-type="number">${bowser.capacity || 0}</td>
+                    <td class="current-reading-cell">${(bowser.current_reading || 0).toFixed(2)}</td>
+                    <td class="status-cell">
+                        <span class="status-badge ${bowser.status || 'active'}">${bowser.status || 'Active'}</span>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Add inline editing event listeners
+            this.setupInlineEditing('bowsers');
+        } catch (error) {
+            console.error('Error rendering bowser management:', error);
+            const tableBody = document.getElementById('bowsers-management-body');
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #dc2626; font-size: 0.9rem;">Error loading bowsers. Please refresh.</td></tr>';
+            }
+        }
+    }
+
+    async addNewBowser() {
+        const name = prompt('Enter bowser name (e.g., Tank A):');
+        if (!name || !name.trim()) return;
+
+        const capacity = prompt('Enter bowser capacity in litres:');
+        if (!capacity || isNaN(parseFloat(capacity))) {
+            alert('Please enter a valid capacity.');
+            return;
+        }
+
+        const currentReading = prompt('Enter current reading in litres:', '0');
+        if (!currentReading || isNaN(parseFloat(currentReading))) {
+            alert('Please enter a valid current reading.');
+            return;
+        }
+
+        const bowserData = {
+            name: name.trim(),
+            capacity: parseFloat(capacity),
+            current_reading: parseFloat(currentReading),
+            status: 'active'
+        };
+
+        try {
+            const { error } = await window.supabaseClient
+                .from('bowsers')
+                .insert([bowserData]);
+
+            if (error) {
+                console.error('Error adding bowser:', error);
+                alert('Error adding bowser: ' + error.message);
+                return;
+            }
+
+            alert('Bowser added successfully!');
+            this.invalidateCache();
+            await this.renderBowserManagement();
+        } catch (error) {
+            console.error('Error adding bowser:', error);
+            alert('Error adding bowser. Please try again.');
         }
     }
 
