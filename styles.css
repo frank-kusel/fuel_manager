@@ -1321,33 +1321,33 @@ input[readonly] {
     }
     
     .calendar-weeks {
-        grid-template-columns: repeat(26, 12px);
-        font-size: 0.55rem;
+        grid-template-columns: repeat(53, 10px);
+        font-size: 0.5rem;
         margin-bottom: 0.4rem;
         height: 1rem;
         overflow-x: hidden;
-        gap: 2px;
-        width: calc(26 * 12px + 25 * 2px);
+        gap: 1px;
+        width: calc(53 * 10px + 52 * 1px);
     }
     
     .calendar-week-label {
-        font-size: 0.5rem;
-        width: 12px;
+        font-size: 0.45rem;
+        width: 10px;
         text-align: center;
     }
     
     .calendar-grid {
-        grid-template-columns: repeat(26, 12px);
-        grid-template-rows: repeat(7, 12px);
+        grid-template-columns: repeat(53, 10px);
+        grid-template-rows: repeat(7, 10px);
         grid-auto-flow: column;
-        gap: 2px;
+        gap: 1px;
         overflow-x: hidden;
-        width: calc(26 * 12px + 25 * 2px);
+        width: calc(53 * 10px + 52 * 1px);
     }
     
     .calendar-cell {
-        width: 12px;
-        height: 12px;
+        width: 10px;
+        height: 10px;
     }
     
     .calendar-legend {
@@ -1800,9 +1800,10 @@ input[readonly] {
     
     .recent-records .table th:first-child,
     .recent-records .table td:first-child {
-        width: 100px !important;
-        min-width: 100px !important;
+        width: 110px !important;
+        min-width: 110px !important;
         font-size: 0.75rem;
+        white-space: nowrap;
     }
 }
 
@@ -1893,5 +1894,87 @@ input[readonly] {
     .review-highlight {
         font-size: 0.85rem;
         font-weight: 700;
+    }
+}
+
+/* Mobile Bottom Navigation */
+.mobile-nav {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 1px solid var(--gray-200);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        height: 80px;
+        padding: 0.5rem;
+    }
+    
+    .mobile-nav-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: none;
+        border: none;
+        padding: 0.5rem;
+        border-radius: var(--border-radius);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        gap: 0.25rem;
+    }
+    
+    .mobile-nav-btn:hover,
+    .mobile-nav-btn.active {
+        background: var(--primary-light);
+        color: var(--primary);
+    }
+    
+    .nav-icon {
+        font-size: 1.2rem;
+    }
+    
+    .nav-label {
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
+    
+    /* Hide desktop navigation on mobile */
+    .nav {
+        display: none;
+    }
+    
+    /* Add bottom padding to main content to avoid overlap */
+    .main {
+        padding-bottom: 100px;
+    }
+    
+    /* Simplified info cards */
+    .selected-info {
+        background: var(--gray-50);
+        border-radius: var(--border-radius);
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+        font-size: 0.85rem;
+    }
+    
+    .info-card {
+        margin-bottom: 0.5rem;
+    }
+    
+    .info-card:last-child {
+        margin-bottom: 0;
+    }
+    
+    .info-label {
+        display: none; /* Hide the labels on mobile */
     }
 }

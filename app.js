@@ -447,10 +447,7 @@ async function getSupabaseConfig() {
                 
                 const vehicleInfoElement = document.getElementById('selected-vehicle-info');
                 if (vehicleInfoElement) {
-                    vehicleInfoElement.innerHTML = `
-                        <strong>${this.currentVehicle.code}</strong> - ${this.currentVehicle.name}<br>
-                        <small>${this.currentVehicle.registration}</small>
-                    `;
+                    vehicleInfoElement.innerHTML = `<strong>${this.currentVehicle.code}</strong> - ${this.currentVehicle.name}`;
                 } else {
                     console.error('selected-vehicle-info element not found');
                 }
@@ -494,10 +491,7 @@ async function getSupabaseConfig() {
             
             const driverInfoElement = document.getElementById('selected-driver-info');
             if (driverInfoElement) {
-                driverInfoElement.innerHTML = `
-                    <strong>${this.currentDriver.code}</strong> - ${this.currentDriver.name}<br>
-                    <small>${this.currentDriver.license || 'No license on file'}</small>
-                `;
+                driverInfoElement.innerHTML = `<strong>${this.currentDriver.code}</strong> - ${this.currentDriver.name}`;
             } else {
                 console.error('selected-driver-info element not found');
             }
