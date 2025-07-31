@@ -2027,33 +2027,36 @@ async function getSupabaseConfig() {
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
+                                    <th>Date & Time</th>
+                                    <th class="flag-column">✓</th>
                                     <th>Vehicle</th>
-                                    <th>Tank</th>
                                     <th>Fuel</th>
                                     <th>ODO Start</th>
                                     <th>ODO End</th>
                                     <th>HrsKm</th>
                                     <th>Tank Start</th>
                                     <th>Tank End</th>
-                                    <th>Flag</th>
+                                    <th>Tank</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${recentEntries.map(entry => `
+                                ${recentEntries.map(entry => {
+                                    const date = new Date(entry.date);
+                                    const dateTimeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                    return `
                                     <tr class="${entry.has_discrepancy ? 'discrepancy-row' : ''}">
-                                        <td>${new Date(entry.date).toLocaleDateString()}</td>
+                                        <td>${dateTimeStr}</td>
+                                        <td class="flag-column">${entry.has_discrepancy ? '❌' : '✅'}</td>
                                         <td>${entry.vehicles?.code || 'N/A'}</td>
-                                        <td>${entry.bowsers?.name || 'Tank A'}</td>
                                         <td>${entry.fuel_amount?.toFixed(1) || 0}L</td>
                                         <td>${entry.odo_start?.toFixed(1) || 0}</td>
                                         <td>${entry.odo_end?.toFixed(1) || 0}</td>
                                         <td>${entry.HrsKm?.toFixed(1) || 0}</td>
                                         <td>${entry.bowser_start?.toFixed(1) || 0}</td>
                                         <td>${entry.bowser_end?.toFixed(1) || 0}</td>
-                                        <td>${entry.has_discrepancy ? '⚠️' : '✅'}</td>
+                                        <td>${entry.bowsers?.name || 'Tank A'}</td>
                                     </tr>
-                                `).join('')}
+                                `}).join('')}
                             </tbody>
                         </table>
                     </div>

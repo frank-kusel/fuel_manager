@@ -1316,32 +1316,38 @@ input[readonly] {
     }
     
     .calendar-container {
-        overflow: hidden;
+        overflow-x: auto;
         width: 100%;
     }
     
     .calendar-weeks {
-        grid-template-columns: repeat(26, 1fr);
+        grid-template-columns: repeat(26, 12px);
         font-size: 0.55rem;
         margin-bottom: 0.4rem;
         height: 1rem;
+        overflow-x: hidden;
+        gap: 2px;
+        width: fit-content;
     }
     
     .calendar-week-label {
         font-size: 0.5rem;
+        width: 12px;
+        text-align: center;
     }
     
     .calendar-grid {
-        grid-template-columns: repeat(26, 1fr);
-        grid-template-rows: repeat(7, 1fr);
+        grid-template-columns: repeat(26, 12px);
+        grid-template-rows: repeat(7, 12px);
         grid-auto-flow: column;
-        max-width: 100%;
-        overflow-x: auto;
+        gap: 2px;
+        overflow-x: hidden;
+        width: fit-content;
     }
     
     .calendar-cell {
-        width: 9px;
-        height: 9px;
+        width: 12px;
+        height: 12px;
     }
     
     .calendar-legend {
@@ -1723,6 +1729,22 @@ input[readonly] {
     .recent-records .discrepancy-row th:first-child,
     .recent-records .discrepancy-row td:first-child {
         background: rgba(245, 158, 11, 0.1);
+    }
+}
+
+/* Flag column styling */
+.flag-column {
+    width: 30px !important;
+    text-align: center !important;
+    padding: 0.5rem 0.25rem !important;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .flag-column {
+        width: 25px !important;
+        padding: 0.25rem !important;
+        font-size: 0.8rem;
     }
 }
 
