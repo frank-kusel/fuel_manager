@@ -1952,11 +1952,11 @@ async function getSupabaseConfig() {
                     
                     return `
                         <tr>
-                            <td><strong>${stat.vehicle.code}</strong> - ${stat.vehicle.name}</td>
-                            <td>${stat.totalFuel.toFixed(1)}</td>
-                            <td>${stat.totalDistance.toFixed(1)}</td>
-                            <td>${avgConsumption.toFixed(2)}</td>
-                            <td>${stat.recordCount}</td>
+                            <td class="vehicle-col"><strong>${stat.vehicle.code}</strong> - ${stat.vehicle.name}</td>
+                            <td class="fuel-col">${stat.totalFuel.toFixed(1)}</td>
+                            <td class="hrskm-col">${stat.totalDistance.toFixed(1)}</td>
+                            <td class="consumption-col">${avgConsumption.toFixed(2)}</td>
+                            <td class="records-col">${stat.recordCount}</td>
                         </tr>
                     `;
                 }).join('');
