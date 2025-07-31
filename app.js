@@ -2138,6 +2138,9 @@ async function getSupabaseConfig() {
                 
                 // Update week number labels
                 this.updateCalendarWeekLabels(startDate, days.length);
+                
+                // Setup synchronized scrolling
+                this.setupCalendarScrollSync();
             }
         } catch (error) {
             console.error('Error rendering activity calendar:', error);
@@ -2181,6 +2184,23 @@ async function getSupabaseConfig() {
         const week1 = new Date(tempDate.getFullYear(), 0, 4);
         // Adjust to Thursday in week 1 and count weeks from there
         return 1 + Math.round(((tempDate.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+    }
+    
+    setupCalendarScrollSync() {
+        const weeksContainer = document.getElementById('calendar-weeks');
+        const calendarGrid = document.getElementById('activity-calendar-grid');
+        
+        if (weeksContainer && calendarGrid) {
+            // Sync calendar grid scroll to weeks container
+            calendarGrid.addEventListener('scroll', () => {
+                weeksContainer.scrollLeft = calendarGrid.scrollLeft;
+            });
+            
+            // Sync weeks container scroll to calendar grid
+            weeksContainer.addEventListener('scroll', () => {
+                calendarGrid.scrollLeft = weeksContainer.scrollLeft;
+            });
+        }
     }
 
     // Export Methods
