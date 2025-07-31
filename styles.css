@@ -1252,19 +1252,57 @@ input[readonly] {
     color: #7d8590;
 }
 
-/* GitHub-style Activity Calendar */
+/* GitHub-style Activity Calendar - Light Mode */
 .activity-calendar {
-    background: #0d1117;
+    background: white;
+    border: 1px solid #d0d7de;
     border-radius: 12px;
     padding: 1.5rem;
     margin: 1.5rem 0;
-    color: #f0f6fc;
+    color: #1f2328;
 }
 
 .activity-calendar h3 {
-    color: #f0f6fc;
+    color: #1f2328;
     margin-bottom: 1rem;
     font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.calendar-wrapper {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+}
+
+.calendar-months {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 3px;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    color: #656d76;
+}
+
+.calendar-month {
+    text-align: center;
+    grid-column: span 4;
+    font-weight: 500;
+}
+
+.calendar-weekdays {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-right: 0.5rem;
+    font-size: 0.7rem;
+    color: #656d76;
+    justify-content: space-around;
+    height: 91px;
+}
+
+.calendar-main {
+    flex: 1;
 }
 
 .calendar-grid {
@@ -1274,31 +1312,40 @@ input[readonly] {
     gap: 3px;
     max-width: 100%;
     overflow: hidden;
-    margin: 1rem 0;
 }
 
 .calendar-cell {
-    width: 12px;
-    height: 12px;
+    width: 11px;
+    height: 11px;
     border-radius: 2px;
-    background-color: #161b22;
-    border: 1px solid #21262d;
+    background-color: #ebedf0;
+    border: 1px solid #d1d9e0;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.calendar-cell:hover {
+    border-color: #1f2328;
 }
 
 .calendar-cell.level-1 {
-    background-color: #0e4429;
+    background-color: #9be9a8;
+    border-color: #7bc96f;
 }
 
 .calendar-cell.level-2 {
-    background-color: #006d32;
+    background-color: #40c463;
+    border-color: #2ea043;
 }
 
 .calendar-cell.level-3 {
-    background-color: #26a641;
+    background-color: #30a14e;
+    border-color: #28a745;
 }
 
 .calendar-cell.level-4 {
-    background-color: #39d353;
+    background-color: #216e39;
+    border-color: #1a5629;
 }
 
 /* Dashboard Mobile Improvements */
@@ -1312,15 +1359,40 @@ input[readonly] {
     .activity-calendar {
         margin: 1rem 0;
         padding: 1rem;
-        background: white;
-        border-radius: 12px;
-        border: 1px solid var(--gray-200);
+    }
+    
+    .calendar-wrapper {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .calendar-months {
+        grid-template-columns: repeat(6, 1fr);
+        font-size: 0.65rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .calendar-month {
+        grid-column: span 2;
+    }
+    
+    .calendar-weekdays {
+        flex-direction: row;
+        height: auto;
+        margin-right: 0;
+        margin-bottom: 0.25rem;
+        justify-content: space-around;
+        width: 100%;
     }
     
     .calendar-grid {
-        grid-template-columns: repeat(13, 1fr);
+        grid-template-columns: repeat(26, 1fr);
         max-width: 100%;
-        margin: 1rem 0;
+    }
+    
+    .calendar-cell {
+        width: 9px;
+        height: 9px;
     }
     
     .calendar-legend {
@@ -1345,7 +1417,21 @@ input[readonly] {
     }
     
     .calendar-grid {
-        grid-template-columns: repeat(7, 1fr);
+        grid-template-columns: repeat(13, 1fr);
+    }
+    
+    .calendar-cell {
+        width: 8px;
+        height: 8px;
+    }
+    
+    .calendar-months {
+        grid-template-columns: repeat(4, 1fr);
+        font-size: 0.6rem;
+    }
+    
+    .calendar-month {
+        grid-column: span 1;
     }
     
     .section-header-with-toggle {
