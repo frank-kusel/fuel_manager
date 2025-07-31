@@ -864,6 +864,13 @@ input[readonly] {
     font-weight: 400;
 }
 
+/* Hide km units on mobile */
+@media (max-width: 768px) {
+    .odo-cell::after {
+        display: none;
+    }
+}
+
 /* Delete Button Styles */
 .delete-cell {
     width: 48px;
@@ -1200,6 +1207,7 @@ input[readonly] {
     padding: 1.5rem;
     margin: 1.5rem 0;
     color: #1f2328;
+    overflow: hidden;
 }
 
 .activity-calendar h3 {
@@ -1224,6 +1232,7 @@ input[readonly] {
 .calendar-container {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .scrollable-calendar {
@@ -1233,6 +1242,7 @@ input[readonly] {
 .calendar-weeks,
 .calendar-grid {
     min-width: fit-content;
+    width: 100%;
 }
 
 .calendar-week-label {
@@ -1302,6 +1312,12 @@ input[readonly] {
     .activity-calendar {
         margin: 1rem 0;
         padding: 1rem;
+        overflow: hidden;
+    }
+    
+    .calendar-container {
+        overflow: hidden;
+        width: 100%;
     }
     
     .calendar-weeks {
@@ -1456,7 +1472,7 @@ input[readonly] {
         background: white;
         border-radius: var(--border-radius);
         border: 1px solid var(--gray-200);
-        padding: 1.25rem;
+        padding: 0.75rem;
         margin-bottom: 0.75rem;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
