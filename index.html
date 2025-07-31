@@ -30,6 +30,14 @@
         <main class="main">
             <!-- Fuel Entry Flow -->
             <section id="fuel-entry-section" class="section active">
+                <!-- Progress Bar -->
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">Step 1 of 5</div>
+                </div>
+                
                 <div class="container">
                     <!-- Step 1: Vehicle Selection -->
                     <div id="step-vehicle" class="step active">
@@ -68,14 +76,6 @@
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                    
-                    <!-- Progress Bar -->
-                    <div class="progress-container">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progress-fill"></div>
-                        </div>
-                        <div class="progress-text" id="progress-text">Step 1 of 5</div>
                     </div>
 
                     <!-- Step 3: Activity Selection -->
@@ -152,9 +152,92 @@
                                     </div>
                                 </div>
 
-                                <!-- Transport & Others -->
+                                <!-- Monitoring & Management -->
                                 <div class="activity-category">
-                                    <h3 class="category-title">Transport & Operations</h3>
+                                    <h3 class="category-title">Monitoring & Management</h3>
+                                    <div class="activity-grid">
+                                        <button class="activity-btn" data-activity="V-SCT" data-name="Scouting & Monitoring (Driving)">
+                                            <span class="activity-icon">🔍</span>
+                                            <span class="activity-code">V-SCT</span>
+                                            <span class="activity-name">Scouting</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Orchard Maintenance -->
+                                <div class="activity-category">
+                                    <h3 class="category-title">Orchard Maintenance</h3>
+                                    <div class="activity-grid">
+                                        <button class="activity-btn" data-activity="V-MOW" data-name="Mowing / Slashing">
+                                            <span class="activity-icon">✂️</span>
+                                            <span class="activity-code">V-MOW</span>
+                                            <span class="activity-name">Mowing</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-MUL" data-name="Chipping & Spreading Mulch">
+                                            <span class="activity-icon">🪵</span>
+                                            <span class="activity-code">V-MUL</span>
+                                            <span class="activity-name">Mulching</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-PRN" data-name="Pruning (Mechanical)">
+                                            <span class="activity-icon">✂️</span>
+                                            <span class="activity-code">V-PRN</span>
+                                            <span class="activity-name">Pruning</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-THN" data-name="Thinning (Mechanical)">
+                                            <span class="activity-icon">🌿</span>
+                                            <span class="activity-code">V-THN</span>
+                                            <span class="activity-name">Thinning</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- General Farm Maintenance -->
+                                <div class="activity-category">
+                                    <h3 class="category-title">General Farm Maintenance</h3>
+                                    <div class="activity-grid">
+                                        <button class="activity-btn" data-activity="V-ROD" data-name="Road Maintenance">
+                                            <span class="activity-icon">🛤️</span>
+                                            <span class="activity-code">V-ROD</span>
+                                            <span class="activity-name">Roads</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-FIR" data-name="Firebreak Maintenance">
+                                            <span class="activity-icon">🔥</span>
+                                            <span class="activity-code">V-FIR</span>
+                                            <span class="activity-name">Firebreaks</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-WWY" data-name="Waterway/Erosion Mgt.">
+                                            <span class="activity-icon">💧</span>
+                                            <span class="activity-code">V-WWY</span>
+                                            <span class="activity-name">Waterways</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-IRR" data-name="Irrigation Operation">
+                                            <span class="activity-icon">💦</span>
+                                            <span class="activity-code">V-IRR</span>
+                                            <span class="activity-name">Irrigation</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Harvest & Handling -->
+                                <div class="activity-category">
+                                    <h3 class="category-title">Harvest & Handling</h3>
+                                    <div class="activity-grid">
+                                        <button class="activity-btn" data-activity="V-HRV" data-name="Harvesting (Mechanical)">
+                                            <span class="activity-icon">🌾</span>
+                                            <span class="activity-code">V-HRV</span>
+                                            <span class="activity-name">Harvesting</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-LOD" data-name="Crop Loading & Stacking">
+                                            <span class="activity-icon">📦</span>
+                                            <span class="activity-code">V-LOD</span>
+                                            <span class="activity-name">Loading</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Transport -->
+                                <div class="activity-category">
+                                    <h3 class="category-title">Transport</h3>
                                     <div class="activity-grid">
                                         <button class="activity-btn" data-activity="V-TRN" data-name="On-Farm Haulage">
                                             <span class="activity-icon">🚛</span>
@@ -165,16 +248,6 @@
                                             <span class="activity-icon">🏪</span>
                                             <span class="activity-code">V-TMK</span>
                                             <span class="activity-name">To Market</span>
-                                        </button>
-                                        <button class="activity-btn" data-activity="V-HRV" data-name="Harvesting (Mechanical)">
-                                            <span class="activity-icon">🌾</span>
-                                            <span class="activity-code">V-HRV</span>
-                                            <span class="activity-name">Harvesting</span>
-                                        </button>
-                                        <button class="activity-btn" data-activity="V-MOW" data-name="Mowing / Slashing">
-                                            <span class="activity-icon">✂️</span>
-                                            <span class="activity-code">V-MOW</span>
-                                            <span class="activity-name">Mowing</span>
                                         </button>
                                     </div>
                                 </div>

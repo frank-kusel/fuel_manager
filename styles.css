@@ -1967,7 +1967,10 @@ input[readonly] {
     }
     
     .info-card {
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.25rem;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+        line-height: 1.2;
     }
     
     .info-card:last-child {
@@ -1977,12 +1980,22 @@ input[readonly] {
     .info-label {
         display: none; /* Hide the labels on mobile */
     }
+    
+    .selected-info {
+        margin-bottom: 0.75rem;
+    }
 }
 
 /* Progress Bar */
 .progress-container {
-    margin: 1rem 0;
+    margin: 0;
+    padding: 1rem 1rem 0.5rem 1rem;
     text-align: center;
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-200);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
 .progress-bar {

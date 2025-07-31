@@ -392,6 +392,7 @@ async function getSupabaseConfig() {
     updateFieldStepInfo() {
         const vehicleInfo3 = document.getElementById('selected-vehicle-info-3');
         const driverInfo3 = document.getElementById('selected-driver-info-3');
+        const activityInfo = document.getElementById('selected-activity-info');
         
         if (vehicleInfo3 && this.currentVehicle) {
             vehicleInfo3.innerHTML = `<strong>${this.currentVehicle.code}</strong> - ${this.currentVehicle.name}`;
@@ -399,6 +400,10 @@ async function getSupabaseConfig() {
         
         if (driverInfo3 && this.currentDriver) {
             driverInfo3.innerHTML = `<strong>${this.currentDriver.code}</strong> - ${this.currentDriver.name}`;
+        }
+        
+        if (activityInfo && this.currentActivity) {
+            activityInfo.innerHTML = `<strong>${this.currentActivity.code}</strong> - ${this.currentActivity.name}`;
         }
     }
 
