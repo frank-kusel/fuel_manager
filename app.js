@@ -114,13 +114,28 @@ async function getSupabaseConfig() {
             }
         });
 
+        // Mobile bottom navigation
+        const mobileNavBtns = document.querySelectorAll('.mobile-nav-btn');
+        mobileNavBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const section = btn.dataset.section;
+                if (section === 'database') {
+                    this.showDatabaseMenu();
+                } else {
+                    this.showSection(section);
+                    this.updateMobileNav(section);
+                }
+            });
+        });
+
         // Step navigation - with null checks
         const stepElements = [
             { id: 'back-to-vehicle', action: () => this.showStep('vehicle') },
             { id: 'back-to-driver', action: () => this.showStep('driver') },
             { id: 'back-to-activity', action: () => this.showStep('activity') },
+            { id: 'back-to-field', action: () => this.showStep('field') },
             { id: 'back-to-fuel-data', action: () => this.showStep('fuel-data') },
-            { id: 'next-to-fuel', action: () => this.nextToFuelData() },
+            { id: 'next-to-fuel', action: () => this.nextToFieldSelection() },
             { id: 'next-to-review', action: () => this.nextToReview() },
             { id: 'save-fuel-record', action: () => this.saveFuelRecord() }
         ];
@@ -176,6 +191,20 @@ async function getSupabaseConfig() {
         document.getElementById('export-annual').addEventListener('click', () => this.exportAnnualReport());
         document.getElementById('export-canepro').addEventListener('click', () => this.exportCaneProFormat());
 
+        // Activity selection
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.activity-btn')) {
+                this.selectActivity(e.target.closest('.activity-btn'));
+            }
+        });
+
+        // Field selection
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.field-row')) {
+                this.selectField(e.target.closest('.field-row'));
+            }
+        });
+
         // Handle window resize for responsive layout
         window.addEventListener('resize', () => {
             clearTimeout(this.resizeTimeout);
@@ -223,6 +252,153 @@ async function getSupabaseConfig() {
             // Ensure vehicles are rendered for fuel entry
             this.renderVehicles();
             this.renderDrivers();
+        }
+    }
+
+    // Mobile navigation methods
+    updateMobileNav(activeSection) {
+        document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.section === activeSection) {
+                btn.classList.add('active');
+            }
+        });
+    }
+
+    showDatabaseMenu() {
+        // Create a modal or overlay for database options
+        const modal = document.createElement('div');
+        modal.className = 'database-modal';
+        modal.innerHTML = `
+            <div class="database-modal-content">
+                <h3>Database Management</h3>
+                <button class="database-btn" data-section="vehicles">
+                    <span>🚗</span> Vehicles
+                </button>
+                <button class="database-btn" data-section="drivers">
+                    <span>👤</span> Drivers  
+                </button>
+                <button class="database-btn" data-section="bowsers">
+                    <span>⛽</span> Bowsers
+                </button>
+                <button class="database-close">✕</button>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Add event listeners
+        modal.querySelectorAll('.database-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.showSection(btn.dataset.section);
+                this.updateMobileNav('database');
+                document.body.removeChild(modal);
+            });
+        });
+        
+        modal.querySelector('.database-close').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+    }
+
+    // Progress tracking
+    updateProgressBar(step) {
+        const steps = ['vehicle', 'driver', 'activity', 'field', 'fuel-data', 'review'];
+        const currentStepIndex = steps.indexOf(step);
+        const progress = ((currentStepIndex + 1) / steps.length) * 100;
+        
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        
+        if (progressFill) {
+            progressFill.style.width = `${progress}%`;
+        }
+        
+        if (progressText) {
+            progressText.textContent = `Step ${currentStepIndex + 1} of ${steps.length}`;
+        }
+    }
+
+    // Activity selection
+    selectActivity(activityBtn) {
+        // Remove previous selection
+        document.querySelectorAll('.activity-btn').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        
+        // Add selection to clicked button
+        activityBtn.classList.add('selected');
+        
+        // Store selected activity
+        this.currentActivity = {
+            code: activityBtn.dataset.activity,
+            name: activityBtn.dataset.name
+        };
+        
+        console.log('Activity selected:', this.currentActivity);
+        
+        // Auto-advance to field selection after brief delay
+        setTimeout(() => {
+            this.showStep('field');
+        }, 500);
+    }
+
+    // Field selection
+    selectField(fieldRow) {
+        // Remove previous selection
+        document.querySelectorAll('.field-row').forEach(row => {
+            row.classList.remove('selected');
+        });
+        
+        // Add selection to clicked row
+        fieldRow.classList.add('selected');
+        
+        // Store selected field
+        this.currentField = fieldRow.dataset.field;
+        
+        console.log('Field selected:', this.currentField);
+        
+        // Auto-advance to fuel data after brief delay
+        setTimeout(() => {
+            this.showStep('fuel-data');
+        }, 500);
+    }
+
+    // Updated field selection navigation
+    nextToFieldSelection() {
+        if (!this.currentActivity) {
+            alert('Please select an activity first');
+            return;
+        }
+        
+        // Update activity info display
+        const activityInfoElement = document.getElementById('selected-activity-info');
+        if (activityInfoElement) {
+            activityInfoElement.innerHTML = `<strong>${this.currentActivity.code}</strong> - ${this.currentActivity.name}`;
+        }
+        
+        // Update other info displays for field step
+        this.updateFieldStepInfo();
+        
+        this.showStep('field');
+    }
+
+    updateFieldStepInfo() {
+        const vehicleInfo3 = document.getElementById('selected-vehicle-info-3');
+        const driverInfo3 = document.getElementById('selected-driver-info-3');
+        
+        if (vehicleInfo3 && this.currentVehicle) {
+            vehicleInfo3.innerHTML = `<strong>${this.currentVehicle.code}</strong> - ${this.currentVehicle.name}`;
+        }
+        
+        if (driverInfo3 && this.currentDriver) {
+            driverInfo3.innerHTML = `<strong>${this.currentDriver.code}</strong> - ${this.currentDriver.name}`;
         }
     }
 
@@ -277,6 +453,9 @@ async function getSupabaseConfig() {
         if (stepElement) {
             stepElement.classList.add('active');
             console.log(`Step ${step} is now active and visible`);
+            
+            // Update progress bar
+            this.updateProgressBar(step);
             
             // Force a reflow to ensure visibility
             stepElement.offsetHeight;
@@ -814,8 +993,8 @@ async function getSupabaseConfig() {
 
     async saveFuelRecord() {
         try {
-            const activity = document.getElementById('activity').value;
-            const fieldName = document.getElementById('field-name').value;
+            const activity = this.currentActivity ? this.currentActivity.code : '';
+            const fieldName = this.currentField || '';
             const odoStart = parseFloat(document.getElementById('odo-start').value);
             const odoEnd = parseFloat(document.getElementById('odo-end').value);
             const litresUsed = parseFloat(document.getElementById('litres-used').value);
@@ -904,32 +1083,52 @@ async function getSupabaseConfig() {
     }
 
     resetFuelEntryForm() {
-        // Clear form fields
-        document.getElementById('activity').value = '';
-        document.getElementById('field-name').value = '';
-        document.getElementById('odo-start').value = '';
-        document.getElementById('odo-end').value = '';
-        document.getElementById('litres-used').value = '';
-        document.getElementById('bowser-start').value = '';
-        document.getElementById('bowser-end').value = '';
-        document.getElementById('fuel-consumption').value = '';
-        document.getElementById('gauge-broken').checked = false;
-        document.getElementById('needs-review').checked = false;
-        
-        // Enable odo end field in case it was disabled
-        document.getElementById('odo-end').disabled = false;
-        
-        // Clear selections
+        // Clear current selections
         this.currentVehicle = null;
         this.currentDriver = null;
+        this.currentActivity = null;
+        this.currentField = null;
+        
+        // Clear form fields that still exist
+        const odoStart = document.getElementById('odo-start');
+        const odoEnd = document.getElementById('odo-end');
+        const litresUsed = document.getElementById('litres-used');
+        const bowserStart = document.getElementById('bowser-start');
+        const bowserEnd = document.getElementById('bowser-end');
+        const fuelConsumption = document.getElementById('fuel-consumption');
+        const date = document.getElementById('date');
+        const needsReview = document.getElementById('needs-review');
+        const gaugeBroken = document.getElementById('gauge-broken');
+        
+        if (odoStart) odoStart.value = '';
+        if (odoEnd) odoEnd.value = '';
+        if (litresUsed) litresUsed.value = '';
+        if (bowserStart) bowserStart.value = '';
+        if (bowserEnd) bowserEnd.value = '';
+        if (fuelConsumption) fuelConsumption.value = '';
+        if (date) date.value = '';
+        if (needsReview) needsReview.checked = false;
+        if (gaugeBroken) gaugeBroken.checked = false;
+        
+        // Clear any selected states
+        document.querySelectorAll('.activity-btn.selected').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        document.querySelectorAll('.field-row.selected').forEach(row => {
+            row.classList.remove('selected');
+        });
+        
+        // Enable odo end field in case it was disabled
+        const odoEndField = document.getElementById('odo-end');
+        if (odoEndField) odoEndField.disabled = false;
+        
+        // Clear row selections
         this.selectedVehicleRow = null;
         this.selectedDriverRow = null;
-        
-        // Clear selected row styling
         document.querySelectorAll('.selected').forEach(row => row.classList.remove('selected'));
         
         // Clear info displays
-        const infoElements = ['selected-vehicle-info', 'selected-driver-info', 'selected-activity-info', 'selected-vehicle-info-2'];
+        const infoElements = ['selected-vehicle-info', 'selected-driver-info', 'selected-activity-info', 'selected-vehicle-info-2', 'selected-vehicle-info-3', 'selected-driver-info-3'];
         infoElements.forEach(id => {
             const element = document.getElementById(id);
             if (element) element.innerHTML = '';

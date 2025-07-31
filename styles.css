@@ -1978,3 +1978,230 @@ input[readonly] {
         display: none; /* Hide the labels on mobile */
     }
 }
+
+/* Progress Bar */
+.progress-container {
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.progress-bar {
+    background: var(--gray-200);
+    border-radius: 10px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    background: var(--primary);
+    height: 100%;
+    transition: width 0.3s ease;
+    width: 20%;
+}
+
+.progress-text {
+    font-size: 0.8rem;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+/* Activity Categories */
+.activity-categories {
+    margin-top: 1rem;
+}
+
+.activity-category {
+    margin-bottom: 2rem;
+}
+
+.category-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.activity-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.activity-btn {
+    background: white;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.activity-btn:hover {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+.activity-btn.selected {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+}
+
+.activity-icon {
+    font-size: 1.5rem;
+}
+
+.activity-code {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--primary);
+}
+
+.activity-btn.selected .activity-code {
+    color: white;
+}
+
+.activity-name {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.activity-btn.selected .activity-name {
+    color: white;
+}
+
+/* Field Selection Table */
+.field-table {
+    cursor: pointer;
+}
+
+.field-row {
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.field-row:hover {
+    background: var(--primary-light);
+}
+
+.field-row.selected {
+    background: var(--primary);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .progress-container {
+        margin: 0.5rem 0;
+    }
+    
+    .category-title {
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .activity-grid {
+        gap: 0.5rem;
+    }
+    
+    .activity-btn {
+        padding: 0.75rem 0.5rem;
+        gap: 0.25rem;
+    }
+    
+    .activity-icon {
+        font-size: 1.2rem;
+    }
+    
+    .activity-code {
+        font-size: 0.7rem;
+    }
+    
+    .activity-name {
+        font-size: 0.65rem;
+    }
+}
+
+/* Database Modal */
+.database-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.database-modal-content {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    max-width: 300px;
+    width: 90%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.database-modal-content h3 {
+    margin-bottom: 1.5rem;
+    text-align: center;
+    color: var(--gray-900);
+}
+
+.database-btn {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--border-radius);
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 1rem;
+}
+
+.database-btn:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+}
+
+.database-btn span {
+    font-size: 1.2rem;
+}
+
+.database-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--gray-500);
+    border-radius: 50%;
+    transition: all 0.15s ease;
+}
+
+.database-close:hover {
+    background: var(--gray-100);
+    color: var(--gray-900);
+}

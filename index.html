@@ -70,66 +70,184 @@
                         </div>
                     </div>
                     
+                    <!-- Progress Bar -->
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-text" id="progress-text">Step 1 of 5</div>
+                    </div>
+
                     <!-- Step 3: Activity Selection -->
                     <div id="step-activity" class="step hidden">
-                        <h2>Select Activity & Field</h2>
+                        <h2>Select Activity</h2>
                         <button class="back-btn" id="back-to-driver">← Back to Drivers</button>
                         <div class="form-container">
                             <div class="selected-info">
                                 <div class="info-card">
-                                    <div class="info-label">Vehicle</div>
                                     <div id="selected-vehicle-info"></div>
                                 </div>
                                 <div class="info-card">
-                                    <div class="info-label">Driver</div>
                                     <div id="selected-driver-info"></div>
                                 </div>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="activity">Activity/Purpose *</label>
-                                <select id="activity" required>
-                                    <option value="">Select activity</option>
-                                    <option value="field-preparation">Field Preparation</option>
-                                    <option value="planting">Planting</option>
-                                    <option value="harvesting">Harvesting</option>
-                                    <option value="transport">Transport</option>
-                                    <option value="maintenance">Maintenance</option>
-                                    <option value="loading">Loading/Unloading</option>
-                                    <option value="delivery">Delivery</option>
-                                    <option value="inspection">Inspection</option>
-                                    <option value="emergency">Emergency</option>
-                                    <option value="other">Other Business</option>
-                                </select>
+                            <div class="activity-categories">
+                                <!-- Field & Orchard Prep -->
+                                <div class="activity-category">
+                                    <h3 class="category-title">Field & Orchard Prep</h3>
+                                    <div class="activity-grid">
+                                        <button class="activity-btn" data-activity="V-CLR" data-name="Clearing & Grubbing">
+                                            <span class="activity-icon">🌲</span>
+                                            <span class="activity-code">V-CLR</span>
+                                            <span class="activity-name">Clearing</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-PLW" data-name="Ploughing">
+                                            <span class="activity-icon">🚜</span>
+                                            <span class="activity-code">V-PLW</span>
+                                            <span class="activity-name">Ploughing</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-DSC" data-name="Discing">
+                                            <span class="activity-icon">⚙️</span>
+                                            <span class="activity-code">V-DSC</span>
+                                            <span class="activity-name">Discing</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-RIP" data-name="Ripping">
+                                            <span class="activity-icon">🔩</span>
+                                            <span class="activity-code">V-RIP</span>
+                                            <span class="activity-name">Ripping</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-RDG" data-name="Ridging / Bed-forming">
+                                            <span class="activity-icon">🏔️</span>
+                                            <span class="activity-code">V-RDG</span>
+                                            <span class="activity-name">Ridging</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-PLT" data-name="Planting (Mechanical)">
+                                            <span class="activity-icon">🌱</span>
+                                            <span class="activity-code">V-PLT</span>
+                                            <span class="activity-name">Planting</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Inputs & Application -->
+                                <div class="activity-category">
+                                    <h3 class="category-title">Inputs & Application</h3>
+                                    <div class="activity-grid">
+                                        <button class="activity-btn" data-activity="V-FER" data-name="Fertiliser (Mechanical)">
+                                            <span class="activity-icon">🧪</span>
+                                            <span class="activity-code">V-FER</span>
+                                            <span class="activity-name">Fertiliser</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-PES" data-name="Pest Control (Spraying)">
+                                            <span class="activity-icon">🦟</span>
+                                            <span class="activity-code">V-PES</span>
+                                            <span class="activity-name">Pest Control</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-WED" data-name="Weed Control (Spraying)">
+                                            <span class="activity-icon">🌿</span>
+                                            <span class="activity-code">V-WED</span>
+                                            <span class="activity-name">Weed Control</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Transport & Others -->
+                                <div class="activity-category">
+                                    <h3 class="category-title">Transport & Operations</h3>
+                                    <div class="activity-grid">
+                                        <button class="activity-btn" data-activity="V-TRN" data-name="On-Farm Haulage">
+                                            <span class="activity-icon">🚛</span>
+                                            <span class="activity-code">V-TRN</span>
+                                            <span class="activity-name">Haulage</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-TMK" data-name="Transport to Market">
+                                            <span class="activity-icon">🏪</span>
+                                            <span class="activity-code">V-TMK</span>
+                                            <span class="activity-name">To Market</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-HRV" data-name="Harvesting (Mechanical)">
+                                            <span class="activity-icon">🌾</span>
+                                            <span class="activity-code">V-HRV</span>
+                                            <span class="activity-name">Harvesting</span>
+                                        </button>
+                                        <button class="activity-btn" data-activity="V-MOW" data-name="Mowing / Slashing">
+                                            <span class="activity-icon">✂️</span>
+                                            <span class="activity-code">V-MOW</span>
+                                            <span class="activity-name">Mowing</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Field Selection -->
+                    <div id="step-field" class="step hidden">
+                        <h2>Select Field/Location</h2>
+                        <button class="back-btn" id="back-to-activity">← Back to Activity</button>
+                        <div class="form-container">
+                            <div class="selected-info">
+                                <div class="info-card">
+                                    <div id="selected-vehicle-info-3"></div>
+                                </div>
+                                <div class="info-card">
+                                    <div id="selected-driver-info-3"></div>
+                                </div>
+                                <div class="info-card">
+                                    <div id="selected-activity-info"></div>
+                                </div>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="field-name">Field/Location *</label>
-                                <select id="field-name" required>
-                                    <option value="">Select field</option>
-                                    <option value="North Field A">North Field A</option>
-                                    <option value="South Field B">South Field B</option>
-                                    <option value="East Field C">East Field C</option>
-                                    <option value="West Field D">West Field D</option>
-                                    <option value="Main Depot">Main Depot</option>
-                                    <option value="Workshop Bay">Workshop Bay</option>
-                                    <option value="Quarry Site">Quarry Site</option>
-                                    <option value="Storage Facility">Storage Facility</option>
-                                    <option value="Loading Bay">Loading Bay</option>
-                                    <option value="Other">Other (specify in notes)</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-actions">
-                                <button type="button" id="next-to-fuel" class="btn btn-primary">Next: Fuel Data →</button>
+                            <div class="field-selection">
+                                <div class="table-container">
+                                    <table class="table field-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Field/Location</th>
+                                                <th>Type</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="field-table-body">
+                                            <tr class="field-row" data-field="North Field A">
+                                                <td><strong>North Field A</strong></td>
+                                                <td>Crop Field</td>
+                                            </tr>
+                                            <tr class="field-row" data-field="South Field B">
+                                                <td><strong>South Field B</strong></td>
+                                                <td>Crop Field</td>
+                                            </tr>
+                                            <tr class="field-row" data-field="East Field C">
+                                                <td><strong>East Field C</strong></td>
+                                                <td>Crop Field</td>
+                                            </tr>
+                                            <tr class="field-row" data-field="West Field D">
+                                                <td><strong>West Field D</strong></td>
+                                                <td>Crop Field</td>
+                                            </tr>
+                                            <tr class="field-row" data-field="Main Depot">
+                                                <td><strong>Main Depot</strong></td>
+                                                <td>Infrastructure</td>
+                                            </tr>
+                                            <tr class="field-row" data-field="Workshop Bay">
+                                                <td><strong>Workshop Bay</strong></td>
+                                                <td>Infrastructure</td>
+                                            </tr>
+                                            <tr class="field-row" data-field="Storage Facility">
+                                                <td><strong>Storage Facility</strong></td>
+                                                <td>Infrastructure</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Step 4: Fuel Data Entry -->
+                    <!-- Step 5: Fuel Data Entry -->
                     <div id="step-fuel-data" class="step hidden">
                         <h2>Fuel & Odometer Data</h2>
-                        <button class="back-btn" id="back-to-activity">← Back to Activity</button>
+                        <button class="back-btn" id="back-to-field">← Back to Field</button>
                         <div class="form-container">
                             <div class="selected-info">
                                 <div class="info-card">
