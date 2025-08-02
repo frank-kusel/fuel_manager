@@ -384,9 +384,8 @@ async function getSupabaseConfig() {
         }
         
         // Update other info displays for field step
-        this.updateFieldStepInfo();
-        
         this.showStep('field');
+        this.updateFieldStepInfo();
     }
 
     updateFieldStepInfo() {
@@ -491,6 +490,9 @@ async function getSupabaseConfig() {
         } else if (step === 'driver') {
             this.currentDriver = null;
             this.selectedDriverRow = null;
+        } else if (step === 'field') {
+            // Update field step info when showing field step
+            this.updateFieldStepInfo();
         }
     }
 
@@ -807,8 +809,9 @@ async function getSupabaseConfig() {
     }
 
     generateReviewSummary() {
-        const activity = document.getElementById('activity').value;
-        const fieldName = document.getElementById('field-name').value;
+        const activity = this.currentActivity ? this.currentActivity.code : '';
+        const activityName = this.currentActivity ? this.currentActivity.name : '';
+        const fieldName = this.currentField || '';
         const odoStart = parseFloat(document.getElementById('odo-start').value);
         const odoEnd = parseFloat(document.getElementById('odo-end').value);
         const litresUsed = parseFloat(document.getElementById('litres-used').value);
@@ -836,7 +839,7 @@ async function getSupabaseConfig() {
                         </div>
                         <div class="review-item">
                             <span class="review-label">Activity</span>
-                            <span class="review-value">${activity.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                            <span class="review-value">${activity} - ${activityName}</span>
                         </div>
                         <div class="review-item">
                             <span class="review-label">Location</span>
