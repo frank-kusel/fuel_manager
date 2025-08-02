@@ -62,7 +62,7 @@ self.addEventListener('fetch', (event) => {
     const request = event.request;
     const url = new URL(request.url);
 
-    // Handle Supabase API requests
+    // Handle Supabase API requests  
     if (url.hostname.includes('supabase.co')) {
         event.respondWith(
             fetch(request)
@@ -160,6 +160,11 @@ async function syncOfflineFuelEntries() {
                 console.log('Service Worker: Successfully synced entry:', entry.id);
             } catch (error) {
                 console.error('Service Worker: Failed to sync entry:', entry.id, error);
+                // If it's a config error, stop trying for now
+                if (error.message.includes('Failed to get Supabase config')) {
+                    console.error('Service Worker: Cannot get Supabase config, stopping sync');
+                    break;
+                }
                 // Keep entry for next sync attempt
             }
         }
@@ -180,12 +185,15 @@ async function syncOfflineFuelEntries() {
 
 // Function to sync a single fuel entry
 async function syncSingleFuelEntry(entry) {
-    const response = await fetch('https://szskplrwmeuahwvicyos.supabase.co/rest/v1/fuel_entries', {
+    // Get Supabase config from main thread
+    const config = await getSupabaseConfigFromMain();
+    
+    const response = await fetch(`${config.SUPABASE_URL}/rest/v1/fuel_entries`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MDkzMTEsImV4cCI6MjA2OTI4NTMxMX0.phbhjcVVF-ENJn167Pd0XxlF_VicDcJW7id5K8Vy7Mc',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MDkzMTEsImV4cCI6MjA2OTI4NTMxMX0.phbhjcVVF-ENJn167Pd0XxlF_VicDcJW7id5K8Vy7Mc',
+            'apikey': config.SUPABASE_KEY,
+            'Authorization': `Bearer ${config.SUPABASE_KEY}`,
             'Prefer': 'return=representation'
         },
         body: JSON.stringify(entry.data)
@@ -196,6 +204,36 @@ async function syncSingleFuelEntry(entry) {
     }
 
     return response.json();
+}
+
+// Get Supabase config from main thread via message
+async function getSupabaseConfigFromMain() {
+    return new Promise((resolve, reject) => {
+        // Set a timeout to prevent hanging
+        const timeout = setTimeout(() => {
+            reject(new Error('Failed to get Supabase config from main thread'));
+        }, 5000);
+
+        // Request config from main thread
+        self.clients.matchAll().then(clients => {
+            if (clients.length > 0) {
+                clients[0].postMessage({ type: 'REQUEST_SUPABASE_CONFIG' });
+                
+                // Listen for response
+                const messageHandler = (event) => {
+                    if (event.data.type === 'SUPABASE_CONFIG_RESPONSE') {
+                        clearTimeout(timeout);
+                        self.removeEventListener('message', messageHandler);
+                        resolve(event.data.config);
+                    }
+                };
+                self.addEventListener('message', messageHandler);
+            } else {
+                clearTimeout(timeout);
+                reject(new Error('No active clients to request config from'));
+            }
+        });
+    });
 }
 
 // IndexedDB helper functions for offline storage

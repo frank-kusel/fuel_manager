@@ -2954,6 +2954,12 @@ async function getSupabaseConfig() {
                     console.log(`Synced ${event.data.syncedCount} offline entries`);
                     this.loadOfflineEntries();
                     this.showSyncNotification(event.data.syncedCount);
+                } else if (event.data.type === 'REQUEST_SUPABASE_CONFIG') {
+                    // Send Supabase config to service worker
+                    navigator.serviceWorker.controller?.postMessage({
+                        type: 'SUPABASE_CONFIG_RESPONSE',
+                        config: window.LOCAL_SUPABASE_CONFIG
+                    });
                 }
             });
         }
