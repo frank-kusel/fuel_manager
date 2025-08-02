@@ -2075,7 +2075,16 @@ input[readonly] {
     margin-top: 1rem;
 }
 
+/* Desktop-only elements */
+.desktop-only {
+    display: block;
+}
+
 @media (max-width: 768px) {
+    .desktop-only {
+        display: none !important;
+    }
+    
     .compact-summary {
         margin: 0.5rem 0.5rem;
         padding: 0.4rem 0.6rem;
