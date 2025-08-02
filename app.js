@@ -253,6 +253,9 @@ async function getSupabaseConfig() {
             this.renderVehicles();
             this.renderDrivers();
         }
+        
+        // Update mobile navigation
+        this.updateMobileNav(section);
     }
 
     // Mobile navigation methods
@@ -406,6 +409,19 @@ async function getSupabaseConfig() {
         }
     }
 
+    updateFuelDataStepInfo() {
+        const vehicleInfo2 = document.getElementById('selected-vehicle-info-2');
+        const activityInfo = document.getElementById('selected-activity-info');
+        
+        if (vehicleInfo2 && this.currentVehicle) {
+            vehicleInfo2.innerHTML = `<strong>${this.currentVehicle.code}</strong> - ${this.currentVehicle.name}`;
+        }
+        
+        if (activityInfo && this.currentActivity) {
+            activityInfo.innerHTML = `<strong>${this.currentActivity.code}</strong> - ${this.currentActivity.name}`;
+        }
+    }
+
     setupToggleButtons() {
         // Vehicle summary toggle buttons
         const vehicleToggleBtns = document.querySelectorAll('.vehicle-summary .toggle-btn');
@@ -493,6 +509,9 @@ async function getSupabaseConfig() {
         } else if (step === 'field') {
             // Update field step info when showing field step
             this.updateFieldStepInfo();
+        } else if (step === 'fuel-data') {
+            // Update fuel data step info when showing fuel data step
+            this.updateFuelDataStepInfo();
         }
     }
 
