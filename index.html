@@ -166,6 +166,7 @@
                                             <span class="activity-icon">🔍</span>
                                             <span class="activity-code">V-SCT</span>
                                             <span class="activity-name">Scouting</span>
+                                            <span class="activity-name-zulu">Ukuhlola</span>
                                         </button>
                                     </div>
                                 </div>
@@ -178,21 +179,25 @@
                                             <span class="activity-icon">✂️</span>
                                             <span class="activity-code">V-MOW</span>
                                             <span class="activity-name">Mowing</span>
+                                            <span class="activity-name-zulu">Ukugamula</span>
                                         </button>
                                         <button class="activity-btn" data-activity="V-MUL" data-name="Chipping & Spreading Mulch">
                                             <span class="activity-icon">🪵</span>
                                             <span class="activity-code">V-MUL</span>
                                             <span class="activity-name">Mulching</span>
+                                            <span class="activity-name-zulu">Ukwendlala udaka</span>
                                         </button>
                                         <button class="activity-btn" data-activity="V-PRN" data-name="Pruning (Mechanical)">
                                             <span class="activity-icon">✂️</span>
                                             <span class="activity-code">V-PRN</span>
                                             <span class="activity-name">Pruning</span>
+                                            <span class="activity-name-zulu">Ukuthena</span>
                                         </button>
                                         <button class="activity-btn" data-activity="V-THN" data-name="Thinning (Mechanical)">
                                             <span class="activity-icon">🌿</span>
                                             <span class="activity-code">V-THN</span>
                                             <span class="activity-name">Thinning</span>
+                                            <span class="activity-name-zulu">Ukunciphisa</span>
                                         </button>
                                     </div>
                                 </div>
@@ -205,21 +210,25 @@
                                             <span class="activity-icon">🛤️</span>
                                             <span class="activity-code">V-ROD</span>
                                             <span class="activity-name">Roads</span>
+                                            <span class="activity-name-zulu">Imigwaqo</span>
                                         </button>
                                         <button class="activity-btn" data-activity="V-FIR" data-name="Firebreak Maintenance">
                                             <span class="activity-icon">🔥</span>
                                             <span class="activity-code">V-FIR</span>
                                             <span class="activity-name">Firebreaks</span>
+                                            <span class="activity-name-zulu">Ukuvimbela umlilo</span>
                                         </button>
                                         <button class="activity-btn" data-activity="V-WWY" data-name="Waterway/Erosion Mgt.">
                                             <span class="activity-icon">💧</span>
                                             <span class="activity-code">V-WWY</span>
                                             <span class="activity-name">Waterways</span>
+                                            <span class="activity-name-zulu">Imisele yamanzi</span>
                                         </button>
                                         <button class="activity-btn" data-activity="V-IRR" data-name="Irrigation Operation">
                                             <span class="activity-icon">💦</span>
                                             <span class="activity-code">V-IRR</span>
                                             <span class="activity-name">Irrigation</span>
+                                            <span class="activity-name-zulu">Ukugeleza</span>
                                         </button>
                                     </div>
                                 </div>
@@ -232,11 +241,13 @@
                                             <span class="activity-icon">🌾</span>
                                             <span class="activity-code">V-HRV</span>
                                             <span class="activity-name">Harvesting</span>
+                                            <span class="activity-name-zulu">Ukuvuna</span>
                                         </button>
                                         <button class="activity-btn" data-activity="V-LOD" data-name="Crop Loading & Stacking">
                                             <span class="activity-icon">📦</span>
                                             <span class="activity-code">V-LOD</span>
                                             <span class="activity-name">Loading</span>
+                                            <span class="activity-name-zulu">Ukulayisha</span>
                                         </button>
                                     </div>
                                 </div>
@@ -249,11 +260,13 @@
                                             <span class="activity-icon">🚛</span>
                                             <span class="activity-code">V-TRN</span>
                                             <span class="activity-name">Haulage</span>
+                                            <span class="activity-name-zulu">Ukuhudula</span>
                                         </button>
                                         <button class="activity-btn" data-activity="V-TMK" data-name="Transport to Market">
                                             <span class="activity-icon">🏪</span>
                                             <span class="activity-code">V-TMK</span>
                                             <span class="activity-name">To Market</span>
+                                            <span class="activity-name-zulu">Emakethe</span>
                                         </button>
                                     </div>
                                 </div>
@@ -281,34 +294,7 @@
                                             </tr>
                                         </thead>
                                         <tbody id="field-table-body">
-                                            <tr class="field-row" data-field="North Field A">
-                                                <td><strong>North Field A</strong></td>
-                                                <td>Crop Field</td>
-                                            </tr>
-                                            <tr class="field-row" data-field="South Field B">
-                                                <td><strong>South Field B</strong></td>
-                                                <td>Crop Field</td>
-                                            </tr>
-                                            <tr class="field-row" data-field="East Field C">
-                                                <td><strong>East Field C</strong></td>
-                                                <td>Crop Field</td>
-                                            </tr>
-                                            <tr class="field-row" data-field="West Field D">
-                                                <td><strong>West Field D</strong></td>
-                                                <td>Crop Field</td>
-                                            </tr>
-                                            <tr class="field-row" data-field="Main Depot">
-                                                <td><strong>Main Depot</strong></td>
-                                                <td>Infrastructure</td>
-                                            </tr>
-                                            <tr class="field-row" data-field="Workshop Bay">
-                                                <td><strong>Workshop Bay</strong></td>
-                                                <td>Infrastructure</td>
-                                            </tr>
-                                            <tr class="field-row" data-field="Storage Facility">
-                                                <td><strong>Storage Facility</strong></td>
-                                                <td>Infrastructure</td>
-                                            </tr>
+                                            <!-- Fields will be populated by JavaScript from Supabase -->
                                         </tbody>
                                     </table>
                                 </div>
@@ -651,6 +637,56 @@
                         <div id="reconciliation-status">
                             <!-- Reconciliation status will be populated by JavaScript -->
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Activities Management Section -->
+            <section id="activities-section" class="section">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Activities Management</h2>
+                        <button id="add-activity" class="btn btn-primary">+ Add Activity</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="table compact-table mobile-table" id="activities-management-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Zulu</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activities-management-body">
+                                <!-- Activities management list will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Fields Management Section -->
+            <section id="fields-section" class="section">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>Fields Management</h2>
+                        <button id="add-field" class="btn btn-primary">+ Add Field</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="table compact-table mobile-table" id="fields-management-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Crop Type</th>
+                                    <th>Area (ha)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fields-management-body">
+                                <!-- Fields management list will be populated by JavaScript -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>

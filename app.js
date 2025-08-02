@@ -1,17 +1,22 @@
 // --- Supabase config fetched from Netlify function ---
 async function getSupabaseConfig() {
-  // Check if we're running locally (development mode)
-  const isLocalDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  // Always check for local config first
+  if (window.LOCAL_SUPABASE_CONFIG) {
+    console.log('Local config found - using config.local.js');
+    return window.LOCAL_SUPABASE_CONFIG;
+  }
+  
+  // If no local config, check if we're running locally
+  const isLocalDevelopment = window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1' ||
+                            window.location.port.startsWith('800'); // Any port 800x for local dev
+  
+  console.log('Current hostname:', window.location.hostname);
+  console.log('Current port:', window.location.port);
+  console.log('Is local development:', isLocalDevelopment);
   
   if (isLocalDevelopment) {
-    console.log('Development mode detected - using local Supabase config...');
-    // Check if local config is available
-    if (window.LOCAL_SUPABASE_CONFIG) {
-      console.log('Using config from config.local.js');
-      return window.LOCAL_SUPABASE_CONFIG;
-    } else {
-      throw new Error('Local config not found. Please ensure config.local.js is loaded.');
-    }
+    throw new Error('Running locally but config.local.js not found. Please ensure config.local.js is loaded.');
   } else {
     // Production mode - use Netlify function
     console.log('Production mode - fetching Supabase config from Netlify function...');
@@ -45,6 +50,8 @@ async function getSupabaseConfig() {
         this.vehiclesCache = null;
         this.driversCache = null;
         this.bowsersCache = null;
+        this.activitiesCache = null;
+        this.fieldsCache = null;
         this.cacheTimestamp = null;
         this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
         this.init();
@@ -348,6 +355,12 @@ async function getSupabaseConfig() {
                 <button class="database-btn" data-section="bowsers">
                     <span>⛽</span> Bowsers
                 </button>
+                <button class="database-btn" data-section="activities">
+                    <span>🔧</span> Activities
+                </button>
+                <button class="database-btn" data-section="fields">
+                    <span>🌾</span> Fields
+                </button>
                 <button class="database-close">✕</button>
             </div>
         `;
@@ -586,8 +599,9 @@ async function getSupabaseConfig() {
             // Update activity step summary
             this.updateCompactSummary('activity');
         } else if (step === 'field') {
-            // Update field step summary
+            // Update field step summary and populate fields
             this.updateCompactSummary('field');
+            this.renderFields();
         } else if (step === 'odometer') {
             // Update odometer step summary
             this.updateCompactSummary('odometer');
@@ -710,6 +724,46 @@ async function getSupabaseConfig() {
             const tableBody = document.getElementById('driver-table-body');
             if (tableBody) {
                 tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading drivers. Please refresh the page.</td></tr>';
+            }
+        }
+    }
+
+    async renderFields() {
+        try {
+            const tableBody = document.getElementById('field-table-body');
+            if (!this.isCacheValid()) {
+                tableBody.innerHTML = '<tr><td colspan="2" style="text-align: center; padding: 20px;">Loading fields...</td></tr>';
+            }
+            
+            const fields = await this.fetchFieldsFromSupabase();
+            if (!fields) {
+                console.error('Failed to fetch fields from Supabase');
+                return;
+            }
+            
+            tableBody.innerHTML = fields.map(field => `
+            <tr class="field-row clickable" data-field="${field.field_code}">
+                <td><strong>${field.field_code}</strong> - ${field.field_name}</td>
+                <td>${field.crop_type}</td>
+            </tr>
+        `).join('');
+
+        // Remove any existing event listeners to prevent duplicates
+        const newTableBody = tableBody.cloneNode(true);
+        tableBody.parentNode.replaceChild(newTableBody, tableBody);
+
+        // Add click handlers for field selection
+        newTableBody.addEventListener('click', (e) => {
+            const row = e.target.closest('.field-row');
+            if (row && row.dataset.field) {
+                this.selectField(row);
+            }
+        });
+        } catch (error) {
+            console.error('Error rendering fields:', error);
+            const tableBody = document.getElementById('field-table-body');
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="2" style="text-align: center; padding: 2rem; color: #dc2626;">Error loading fields. Please refresh the page.</td></tr>';
             }
         }
     }
@@ -1347,6 +1401,50 @@ async function getSupabaseConfig() {
             console.error('Error fetching fuel entries:', error);
             return [];
         }
+        return data;
+    }
+
+    async fetchActivitiesFromSupabase() {
+        // Return cached data if valid
+        if (this.activitiesCache && this.isCacheValid()) {
+            return this.activitiesCache;
+        }
+
+        const { data, error } = await window.supabaseClient
+            .from('activities')
+            .select('*')
+            .order('category', { ascending: true })
+            .order('code', { ascending: true });
+        if (error) {
+            console.error('Error fetching activities:', error);
+            return [];
+        }
+        
+        // Update cache
+        this.activitiesCache = data;
+        this.cacheTimestamp = Date.now();
+        return data;
+    }
+
+    async fetchFieldsFromSupabase() {
+        // Return cached data if valid
+        if (this.fieldsCache && this.isCacheValid()) {
+            return this.fieldsCache;
+        }
+
+        const { data, error } = await window.supabaseClient
+            .from('fields')
+            .select('*')
+            .order('crop_type', { ascending: true })
+            .order('field_code', { ascending: true });
+        if (error) {
+            console.error('Error fetching fields:', error);
+            return [];
+        }
+        
+        // Update cache
+        this.fieldsCache = data;
+        this.cacheTimestamp = Date.now();
         return data;
     }
 

@@ -160,6 +160,13 @@ body {
 .vehicle-type-d-axle-lorry { --type-color: #c2410c; }
 .vehicle-type-other { --type-color: var(--gray-500); }
 
+/* Standard vehicle type colors */
+.vehicle-type-tractor { --type-color: #16a34a; }
+.vehicle-type-bakkie { --type-color: #2563eb; }
+.vehicle-type-truck { --type-color: #ea580c; }
+.vehicle-type-loader { --type-color: #7c3aed; }
+.vehicle-type-utility { --type-color: #059669; }
+
 .vehicle-type-indicator {
     width: 12px;
     height: 12px;
@@ -1039,7 +1046,7 @@ input[readonly] {
     #vehicle-table th:nth-child(1),
     #vehicle-table td:nth-child(1) { /* Code */
         width: 15%;
-        font-weight: 600;
+        font-weight: 300;
         color: var(--primary);
     }
     
@@ -2125,6 +2132,30 @@ input[readonly] {
     
     .checkbox-label-large {
         font-size: 1.1rem;
+    }
+    
+    /* Reduce padding for fuel entry tables on mobile */
+    #fuel-entry-section .container {
+        padding: 0.5rem;
+    }
+    
+    /* Even tighter spacing for table containers in fuel entry */
+    #fuel-entry-section .table-container {
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Compact spacing for step content */
+    .step h2 {
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
+    }
+    
+    /* Tighter button spacing */
+    .back-btn {
+        margin-bottom: 1rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
     }
 }
 
