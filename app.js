@@ -135,7 +135,6 @@ async function getSupabaseConfig() {
             { id: 'back-to-activity', action: () => this.showStep('activity') },
             { id: 'back-to-field', action: () => this.showStep('field') },
             { id: 'back-to-fuel-data', action: () => this.showStep('fuel-data') },
-            { id: 'next-to-fuel', action: () => this.nextToFieldSelection() },
             { id: 'next-to-review', action: () => this.nextToReview() },
             { id: 'save-fuel-record', action: () => this.saveFuelRecord() }
         ];
@@ -159,37 +158,85 @@ async function getSupabaseConfig() {
         }
 
         // Vehicle management
-        document.getElementById('add-vehicle').addEventListener('click', () => this.addNewVehicle());
+        const addVehicleBtn = document.getElementById('add-vehicle');
+        if (addVehicleBtn) {
+            addVehicleBtn.addEventListener('click', () => this.addNewVehicle());
+        }
 
         // Driver management
-        document.getElementById('add-driver').addEventListener('click', () => this.addNewDriver());
+        const addDriverBtn = document.getElementById('add-driver');
+        if (addDriverBtn) {
+            addDriverBtn.addEventListener('click', () => this.addNewDriver());
+        }
 
         // Bowser management
-        document.getElementById('add-bowser').addEventListener('click', () => this.addNewBowser());
-        document.getElementById('add-refill').addEventListener('click', () => this.addBowserRefill());
-        document.getElementById('reconcile-month').addEventListener('click', () => this.reconcileMonth());
+        const addBowserBtn = document.getElementById('add-bowser');
+        const addRefillBtn = document.getElementById('add-refill');
+        const reconcileBtn = document.getElementById('reconcile-month');
+        
+        if (addBowserBtn) {
+            addBowserBtn.addEventListener('click', () => this.addNewBowser());
+        }
+        if (addRefillBtn) {
+            addRefillBtn.addEventListener('click', () => this.addBowserRefill());
+        }
+        if (reconcileBtn) {
+            reconcileBtn.addEventListener('click', () => this.reconcileMonth());
+        }
 
         // Toggle button functionality
         this.setupToggleButtons();
 
         // Fuel consumption calculation and gauge broken functionality
-        document.getElementById('odo-start').addEventListener('input', () => this.calculateConsumption());
-        document.getElementById('odo-end').addEventListener('input', () => this.calculateConsumption());
-        document.getElementById('litres-used').addEventListener('input', () => this.calculateConsumption());
-        document.getElementById('gauge-broken').addEventListener('change', () => this.handleGaugeBroken());
+        const odoStart = document.getElementById('odo-start');
+        const odoEnd = document.getElementById('odo-end');
+        const litresUsed = document.getElementById('litres-used');
+        const gaugeBroken = document.getElementById('gauge-broken');
+        
+        if (odoStart) {
+            odoStart.addEventListener('input', () => this.calculateConsumption());
+        }
+        if (odoEnd) {
+            odoEnd.addEventListener('input', () => this.calculateConsumption());
+        }
+        if (litresUsed) {
+            litresUsed.addEventListener('input', () => this.calculateConsumption());
+        }
+        if (gaugeBroken) {
+            gaugeBroken.addEventListener('change', () => this.handleGaugeBroken());
+        }
 
         // Bowser reading validation and auto-calculation
-        document.getElementById('bowser-start').addEventListener('input', () => this.autoCalculateBowserEnd());
-        document.getElementById('bowser-end').addEventListener('input', () => {
-            this.markBowserEndAsManuallyModified();
-            this.validateBowserReading();
-        });
-        document.getElementById('litres-used').addEventListener('input', () => this.autoCalculateBowserEnd());
+        const bowserStart = document.getElementById('bowser-start');
+        const bowserEnd = document.getElementById('bowser-end');
+        
+        if (bowserStart) {
+            bowserStart.addEventListener('input', () => this.autoCalculateBowserEnd());
+        }
+        if (bowserEnd) {
+            bowserEnd.addEventListener('input', () => {
+                this.markBowserEndAsManuallyModified();
+                this.validateBowserReading();
+            });
+        }
+        if (litresUsed) {
+            litresUsed.addEventListener('input', () => this.autoCalculateBowserEnd());
+        }
 
         // Export functionality
-        document.getElementById('export-monthly').addEventListener('click', () => this.exportMonthlyReport());
-        document.getElementById('export-annual').addEventListener('click', () => this.exportAnnualReport());
-        document.getElementById('export-canepro').addEventListener('click', () => this.exportCaneProFormat());
+        const exportMonthly = document.getElementById('export-monthly');
+        const exportAnnual = document.getElementById('export-annual');
+        const exportCanepro = document.getElementById('export-canepro');
+        
+        if (exportMonthly) {
+            exportMonthly.addEventListener('click', () => this.exportMonthlyReport());
+        }
+        if (exportAnnual) {
+            exportAnnual.addEventListener('click', () => this.exportAnnualReport());
+        }
+        if (exportCanepro) {
+            exportCanepro.addEventListener('click', () => this.exportCaneProFormat());
+        }
 
         // Activity selection
         document.addEventListener('click', (e) => {
