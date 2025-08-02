@@ -391,35 +391,29 @@ async function getSupabaseConfig() {
         this.updateFieldStepInfo();
     }
 
-    updateFieldStepInfo() {
-        const vehicleInfo3 = document.getElementById('selected-vehicle-info-3');
-        const driverInfo3 = document.getElementById('selected-driver-info-3');
-        const activityInfo = document.getElementById('selected-activity-info');
+    updateCompactSummary(stepId) {
+        const summaryElement = document.getElementById(`${stepId}-summary`);
+        if (!summaryElement) return;
         
-        if (vehicleInfo3 && this.currentVehicle) {
-            vehicleInfo3.innerHTML = `<strong>${this.currentVehicle.code}</strong> - ${this.currentVehicle.name}`;
+        let summary = '';
+        
+        if (this.currentVehicle) {
+            summary += `<strong>${this.currentVehicle.code}</strong> ${this.currentVehicle.name}`;
         }
         
-        if (driverInfo3 && this.currentDriver) {
-            driverInfo3.innerHTML = `<strong>${this.currentDriver.code}</strong> - ${this.currentDriver.name}`;
+        if (this.currentDriver) {
+            summary += summary ? `, <strong>${this.currentDriver.code}</strong> ${this.currentDriver.name}` : `<strong>${this.currentDriver.code}</strong> ${this.currentDriver.name}`;
         }
         
-        if (activityInfo && this.currentActivity) {
-            activityInfo.innerHTML = `<strong>${this.currentActivity.code}</strong> - ${this.currentActivity.name}`;
-        }
-    }
-
-    updateFuelDataStepInfo() {
-        const vehicleInfo2 = document.getElementById('selected-vehicle-info-2');
-        const activityInfo = document.getElementById('selected-activity-info');
-        
-        if (vehicleInfo2 && this.currentVehicle) {
-            vehicleInfo2.innerHTML = `<strong>${this.currentVehicle.code}</strong> - ${this.currentVehicle.name}`;
+        if (this.currentActivity) {
+            summary += summary ? `, <strong>${this.currentActivity.code}</strong> ${this.currentActivity.name}` : `<strong>${this.currentActivity.code}</strong> ${this.currentActivity.name}`;
         }
         
-        if (activityInfo && this.currentActivity) {
-            activityInfo.innerHTML = `<strong>${this.currentActivity.code}</strong> - ${this.currentActivity.name}`;
+        if (this.currentField && stepId === 'fuel-data') {
+            summary += summary ? `, <strong>Field:</strong> ${this.currentField}` : `<strong>Field:</strong> ${this.currentField}`;
         }
+        
+        summaryElement.innerHTML = summary;
     }
 
     setupToggleButtons() {
@@ -506,12 +500,15 @@ async function getSupabaseConfig() {
         } else if (step === 'driver') {
             this.currentDriver = null;
             this.selectedDriverRow = null;
+        } else if (step === 'activity') {
+            // Update activity step summary
+            this.updateCompactSummary('activity');
         } else if (step === 'field') {
-            // Update field step info when showing field step
-            this.updateFieldStepInfo();
+            // Update field step summary
+            this.updateCompactSummary('field');
         } else if (step === 'fuel-data') {
-            // Update fuel data step info when showing fuel data step
-            this.updateFuelDataStepInfo();
+            // Update fuel data step summary
+            this.updateCompactSummary('fuel-data');
         }
     }
 
@@ -1154,9 +1151,9 @@ async function getSupabaseConfig() {
         this.selectedDriverRow = null;
         document.querySelectorAll('.selected').forEach(row => row.classList.remove('selected'));
         
-        // Clear info displays
-        const infoElements = ['selected-vehicle-info', 'selected-driver-info', 'selected-activity-info', 'selected-vehicle-info-2', 'selected-vehicle-info-3', 'selected-driver-info-3'];
-        infoElements.forEach(id => {
+        // Clear compact summaries
+        const summaryElements = ['activity-summary', 'field-summary', 'fuel-data-summary'];
+        summaryElements.forEach(id => {
             const element = document.getElementById(id);
             if (element) element.innerHTML = '';
         });

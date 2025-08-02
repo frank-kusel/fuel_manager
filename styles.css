@@ -1986,6 +1986,31 @@ input[readonly] {
     }
 }
 
+/* Compact Summary */
+.compact-summary {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    margin: 0.75rem 1rem;
+    font-size: 0.8rem;
+    color: var(--gray-700);
+    line-height: 1.3;
+}
+
+.compact-summary strong {
+    color: var(--gray-900);
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .compact-summary {
+        margin: 0.5rem 1rem;
+        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+    }
+}
+
 /* Progress Bar */
 .progress-container {
     margin: 0;
