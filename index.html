@@ -35,7 +35,7 @@
                     <div class="progress-bar">
                         <div class="progress-fill" id="progress-fill"></div>
                     </div>
-                    <div class="progress-text" id="progress-text">Step 1 of 5</div>
+                    <div class="progress-text" id="progress-text">Step 1 of 6</div>
                 </div>
                 
                 <div class="container">
@@ -306,63 +306,74 @@
                         </div>
                     </div>
                     
-                    <!-- Step 5: Fuel Data Entry -->
-                    <div id="step-fuel-data" class="step hidden">
-                        <h2>Fuel & Odometer Data</h2>
+                    <!-- Step 5: Odometer Reading -->
+                    <div id="step-odometer" class="step hidden">
+                        <h2>Odometer Reading</h2>
                         <button class="back-btn" id="back-to-field">← Back to Field</button>
+                        <!-- Compact Summary -->
+                        <div class="compact-summary" id="odometer-summary">
+                            <!-- Summary will be populated by JavaScript -->
+                        </div>
+                        
+                        <div class="form-container mobile-optimized">
+                            <div class="form-group-large">
+                                <label for="odo-start">Odometer Start (km) *</label>
+                                <input type="number" inputmode="decimal" pattern="[0-9]*" id="odo-start" required min="0" step="0.1" class="input-large">
+                            </div>
+                            
+                            <div class="form-group-large">
+                                <label for="odo-end">Odometer End (km) *</label>
+                                <input type="number" inputmode="decimal" pattern="[0-9]*" id="odo-end" required min="0" step="0.1" class="input-large">
+                            </div>
+                            
+                            <div class="checkbox-group-large">
+                                <input type="checkbox" id="gauge-broken">
+                                <label for="gauge-broken" class="checkbox-label-large">Gauge broken (use start ODO as end ODO)</label>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" id="next-to-fuel" class="btn btn-primary btn-large">Next: Fuel Data →</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 6: Fuel Data -->
+                    <div id="step-fuel-data" class="step hidden">
+                        <h2>Fuel Data</h2>
+                        <button class="back-btn" id="back-to-odometer">← Back to Odometer</button>
                         <!-- Compact Summary -->
                         <div class="compact-summary" id="fuel-data-summary">
                             <!-- Summary will be populated by JavaScript -->
                         </div>
                         
-                        <div class="form-container">
-                            
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="odo-start">Odometer Start (km) *</label>
-                                    <input type="number" id="odo-start" required min="0" step="0.1">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="odo-end">Odometer End (km) *</label>
-                                    <input type="number" id="odo-end" required min="0" step="0.1">
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
+                        <div class="form-container mobile-optimized">
+                            <div class="form-group-large">
                                 <label for="litres-used">Litres Used *</label>
-                                <input type="number" id="litres-used" required min="0" step="0.01">
+                                <input type="number" inputmode="decimal" pattern="[0-9]*" id="litres-used" required min="0" step="0.01" class="input-large">
                             </div>
                             
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="bowser-start">Bowser Start Reading (L) *</label>
-                                    <input type="number" id="bowser-start" required min="0" step="0.01">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="bowser-end">Bowser End Reading (L) *</label>
-                                    <input type="number" id="bowser-end" required min="0" step="0.01">
-                                </div>
+                            <div class="form-group-large">
+                                <label for="bowser-start">Bowser Start Reading (L) *</label>
+                                <input type="number" inputmode="decimal" pattern="[0-9]*" id="bowser-start" required min="0" step="0.01" class="input-large">
                             </div>
                             
-                            <div class="form-group">
+                            <div class="form-group-large">
+                                <label for="bowser-end">Bowser End Reading (L) *</label>
+                                <input type="number" inputmode="decimal" pattern="[0-9]*" id="bowser-end" required min="0" step="0.01" class="input-large">
+                            </div>
+                            
+                            <div class="form-group-large">
                                 <label for="fuel-consumption">Fuel Consumption (L/100km)</label>
-                                <input type="text" id="fuel-consumption" readonly>
-                            </div>
-                            
-                            <div class="checkbox-group">
-                                <input type="checkbox" id="gauge-broken">
-                                <label for="gauge-broken" class="mb-0">Gauge broken (use start ODO as end ODO)</label>
+                                <input type="text" id="fuel-consumption" readonly class="input-large readonly-input">
                             </div>
                             
                             <div class="form-actions">
-                                <button type="button" id="next-to-review" class="btn btn-primary">Next: Review & Save →</button>
+                                <button type="button" id="next-to-review" class="btn btn-primary btn-large">Next: Review & Save →</button>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Step 5: Review & Save -->
+                    <!-- Step 7: Review & Save -->
                     <div id="step-review" class="step hidden">
                         <h2>Review & Save Record</h2>
                         <button class="back-btn" id="back-to-fuel-data">← Back to Fuel Data</button>

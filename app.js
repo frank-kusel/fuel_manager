@@ -134,7 +134,9 @@ async function getSupabaseConfig() {
             { id: 'back-to-driver', action: () => this.showStep('driver') },
             { id: 'back-to-activity', action: () => this.showStep('activity') },
             { id: 'back-to-field', action: () => this.showStep('field') },
+            { id: 'back-to-odometer', action: () => this.showStep('odometer') },
             { id: 'back-to-fuel-data', action: () => this.showStep('fuel-data') },
+            { id: 'next-to-fuel', action: () => this.nextToFuel() },
             { id: 'next-to-review', action: () => this.nextToReview() },
             { id: 'save-fuel-record', action: () => this.saveFuelRecord() }
         ];
@@ -359,7 +361,7 @@ async function getSupabaseConfig() {
 
     // Progress tracking
     updateProgressBar(step) {
-        const steps = ['vehicle', 'driver', 'activity', 'field', 'fuel-data', 'review'];
+        const steps = ['vehicle', 'driver', 'activity', 'field', 'odometer', 'fuel-data', 'review'];
         const currentStepIndex = steps.indexOf(step);
         const progress = ((currentStepIndex + 1) / steps.length) * 100;
         
@@ -416,8 +418,26 @@ async function getSupabaseConfig() {
         
         // Auto-advance to fuel data after brief delay
         setTimeout(() => {
-            this.showStep('fuel-data');
+            this.showStep('odometer');
         }, 500);
+    }
+
+    nextToFuel() {
+        const odoStart = parseFloat(document.getElementById('odo-start').value);
+        const odoEnd = parseFloat(document.getElementById('odo-end').value);
+        const gaugeBroken = document.getElementById('gauge-broken').checked;
+        
+        if (isNaN(odoStart) || odoStart < 0) {
+            alert('Please enter a valid odometer start reading.');
+            return;
+        }
+        
+        if (!gaugeBroken && (isNaN(odoEnd) || odoEnd < odoStart)) {
+            alert('Please enter a valid odometer end reading that is greater than or equal to the start reading.');
+            return;
+        }
+        
+        this.showStep('fuel-data');
     }
 
     // Updated field selection navigation
@@ -553,6 +573,9 @@ async function getSupabaseConfig() {
         } else if (step === 'field') {
             // Update field step summary
             this.updateCompactSummary('field');
+        } else if (step === 'odometer') {
+            // Update odometer step summary
+            this.updateCompactSummary('odometer');
         } else if (step === 'fuel-data') {
             // Update fuel data step summary
             this.updateCompactSummary('fuel-data');
@@ -1199,7 +1222,7 @@ async function getSupabaseConfig() {
         document.querySelectorAll('.selected').forEach(row => row.classList.remove('selected'));
         
         // Clear compact summaries
-        const summaryElements = ['activity-summary', 'field-summary', 'fuel-data-summary'];
+        const summaryElements = ['activity-summary', 'field-summary', 'odometer-summary', 'fuel-data-summary'];
         summaryElements.forEach(id => {
             const element = document.getElementById(id);
             if (element) element.innerHTML = '';
