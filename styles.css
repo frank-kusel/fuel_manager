@@ -2042,6 +2042,11 @@ input[readonly] {
     cursor: not-allowed;
 }
 
+.input-calculated {
+    background: var(--gray-50);
+    color: var(--gray-500);
+}
+
 .checkbox-group-large {
     margin: 1.5rem 0;
     display: flex;
@@ -2175,13 +2180,13 @@ input[readonly] {
     background: white;
     border: 2px solid var(--gray-200);
     border-radius: var(--border-radius);
-    padding: 1rem;
+    padding: 0.75rem 0.5rem;
     cursor: pointer;
     transition: all 0.15s ease;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
     text-align: center;
     box-shadow: var(--shadow);
 }
@@ -2204,23 +2209,36 @@ input[readonly] {
 }
 
 .activity-code {
-    font-weight: 700;
-    font-size: 0.8rem;
-    color: var(--primary);
+    font-weight: 500;
+    font-size: 0.65rem;
+    color: var(--gray-500);
 }
 
 .activity-btn.selected .activity-code {
-    color: white;
+    color: rgba(255, 255, 255, 0.8);
 }
 
 .activity-name {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--gray-700);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    line-height: 1.1;
 }
 
 .activity-btn.selected .activity-name {
     color: white;
+}
+
+.activity-name-zulu {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--gray-600);
+    font-style: italic;
+    line-height: 1.1;
+}
+
+.activity-btn.selected .activity-name-zulu {
+    color: rgba(255, 255, 255, 0.9);
 }
 
 /* Field Selection Table */
@@ -2253,7 +2271,7 @@ input[readonly] {
     }
     
     .activity-grid {
-        gap: 0.5rem;
+        gap: 0.25rem;
     }
     
     .activity-btn {

@@ -598,7 +598,7 @@ async function getSupabaseConfig() {
         try {
             const tableBody = document.getElementById('vehicle-table-body');
             if (!this.isCacheValid()) {
-                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Loading vehicles...</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">Loading vehicles...</td></tr>';
             }
             
             const vehicles = await this.fetchVehiclesFromSupabase();
@@ -612,6 +612,7 @@ async function getSupabaseConfig() {
                 <tr class="clickable vehicle-type-${typeClass}" data-id="${vehicle.id}">
                     <td><span class="vehicle-code-colored">${vehicle.code || ''}</span></td>
                     <td>${vehicle.name || ''}</td>
+                    <td>${vehicle.type || '-'}</td>
                     <td>${vehicle.registration || '-'}</td>
                 </tr>
             `;
@@ -664,7 +665,7 @@ async function getSupabaseConfig() {
             <tr class="clickable" data-id="${driver.id}">
                 <td><strong>${driver.code}</strong></td>
                 <td>${driver.name}</td>
-                <td>${driver.license || 'N/A'}</td>
+                <td>${driver.default_veh || '-'}</td>
             </tr>
         `).join('');
 
@@ -932,32 +933,12 @@ async function getSupabaseConfig() {
                             <span class="review-value">${fieldName}</span>
                         </div>
                         <div class="review-item">
-                            <span class="review-label">Odometer Start</span>
-                            <span class="review-value">${odoStart.toFixed(1)} km</span>
-                        </div>
-                        <div class="review-item">
-                            <span class="review-label">Odometer End</span>
-                            <span class="review-value">${gaugeBroken ? 'N/A (gauge broken)' : odoEnd.toFixed(1) + ' km'}</span>
-                        </div>
-                        <div class="review-item">
                             <span class="review-label">Distance</span>
                             <span class="review-value">${gaugeBroken ? 'N/A (gauge broken)' : distance.toFixed(1) + ' km'}</span>
                         </div>
                         <div class="review-item">
                             <span class="review-label">Fuel Used</span>
                             <span class="review-value review-highlight">${litresUsed.toFixed(2)} L</span>
-                        </div>
-                        <div class="review-item">
-                            <span class="review-label">Bowser Start</span>
-                            <span class="review-value">${bowserStart.toFixed(2)} L</span>
-                        </div>
-                        <div class="review-item">
-                            <span class="review-label">Bowser End</span>
-                            <span class="review-value">${bowserEnd.toFixed(2)} L</span>
-                        </div>
-                        <div class="review-item">
-                            <span class="review-label">Bowser Dispensed</span>
-                            <span class="review-value">${bowserDispensed.toFixed(2)} L</span>
                         </div>
                         <div class="review-item">
                             <span class="review-label">Consumption</span>
