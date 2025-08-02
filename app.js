@@ -1,12 +1,26 @@
 // --- Supabase config fetched from Netlify function ---
 async function getSupabaseConfig() {
-  console.log('Fetching Supabase config from Netlify function...');
-  const res = await fetch('/.netlify/functions/config');
-  console.log('Netlify function response status:', res.status);
-  if (!res.ok) throw new Error(`Failed to load Supabase config: ${res.status} ${res.statusText}`);
-  const config = await res.json();
-  console.log('Supabase config loaded successfully');
-  return config;
+  // Check if we're running locally (development mode)
+  const isLocalDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  
+  if (isLocalDevelopment) {
+    console.log('Development mode detected - using local Supabase config...');
+    // Local development configuration
+    // Replace these with your actual Supabase URL and anon key
+    return {
+      SUPABASE_URL: 'https://your-project-id.supabase.co',
+      SUPABASE_KEY: 'your-anon-key-here'
+    };
+  } else {
+    // Production mode - use Netlify function
+    console.log('Production mode - fetching Supabase config from Netlify function...');
+    const res = await fetch('/.netlify/functions/config');
+    console.log('Netlify function response status:', res.status);
+    if (!res.ok) throw new Error(`Failed to load Supabase config: ${res.status} ${res.statusText}`);
+    const config = await res.json();
+    console.log('Supabase config loaded successfully');
+    return config;
+  }
 }
 
 (async () => {
