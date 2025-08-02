@@ -303,15 +303,18 @@ async function getSupabaseConfig() {
         // Database-only sections (activities, fields) don't have desktop nav buttons
         const databaseOnlySections = ['activities', 'fields'];
         
+        // Only update navigation for sections that have nav buttons
         if (!databaseOnlySections.includes(section)) {
-            // Update navigation for regular sections
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
             const navBtn = document.getElementById(`nav-${section}`);
             if (navBtn) {
                 navBtn.classList.add('active');
             } else {
-                console.warn(`Navigation button nav-${section} not found (this is normal for database-only sections)`);
+                console.warn(`Navigation button nav-${section} not found`);
             }
+        } else {
+            // For database-only sections, don't try to update nav buttons
+            console.log(`Database-only section: ${section} (no nav button required)`);
         }
 
         // Show section
