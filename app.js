@@ -54,7 +54,14 @@ async function getSupabaseConfig() {
         this.fieldsCache = null;
         this.cacheTimestamp = null;
         this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
+        
+        // Offline functionality
+        this.isOnline = navigator.onLine;
+        this.offlineEntries = [];
+        this.syncInProgress = false;
+        
         this.init();
+        this.initializeOfflineHandlers();
     }
 
     async init() {
@@ -74,6 +81,9 @@ async function getSupabaseConfig() {
         // Load data from Supabase
         await this.loadInitialData();
         console.log('Initial data loaded successfully from Supabase');
+        
+        // Cache essential data for offline use
+        await this.cacheEssentialData();
         
         console.log('Fleet Manager initialization complete');
     }
@@ -838,20 +848,12 @@ async function getSupabaseConfig() {
                 console.error('selected-driver-info element not found');
             }
             
-            // Set default odometer start value to last reading
+            // Set default odometer start value to last reading (offline-aware)
             try {
-                const { data: records, error: odoError } = await window.supabaseClient
-                    .from('fuel_entries')
-                    .select('odo_end')
-                    .eq('vehicle_id', this.currentVehicle.id)
-                    .order('date', { ascending: false })
-                    .limit(1);
-                    
-                if (!odoError && records && records.length > 0) {
-                    const odoStartElement = document.getElementById('odo-start');
-                    if (odoStartElement) {
-                        odoStartElement.value = records[0].odo_end;
-                    }
+                const lastOdoReading = await this.getLastOdometerReading(this.currentVehicle.id);
+                const odoStartElement = document.getElementById('odo-start');
+                if (odoStartElement && lastOdoReading > 0) {
+                    odoStartElement.value = lastOdoReading;
                 }
             } catch (odoError) {
                 console.warn('Could not set default odometer value:', odoError);
@@ -1188,37 +1190,65 @@ async function getSupabaseConfig() {
                 timestamp: new Date().toISOString()
             };
             
-            const { data, error } = await window.supabaseClient
-                .from('fuel_entries')
-                .insert([fuelEntry])
-                .select();
-                
-            if (error) {
-                console.error('Error saving fuel record:', error);
-                alert('Error saving fuel record. Please try again.');
-                return;
+            // Try to save online first, fallback to offline storage
+            if (this.isOnline) {
+                try {
+                    const { data, error } = await window.supabaseClient
+                        .from('fuel_entries')
+                        .insert([fuelEntry])
+                        .select();
+                        
+                    if (error) {
+                        throw error;
+                    }
+                    
+                    // Update bowser current reading
+                    try {
+                        const { error: bowserError } = await window.supabaseClient
+                            .from('bowsers')
+                            .update({ current_reading: bowserEnd })
+                            .eq('id', defaultBowser.id);
+                            
+                        if (bowserError) {
+                            console.error('Error updating bowser reading:', bowserError);
+                        }
+                    } catch (bowserUpdateError) {
+                        console.error('Failed to update bowser reading:', bowserUpdateError);
+                    }
+                    
+                    console.log('Fuel record saved successfully:', data);
+                    alert('Fuel record saved successfully!');
+                    
+                } catch (onlineError) {
+                    console.error('Online save failed, falling back to offline:', onlineError);
+                    // Fallback to offline storage
+                    const saved = await this.saveOfflineFuelEntry(fuelEntry);
+                    if (saved) {
+                        alert('Connection lost - fuel record saved offline. It will sync when connection is restored.');
+                    } else {
+                        alert('Failed to save fuel record. Please try again.');
+                        return;
+                    }
+                }
+            } else {
+                // Save offline when no connection
+                const saved = await this.saveOfflineFuelEntry(fuelEntry);
+                if (saved) {
+                    alert('Offline mode - fuel record saved locally. It will sync when connection is restored.');
+                } else {
+                    alert('Failed to save fuel record offline. Please try again.');
+                    return;
+                }
             }
-            
-            // Update bowser current reading
-            const { error: bowserError } = await window.supabaseClient
-                .from('bowsers')
-                .update({ current_reading: bowserEnd })
-                .eq('id', defaultBowser.id);
-                
-            if (bowserError) {
-                console.error('Error updating bowser reading:', bowserError);
-                alert('Fuel record saved but failed to update bowser reading.');
-            }
-            
-            console.log('Fuel record saved successfully:', data);
-            alert('Fuel record saved successfully!');
             
             // Reset form and go back to vehicle selection
             this.resetFuelEntryForm();
             this.showStep('vehicle');
             
-            // Refresh data
-            await this.loadInitialData();
+            // Refresh data if online
+            if (this.isOnline) {
+                await this.loadInitialData();
+            }
             
         } catch (error) {
             console.error('Error saving fuel record:', error);
@@ -1307,7 +1337,29 @@ async function getSupabaseConfig() {
         this.vehiclesCache = null;
         this.driversCache = null;
         this.bowsersCache = null;
+        this.activitiesCache = null;
+        this.fieldsCache = null;
         this.cacheTimestamp = null;
+    }
+
+    // Enhanced caching for offline support
+    async cacheEssentialData() {
+        try {
+            console.log('Caching essential data for offline use...');
+            
+            // Cache vehicles, drivers, bowsers, activities, and fields
+            await Promise.all([
+                this.fetchVehiclesFromSupabase(),
+                this.fetchDriversFromSupabase(), 
+                this.fetchBowsersFromSupabase(),
+                this.fetchActivitiesFromSupabase(),
+                this.fetchFieldsFromSupabase()
+            ]);
+            
+            console.log('Essential data cached successfully');
+        } catch (error) {
+            console.error('Failed to cache essential data:', error);
+        }
     }
 
     async fetchVehiclesFromSupabase() {
@@ -2789,6 +2841,318 @@ async function getSupabaseConfig() {
             'other': 'All'
         };
         return activityMap[activity] || activity;
+    }
+
+    // ===== OFFLINE FUNCTIONALITY METHODS =====
+
+    initializeOfflineHandlers() {
+        // Listen for online/offline events
+        window.addEventListener('online', () => {
+            console.log('Connection restored - triggering sync');
+            this.isOnline = true;
+            this.updateOfflineStatus();
+            this.triggerSync();
+            // Refresh data when back online
+            this.loadInitialData();
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('Connection lost - entering offline mode');
+            this.isOnline = false;
+            this.updateOfflineStatus();
+        });
+
+        // Listen for service worker messages
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data.type === 'SYNC_COMPLETE') {
+                    console.log(`Synced ${event.data.syncedCount} offline entries`);
+                    this.loadOfflineEntries();
+                    this.showSyncNotification(event.data.syncedCount);
+                }
+            });
+        }
+
+        // Load any existing offline entries
+        this.loadOfflineEntries();
+        
+        // Update UI to show offline status
+        this.updateOfflineStatus();
+    }
+
+    updateOfflineStatus() {
+        // Add offline indicator to the UI
+        let offlineIndicator = document.getElementById('offline-indicator');
+        
+        if (!offlineIndicator) {
+            offlineIndicator = document.createElement('div');
+            offlineIndicator.id = 'offline-indicator';
+            offlineIndicator.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                z-index: 1000;
+                transition: all 0.3s ease;
+            `;
+            document.body.appendChild(offlineIndicator);
+        }
+
+        if (this.isOnline) {
+            offlineIndicator.textContent = '🟢 Online';
+            offlineIndicator.style.background = '#dcfce7';
+            offlineIndicator.style.color = '#16a34a';
+            offlineIndicator.style.border = '1px solid #bbf7d0';
+        } else {
+            offlineIndicator.textContent = '🔴 Offline';
+            offlineIndicator.style.background = '#fef2f2';
+            offlineIndicator.style.color = '#dc2626';
+            offlineIndicator.style.border = '1px solid #fecaca';
+        }
+
+        // Show offline entries count if any
+        if (this.offlineEntries.length > 0) {
+            offlineIndicator.textContent += ` (${this.offlineEntries.length} pending)`;
+        }
+    }
+
+    async saveOfflineFuelEntry(fuelEntry) {
+        try {
+            const offlineEntry = {
+                id: Date.now().toString(),
+                data: fuelEntry,
+                timestamp: new Date().toISOString()
+            };
+
+            // Save to IndexedDB
+            await this.storeOfflineEntry(offlineEntry);
+            
+            // Update local array
+            this.offlineEntries.push(offlineEntry);
+            
+            // Update UI
+            this.updateOfflineStatus();
+            
+            console.log('Fuel entry saved offline:', offlineEntry.id);
+            return true;
+            
+        } catch (error) {
+            console.error('Failed to save offline entry:', error);
+            return false;
+        }
+    }
+
+    async storeOfflineEntry(entry) {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('FuelManagerDB', 1);
+            
+            request.onerror = () => reject(request.error);
+            
+            request.onsuccess = () => {
+                const db = request.result;
+                const transaction = db.transaction(['offlineFuelEntries'], 'readwrite');
+                const store = transaction.objectStore('offlineFuelEntries');
+                const addRequest = store.add(entry);
+                
+                addRequest.onsuccess = () => resolve();
+                addRequest.onerror = () => reject(addRequest.error);
+            };
+            
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('offlineFuelEntries')) {
+                    db.createObjectStore('offlineFuelEntries', { keyPath: 'id' });
+                }
+            };
+        });
+    }
+
+    async loadOfflineEntries() {
+        try {
+            const request = indexedDB.open('FuelManagerDB', 1);
+            
+            const entries = await new Promise((resolve, reject) => {
+                request.onerror = () => reject(request.error);
+                
+                request.onsuccess = () => {
+                    const db = request.result;
+                    const transaction = db.transaction(['offlineFuelEntries'], 'readonly');
+                    const store = transaction.objectStore('offlineFuelEntries');
+                    const getAllRequest = store.getAll();
+                    
+                    getAllRequest.onsuccess = () => resolve(getAllRequest.result);
+                    getAllRequest.onerror = () => reject(getAllRequest.error);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains('offlineFuelEntries')) {
+                        db.createObjectStore('offlineFuelEntries', { keyPath: 'id' });
+                    }
+                };
+            });
+            
+            this.offlineEntries = entries;
+            this.updateOfflineStatus();
+            
+        } catch (error) {
+            console.error('Failed to load offline entries:', error);
+            this.offlineEntries = [];
+        }
+    }
+
+    triggerSync() {
+        if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+            navigator.serviceWorker.ready.then((registration) => {
+                return registration.sync.register('fuel-entry-sync');
+            }).then(() => {
+                console.log('Background sync registered');
+            }).catch((error) => {
+                console.error('Background sync registration failed:', error);
+                // Fallback: try to sync immediately
+                this.manualSync();
+            });
+        } else {
+            // Fallback for browsers without background sync
+            this.manualSync();
+        }
+    }
+
+    async manualSync() {
+        if (this.syncInProgress || this.offlineEntries.length === 0) {
+            return;
+        }
+
+        this.syncInProgress = true;
+        console.log('Starting manual sync...');
+
+        try {
+            for (const entry of this.offlineEntries) {
+                try {
+                    await this.syncSingleEntry(entry);
+                    await this.removeOfflineEntry(entry.id);
+                    console.log('Synced entry:', entry.id);
+                } catch (error) {
+                    console.error('Failed to sync entry:', entry.id, error);
+                }
+            }
+            
+            // Reload offline entries to update the UI
+            await this.loadOfflineEntries();
+            
+            console.log('Manual sync completed');
+            this.showSyncNotification(this.offlineEntries.length);
+            
+        } catch (error) {
+            console.error('Manual sync failed:', error);
+        } finally {
+            this.syncInProgress = false;
+        }
+    }
+
+    async syncSingleEntry(entry) {
+        const { data, error } = await window.supabaseClient
+            .from('fuel_entries')
+            .insert([entry.data])
+            .select();
+            
+        if (error) {
+            throw error;
+        }
+        
+        return data;
+    }
+
+    async removeOfflineEntry(id) {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('FuelManagerDB', 1);
+            
+            request.onerror = () => reject(request.error);
+            
+            request.onsuccess = () => {
+                const db = request.result;
+                const transaction = db.transaction(['offlineFuelEntries'], 'readwrite');
+                const store = transaction.objectStore('offlineFuelEntries');
+                const deleteRequest = store.delete(id);
+                
+                deleteRequest.onsuccess = () => resolve();
+                deleteRequest.onerror = () => reject(deleteRequest.error);
+            };
+        });
+    }
+
+    showSyncNotification(count) {
+        if (count === 0) return;
+        
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 50px;
+            right: 10px;
+            background: #dcfce7;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 1001;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        `;
+        notification.textContent = `✅ Synced ${count} fuel entries`;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    async getLastOdometerReading(vehicleId) {
+        try {
+            // Try to get from online database first
+            if (this.isOnline) {
+                const { data, error } = await window.supabaseClient
+                    .from('fuel_entries')
+                    .select('odo_end')
+                    .eq('vehicle_id', vehicleId)
+                    .order('date', { ascending: false })
+                    .limit(1);
+                    
+                if (!error && data && data.length > 0) {
+                    return data[0].odo_end;
+                }
+            }
+            
+            // Fallback: check offline entries
+            const offlineReading = this.getLastOfflineOdometerReading(vehicleId);
+            if (offlineReading !== null) {
+                return offlineReading;
+            }
+            
+            // If no data available, return vehicle's current odo or 0
+            if (this.currentVehicle && this.currentVehicle.id === vehicleId) {
+                return this.currentVehicle.currentOdo || 0;
+            }
+            
+            return 0;
+            
+        } catch (error) {
+            console.error('Error getting last odometer reading:', error);
+            return this.getLastOfflineOdometerReading(vehicleId) || 0;
+        }
+    }
+
+    getLastOfflineOdometerReading(vehicleId) {
+        // Sort offline entries by timestamp and find the most recent for this vehicle
+        const vehicleEntries = this.offlineEntries
+            .filter(entry => entry.data.vehicle_id === vehicleId)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+        return vehicleEntries.length > 0 ? vehicleEntries[0].data.odo_end : null;
     }
 }
 
