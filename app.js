@@ -300,13 +300,18 @@ async function getSupabaseConfig() {
     showSection(section) {
         console.log(`Switching to section: ${section}`);
         
-        // Update navigation
-        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-        const navBtn = document.getElementById(`nav-${section}`);
-        if (navBtn) {
-            navBtn.classList.add('active');
-        } else {
-            console.error(`Navigation button nav-${section} not found`);
+        // Database-only sections (activities, fields) don't have desktop nav buttons
+        const databaseOnlySections = ['activities', 'fields'];
+        
+        if (!databaseOnlySections.includes(section)) {
+            // Update navigation for regular sections
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            const navBtn = document.getElementById(`nav-${section}`);
+            if (navBtn) {
+                navBtn.classList.add('active');
+            } else {
+                console.warn(`Navigation button nav-${section} not found (this is normal for database-only sections)`);
+            }
         }
 
         // Show section
@@ -315,6 +320,13 @@ async function getSupabaseConfig() {
         if (sectionElement) {
             sectionElement.classList.add('active');
             console.log(`Section ${section} is now active`);
+            
+            // Load data for database sections
+            if (section === 'activities') {
+                this.renderActivitiesManagement();
+            } else if (section === 'fields') {
+                this.renderFieldsManagement();
+            }
         } else {
             console.error(`Section ${section}-section not found`);
         }
@@ -1854,6 +1866,76 @@ async function getSupabaseConfig() {
             const tableBody = document.getElementById('bowsers-management-body');
             if (tableBody) {
                 tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #dc2626; font-size: 0.9rem;">Error loading bowsers. Please refresh.</td></tr>';
+            }
+        }
+    }
+
+    // Activities Management Methods
+    async renderActivitiesManagement() {
+        try {
+            const activities = await this.fetchActivitiesFromSupabase();
+            const tableBody = document.getElementById('activities-management-body');
+            
+            if (!tableBody) {
+                console.error('Activities management table body not found');
+                return;
+            }
+
+            if (activities.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No activities found. Please add activities via SQL.</td></tr>';
+                return;
+            }
+
+            // Simple table layout for all screen sizes
+            tableBody.innerHTML = activities.map(activity => `
+                <tr data-id="${activity.id}" class="mobile-row">
+                    <td class="mobile-cell">${activity.code || ''}</td>
+                    <td class="mobile-cell">${activity.name || ''}</td>
+                    <td class="mobile-cell">${activity.category || ''}</td>
+                    <td class="mobile-cell">${activity.name_zulu || ''}</td>
+                </tr>
+            `).join('');
+
+        } catch (error) {
+            console.error('Error rendering activities management:', error);
+            const tableBody = document.getElementById('activities-management-body');
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #dc2626; font-size: 0.9rem;">Error loading activities. Please refresh.</td></tr>';
+            }
+        }
+    }
+
+    // Fields Management Methods
+    async renderFieldsManagement() {
+        try {
+            const fields = await this.fetchFieldsFromSupabase();
+            const tableBody = document.getElementById('fields-management-body');
+            
+            if (!tableBody) {
+                console.error('Fields management table body not found');
+                return;
+            }
+
+            if (fields.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #64748b; font-size: 0.9rem;">No fields found. Please add fields via SQL.</td></tr>';
+                return;
+            }
+
+            // Simple table layout for all screen sizes
+            tableBody.innerHTML = fields.map(field => `
+                <tr data-id="${field.id}" class="mobile-row">
+                    <td class="mobile-cell">${field.field_code || ''}</td>
+                    <td class="mobile-cell">${field.field_name || ''}</td>
+                    <td class="mobile-cell">${field.crop_type || ''}</td>
+                    <td class="mobile-cell">${field.area_hectares ? field.area_hectares.toFixed(1) + ' ha' : ''}</td>
+                </tr>
+            `).join('');
+
+        } catch (error) {
+            console.error('Error rendering fields management:', error);
+            const tableBody = document.getElementById('fields-management-body');
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem; color: #dc2626; font-size: 0.9rem;">Error loading fields. Please refresh.</td></tr>';
             }
         }
     }
