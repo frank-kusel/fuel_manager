@@ -5,12 +5,13 @@ async function getSupabaseConfig() {
   
   if (isLocalDevelopment) {
     console.log('Development mode detected - using local Supabase config...');
-    // Local development configuration
-    // Replace these with your actual Supabase URL and anon key
-    return {
-      SUPABASE_URL: 'https://your-project-id.supabase.co',
-      SUPABASE_KEY: 'your-anon-key-here'
-    };
+    // Check if local config is available
+    if (window.LOCAL_SUPABASE_CONFIG) {
+      console.log('Using config from config.local.js');
+      return window.LOCAL_SUPABASE_CONFIG;
+    } else {
+      throw new Error('Local config not found. Please ensure config.local.js is loaded.');
+    }
   } else {
     // Production mode - use Netlify function
     console.log('Production mode - fetching Supabase config from Netlify function...');
