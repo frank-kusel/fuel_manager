@@ -72,7 +72,7 @@
 					inputmode="numeric" 
 					pattern="[0-9]*" 
 					bind:value={newOdo}
-					placeholder="Enter new reading"
+					placeholder="Enter reading"
 					class="new-odo-input"
 					autocomplete="off"
 				/>

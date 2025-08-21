@@ -93,7 +93,7 @@
 				inputmode="numeric" 
 				pattern="[0-9]*" 
 				bind:value={fuelAmount}
-				placeholder="Enter fuel amount"
+				placeholder="Enter fuel"
 				class="fuel-input"
 				autocomplete="off"
 			/>

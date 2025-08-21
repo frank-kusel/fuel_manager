@@ -38,22 +38,15 @@ class SupabaseService {
 
 	// Load Supabase configuration from environment variables
 	private async loadConfig(): Promise<{ url: string; key: string }> {
-		// In browser environment, Vite provides the env variables
-		if (typeof window !== 'undefined') {
-			// @ts-ignore - Vite will replace these at build time
-			const url = import.meta.env.VITE_SUPABASE_URL;
-			// @ts-ignore
-			const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-			
-			if (!url || !key) {
-				throw new Error('Missing Supabase configuration. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
-			}
-			
-			return { url, key };
+		// Get env variables (works in both client and server environments)
+		const url = import.meta.env.VITE_SUPABASE_URL;
+		const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+		
+		if (!url || !key) {
+			throw new Error('Missing Supabase configuration. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
 		}
 		
-		// Server-side (if needed in future)
-		throw new Error('Server-side Supabase configuration not implemented');
+		return { url, key };
 	}
 
 	// Ensure client is initialized

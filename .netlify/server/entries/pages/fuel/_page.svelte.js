@@ -329,7 +329,7 @@ function OdometerReading($$payload, $$props) {
     $$payload.out.push(`<div class="current-odo-display svelte-1i40lvu"><div class="current-odo-value svelte-1i40lvu">${escape_html(currentOdo || "No reading")}</div> <div class="current-odo-label svelte-1i40lvu">Current ODO (km)</div></div> <div class="gauge-toggle svelte-1i40lvu"><label class="checkbox svelte-1i40lvu"><input type="checkbox"${attr("checked", isBrokenGauge, true)} class="svelte-1i40lvu"/> <span>Broken Gauge</span></label></div> `);
     {
       $$payload.out.push("<!--[-->");
-      $$payload.out.push(`<div class="new-odo-container svelte-1i40lvu"><input type="number" inputmode="numeric" pattern="[0-9]*"${attr("value", newOdo)} placeholder="Enter new reading" class="new-odo-input svelte-1i40lvu" autocomplete="off"/> <div class="new-odo-label svelte-1i40lvu">New ODO reading (km)</div></div> `);
+      $$payload.out.push(`<div class="new-odo-container svelte-1i40lvu"><input type="number" inputmode="numeric" pattern="[0-9]*"${attr("value", newOdo)} placeholder="Enter reading" class="new-odo-input svelte-1i40lvu" autocomplete="off"/> <div class="new-odo-label svelte-1i40lvu">New ODO reading (km)</div></div> `);
       {
         $$payload.out.push("<!--[!-->");
       }
@@ -363,7 +363,7 @@ function FuelDataEntry($$payload, $$props) {
       $$payload.out.push("<!--[-->");
       $$payload.out.push(`<div class="loading svelte-1v3i59b">Loading fuel bowsers...</div>`);
     }
-    $$payload.out.push(`<!--]--> <div class="fuel-input-container svelte-1v3i59b"><input type="number" inputmode="numeric" pattern="[0-9]*"${attr("value", fuelAmount)} placeholder="Enter fuel amount" class="fuel-input svelte-1v3i59b" autocomplete="off"/> <div class="fuel-label svelte-1v3i59b">Litres dispensed</div></div> <div class="calculations svelte-1v3i59b"><div class="calc-header svelte-1v3i59b"><h3 class="svelte-1v3i59b">Bowser</h3></div> <div class="calc-item svelte-1v3i59b"><span class="calc-label svelte-1v3i59b">Start reading:</span> <span class="calc-value svelte-1v3i59b">`);
+    $$payload.out.push(`<!--]--> <div class="fuel-input-container svelte-1v3i59b"><input type="number" inputmode="numeric" pattern="[0-9]*"${attr("value", fuelAmount)} placeholder="Enter fuel" class="fuel-input svelte-1v3i59b" autocomplete="off"/> <div class="fuel-label svelte-1v3i59b">Litres dispensed</div></div> <div class="calculations svelte-1v3i59b"><div class="calc-header svelte-1v3i59b"><h3 class="svelte-1v3i59b">Bowser</h3></div> <div class="calc-item svelte-1v3i59b"><span class="calc-label svelte-1v3i59b">Start reading:</span> <span class="calc-value svelte-1v3i59b">`);
     {
       $$payload.out.push("<!--[!-->");
       $$payload.out.push(`-`);

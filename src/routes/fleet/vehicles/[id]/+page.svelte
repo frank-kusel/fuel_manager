@@ -99,6 +99,45 @@
 		};
 		return colors[category] || 'bg-gray-100 text-gray-800';
 	}
+	
+	// Maintenance alerts based on odometer readings
+	const maintenanceAlerts = $derived(() => {
+		const currentOdometer = vehicle.current_odometer || 0;
+		const alerts = [];
+		
+		// Standard maintenance intervals
+		const intervals = {
+			'Oil Change': { interval: 10000, urgency: 'warning' },
+			'Air Filter': { interval: 15000, urgency: 'info' },
+			'Hydraulic Service': { interval: 25000, urgency: 'warning' },
+			'Major Service': { interval: 50000, urgency: 'critical' }
+		};
+		
+		Object.entries(intervals).forEach(([service, config]) => {
+			const nextService = Math.ceil(currentOdometer / config.interval) * config.interval;
+			const kmRemaining = nextService - currentOdometer;
+			
+			if (kmRemaining <= 2000) {
+				alerts.push({
+					service,
+					nextService,
+					kmRemaining,
+					urgency: kmRemaining <= 500 ? 'critical' : config.urgency
+				});
+			}
+		});
+		
+		return alerts.sort((a, b) => a.kmRemaining - b.kmRemaining);
+	});
+	
+	function getAlertColor(urgency: string): string {
+		const colors = {
+			critical: 'bg-red-50 border-red-200 text-red-800',
+			warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+			info: 'bg-blue-50 border-blue-200 text-blue-800'
+		};
+		return colors[urgency] || colors.info;
+	}
 </script>
 
 <div class="container mx-auto px-4 py-8 max-w-7xl">
@@ -174,6 +213,36 @@
 			<div class="text-xs text-gray-500">Valid readings</div>
 		</div>
 	</div>
+	
+	<!-- Maintenance Alerts -->
+	{#if maintenanceAlerts().length > 0}
+		<div class="bg-white rounded-lg shadow p-6 mb-8">
+			<h2 class="text-lg font-semibold mb-4 flex items-center">
+				<span class="text-2xl mr-2">🔧</span>
+				Maintenance Alerts
+			</h2>
+			<div class="grid gap-3">
+				{#each maintenanceAlerts() as alert}
+					<div class="border rounded-lg p-4 {getAlertColor(alert.urgency)}">
+						<div class="flex items-center justify-between">
+							<div>
+								<div class="font-medium">{alert.service}</div>
+								<div class="text-sm opacity-75">
+									Next service: {formatNumber(alert.nextService)} {vehicle.odometer_unit || 'km'}
+								</div>
+							</div>
+							<div class="text-right">
+								<div class="font-bold">
+									{alert.kmRemaining} {vehicle.odometer_unit || 'km'}
+								</div>
+								<div class="text-xs opacity-75">remaining</div>
+							</div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 	
 	<!-- Charts Section -->
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

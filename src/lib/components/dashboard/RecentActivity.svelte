@@ -185,11 +185,6 @@
 		border-color: var(--color-primary-200);
 	}
 
-	.activity-icon {
-		font-size: 1.25rem;
-		flex-shrink: 0;
-		margin-top: 0.125rem;
-	}
 
 	.activity-info {
 		flex: 1;
