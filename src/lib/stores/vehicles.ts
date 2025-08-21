@@ -63,7 +63,7 @@ function createVehicleStore() {
 			}));
 		},
 		
-		updateVehicle: (updatedVehicle: Vehicle) => {
+		updateVehicleLocal: (updatedVehicle: Vehicle) => {
 			update(state => ({
 				...state,
 				vehicles: state.vehicles.map(vehicle =>

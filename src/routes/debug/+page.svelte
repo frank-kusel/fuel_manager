@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	
-	// Check environment variables
-	let envVars: Record<string, string> = {};
+	// Check environment variables status (without exposing values)
+	let envStatus: Record<string, boolean> = {};
 	let connectionResult: any = null;
 	
 	if (browser) {
-		envVars = {
-			VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'NOT_SET',
-			VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || 'NOT_SET',
-			VITE_APP_NAME: import.meta.env.VITE_APP_NAME || 'NOT_SET',
-			VITE_APP_VERSION: import.meta.env.VITE_APP_VERSION || 'NOT_SET'
+		envStatus = {
+			VITE_SUPABASE_URL: !!(import.meta.env.VITE_SUPABASE_URL),
+			VITE_SUPABASE_ANON_KEY: !!(import.meta.env.VITE_SUPABASE_ANON_KEY),
+			VITE_APP_NAME: !!(import.meta.env.VITE_APP_NAME),
+			VITE_APP_VERSION: !!(import.meta.env.VITE_APP_VERSION)
 		};
 	}
 	
@@ -57,20 +57,20 @@
 </script>
 
 <svelte:head>
-	<title>Debug - Environment Variables</title>
+	<title>Debug - Environment Status</title>
 </svelte:head>
 
 <div class="debug-container">
 	<h1>Environment Debug</h1>
 	
 	<div class="section">
-		<h2>Environment Variables</h2>
+		<h2>Environment Variables Status</h2>
 		<div class="env-vars">
-			{#each Object.entries(envVars) as [key, value]}
+			{#each Object.entries(envStatus) as [key, isSet]}
 				<div class="env-var">
 					<strong>{key}:</strong> 
-					<span class:error={value === 'NOT_SET'}>
-						{key.includes('KEY') ? value.slice(0, 20) + '...' : value}
+					<span class:error={!isSet}>
+						{isSet ? '✅ Set' : '❌ Missing'}
 					</span>
 				</div>
 			{/each}

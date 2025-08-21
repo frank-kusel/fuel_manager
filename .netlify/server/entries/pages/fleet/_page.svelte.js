@@ -42,7 +42,7 @@ function createVehicleStore() {
         // Add to beginning
       }));
     },
-    updateVehicle: (updatedVehicle) => {
+    updateVehicleLocal: (updatedVehicle) => {
       update((state) => ({
         ...state,
         vehicles: state.vehicles.map(
