@@ -1,0 +1,340 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import supabaseService from '$lib/services/supabase';
+	import type { Bowser, Vehicle } from '$lib/types';
+	
+	interface Props {
+		selectedVehicle: Vehicle | null;
+		selectedBowser: Bowser | null;
+		bowserReadingStart: number | null;
+		bowserReadingEnd: number | null;
+		litresDispensed: number | null;
+		onFuelDataUpdate: (bowser: Bowser | null, startReading: number | null, endReading: number | null, litres: number | null) => void;
+		errors: string[];
+	}
+	
+	let { selectedVehicle, selectedBowser, bowserReadingStart, bowserReadingEnd, litresDispensed, onFuelDataUpdate, errors }: Props = $props();
+	
+	let bowsers: Bowser[] = $state([]);
+	let loading = $state(true);
+	
+	// Main fuel input
+	let fuelAmount = $state(litresDispensed?.toString() || '');
+	let selectedBowserId = $state(selectedBowser?.id || '');
+	
+	// Bowser readings
+	let startReading = $state(bowserReadingStart || 0);
+	let endReading = $state(bowserReadingEnd || 0);
+	let isEditingEndReading = $state(false);
+	
+	onMount(async () => {
+		try {
+			await supabaseService.init();
+			const result = await supabaseService.getBowsers();
+			if (result.error) {
+				throw new Error(result.error);
+			}
+			bowsers = (result.data || []).filter(bowser => 
+				selectedVehicle ? bowser.fuel_type === selectedVehicle.fuel_type : true
+			);
+			
+			// Auto-select first bowser
+			if (bowsers.length > 0 && !selectedBowserId) {
+				selectedBowserId = bowsers[0].id;
+				startReading = bowsers[0].current_reading || 0;
+			}
+		} catch (err) {
+			console.error('Failed to load bowsers:', err);
+		} finally {
+			loading = false;
+		}
+	});
+	
+	// Auto-calculate end reading when fuel amount changes (only if not manually edited)
+	$effect(() => {
+		if (!isEditingEndReading) {
+			const fuel = parseFloat(fuelAmount);
+			if (!isNaN(fuel) && fuel > 0 && startReading) {
+				endReading = startReading - fuel; // Bowser reading decreases as fuel is dispensed
+			}
+		}
+	});
+	
+	// Update parent when values change
+	$effect(() => {
+		const bowser = bowsers.find(b => b.id === selectedBowserId) || null;
+		const fuel = fuelAmount ? parseFloat(fuelAmount) : null;
+		
+		onFuelDataUpdate(bowser, startReading, endReading, fuel);
+	});
+	
+	let selectedBowserInfo = $state(null);
+	
+	// Update selected bowser when values change
+	$effect(() => {
+		selectedBowserInfo = bowsers.find(b => b.id === selectedBowserId) || null;
+	});
+</script>
+
+<div class="fuel-data-entry">
+	
+	{#if selectedVehicle}
+		<!-- Auto-selected bowser info (hidden, Tank A Diesel auto-selected) -->
+		{#if loading}
+			<div class="loading">Loading fuel bowsers...</div>
+		{:else if bowsers.length === 0}
+			<div class="no-bowsers">No fuel bowsers available</div>
+		{/if}
+		
+		<!-- Main Fuel Input -->
+		<div class="fuel-input-container">
+			<input 
+				type="number" 
+				inputmode="numeric" 
+				pattern="[0-9]*" 
+				bind:value={fuelAmount}
+				placeholder="Enter fuel amount"
+				class="fuel-input"
+				autocomplete="off"
+			/>
+			<div class="fuel-label">Litres dispensed</div>
+		</div>
+		
+		<!-- Bowser Readings - Always visible -->
+		<div class="calculations">
+			<div class="calc-header">
+				<h3>Bowser</h3>
+			</div>
+			<div class="calc-item">
+				<span class="calc-label">Start reading:</span>
+				<span class="calc-value">
+					{#if selectedBowserInfo}
+						{new Intl.NumberFormat().format(startReading)}L
+					{:else}
+						-
+					{/if}
+				</span>
+			</div>
+			<div class="calc-item">
+				<span class="calc-label">End reading:</span>
+				{#if isEditingEndReading}
+					<input 
+						type="number" 
+						inputmode="numeric" 
+						bind:value={endReading}
+						placeholder="Enter end reading"
+						class="end-reading-input"
+						onblur={() => isEditingEndReading = false}
+						onfocus={(e) => e.target.select()}
+						autocomplete="off"
+					/>
+				{:else}
+					<span class="calc-value" class:editable={selectedBowserInfo}>
+						{#if fuelAmount && parseFloat(fuelAmount) > 0 && selectedBowserInfo}
+							{new Intl.NumberFormat().format(endReading)}L
+						{:else}
+							-
+						{/if}
+					</span>
+				{/if}
+				{#if selectedBowserInfo}
+					<button class="edit-btn" onclick={() => isEditingEndReading = true}>
+						{isEditingEndReading ? 'Save' : 'Edit'}
+					</button>
+				{/if}
+			</div>
+		</div>
+		
+	{:else}
+		<div class="no-vehicle">Select a vehicle first</div>
+	{/if}
+</div>
+
+<style>
+	.fuel-data-entry {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.step-header {
+		text-align: center;
+		margin-bottom: 0.5rem;
+	}
+
+	.step-header h2 {
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--gray-900, #0f172a);
+		margin: 0;
+	}
+
+
+	/* Bowser Selection */
+	.bowser-selection {
+		margin-bottom: 1rem;
+	}
+
+	.bowser-label {
+		display: block;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: #374151;
+		margin-bottom: 0.5rem;
+	}
+
+	.bowser-select {
+		width: 100%;
+		padding: 0.75rem;
+		border: 2px solid #e5e7eb;
+		border-radius: 0.5rem;
+		background: white;
+		font-size: 1rem;
+	}
+
+	.bowser-select:focus {
+		outline: none;
+		border-color: #2563eb;
+		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+	}
+
+	/* Main Fuel Input - Large and Touch-Friendly */
+	.fuel-input-container {
+		text-align: center;
+	}
+
+	.fuel-input {
+		width: 100%;
+		padding: 1.5rem;
+		font-size: 2.5rem;
+		font-weight: 600;
+		text-align: center;
+		border: 3px solid #10b981;
+		border-radius: 0.75rem;
+		background: white;
+		color: #1e293b;
+		margin-bottom: 0.5rem;
+		-webkit-appearance: none;
+		appearance: none;
+	}
+
+	.fuel-input:focus {
+		outline: none;
+		border-color: #059669;
+		box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+	}
+
+	.fuel-input::placeholder {
+		color: #94a3b8;
+		font-weight: 400;
+	}
+
+	.fuel-label {
+		font-size: 0.875rem;
+		color: #64748b;
+		font-weight: 500;
+	}
+
+	/* Calculations Display */
+	.calculations {
+		padding: 1rem;
+		background: #f8fafc;
+		border: 1px solid #e2e8f0;
+		border-radius: 0.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.calc-header {
+		text-align: center;
+		margin-bottom: 0.5rem;
+	}
+
+	.calc-header h3 {
+		font-size: 1rem;
+		font-weight: 600;
+		color: #374151;
+		margin: 0;
+	}
+
+	.calc-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.5rem 0;
+	}
+
+
+	.calc-label {
+		color: #64748b;
+		font-size: 0.875rem;
+	}
+
+	.calc-value {
+		color: #1e293b;
+		font-weight: 600;
+	}
+
+	.calc-value.editable {
+		cursor: pointer;
+		text-decoration: underline;
+		text-decoration-style: dotted;
+	}
+
+	.end-reading-input {
+		padding: 0.25rem 0.5rem;
+		border: 1px solid #d1d5db;
+		border-radius: 0.25rem;
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #1e293b;
+		background: white;
+		width: 120px;
+		text-align: right;
+	}
+
+	.end-reading-input:focus {
+		outline: none;
+		border-color: #3b82f6;
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+	}
+
+	.edit-btn {
+		background: #3b82f6;
+		color: white;
+		border: none;
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.25rem;
+		font-size: 0.75rem;
+		cursor: pointer;
+		margin-left: 0.5rem;
+	}
+
+	.edit-btn:hover {
+		background: #2563eb;
+	}
+
+	/* States */
+	.loading,
+	.no-bowsers,
+	.no-vehicle {
+		text-align: center;
+		padding: 2rem;
+		color: #64748b;
+		font-size: 1rem;
+	}
+
+	/* Mobile Optimizations */
+	@media (max-width: 768px) {
+		.fuel-input {
+			font-size: 3rem;
+			padding: 2rem 1rem;
+			min-height: 100px;
+		}
+
+		.calculations {
+			margin: 0 -0.5rem;
+		}
+	}
+</style>
