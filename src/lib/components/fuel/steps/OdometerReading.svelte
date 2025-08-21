@@ -51,22 +51,14 @@
 	
 	{#if selectedVehicle}
 		<!-- Current ODO Display -->
-		<div class="current-odo-display">
-			<div class="current-odo-value">{currentOdo || 'No reading'}</div>
-			<div class="current-odo-label">Current ODO (km)</div>
-		</div>
-		
-		<!-- Gauge Status Toggle -->
-		<div class="gauge-toggle">
-			<label class="checkbox">
-				<input type="checkbox" bind:checked={isBrokenGauge} />
-				<span>Broken Gauge</span>
-			</label>
+		<div class="odo-card current-odo">
+			<div class="odo-value">{currentOdo || 'No reading'}</div>
+			<div class="odo-label">Current ODO ({selectedVehicle?.odometer_unit || 'km/hr'})</div>
 		</div>
 		
 		{#if !isBrokenGauge}
 			<!-- Main ODO Input -->
-			<div class="new-odo-container">
+			<div class="odo-card new-odo">
 				<input 
 					type="number" 
 					inputmode="numeric" 
@@ -76,19 +68,35 @@
 					class="new-odo-input"
 					autocomplete="off"
 				/>
-				<div class="new-odo-label">New ODO reading (km)</div>
+				<div class="odo-label">New ODO reading ({selectedVehicle?.odometer_unit || 'km/hr'})</div>
 			</div>
 			
 			<!-- Distance Display -->
 			{#if distance && distance > 0}
 				<div class="distance-display">
-					<span class="distance-value">{new Intl.NumberFormat().format(distance)} km</span>
-					<span class="distance-label">Distance traveled</span>
+					<span class="distance-value">{new Intl.NumberFormat().format(distance)} {selectedVehicle?.odometer_unit || 'km/hr'}</span>
+					<span class="distance-label">Distance or time</span>
 				</div>
 			{/if}
+			
+			<!-- Gauge Status Toggle - moved below new reading -->
+			<div class="gauge-toggle">
+				<label class="checkbox">
+					<input type="checkbox" bind:checked={isBrokenGauge} />
+					<span>Broken Gauge</span>
+				</label>
+			</div>
 		{:else}
 			<div class="odo-not-working">
 				Gauge broken - using previous reading, no distance recorded
+			</div>
+			
+			<!-- Gauge Status Toggle -->
+			<div class="gauge-toggle">
+				<label class="checkbox">
+					<input type="checkbox" bind:checked={isBrokenGauge} />
+					<span>Broken Gauge</span>
+				</label>
 			</div>
 		{/if}
 		
@@ -117,17 +125,29 @@
 	}
 
 
-	/* Current ODO Display - Large and Prominent */
-	.current-odo-display {
+	/* Unified ODO Cards - Same size and style */
+	.odo-card {
 		text-align: center;
 		padding: 1.5rem;
-		background: #f8fafc;
-		border: 2px solid #e2e8f0;
 		border-radius: 0.75rem;
 		margin-bottom: 1rem;
+		min-height: 120px;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
 	}
 
-	.current-odo-value {
+	.current-odo {
+		background: #f8fafc;
+		border: 2px solid #e2e8f0;
+	}
+
+	.new-odo {
+		background: white;
+		border: 3px solid #2563eb;
+	}
+
+	.odo-value {
 		font-size: 2.5rem;
 		font-weight: 700;
 		color: #64748b;
@@ -135,19 +155,43 @@
 		font-family: monospace;
 	}
 
-	.current-odo-label {
+	.odo-label {
 		font-size: 0.875rem;
 		color: #64748b;
 		font-weight: 500;
 	}
 
-	/* Gauge Toggle */
+	.new-odo-input {
+		width: 100%;
+		padding: 0;
+		font-size: 2.5rem;
+		font-weight: 700;
+		text-align: center;
+		border: none;
+		background: transparent;
+		color: #1e293b;
+		margin-bottom: 0.5rem;
+		font-family: monospace;
+		-webkit-appearance: none;
+		appearance: none;
+	}
+
+	.new-odo-input:focus {
+		outline: none;
+	}
+
+	.new-odo-input::placeholder {
+		color: #94a3b8;
+		font-weight: 400;
+	}
+
+	/* Gauge Toggle - moved and styled */
 	.gauge-toggle {
 		padding: 1rem;
 		background: white;
 		border: 1px solid #e2e8f0;
 		border-radius: 0.5rem;
-		margin-bottom: 1rem;
+		margin-top: 1rem;
 	}
 
 	.checkbox {
@@ -161,43 +205,6 @@
 	.checkbox input {
 		width: 18px;
 		height: 18px;
-	}
-
-	/* New ODO Input - Large and Touch-Friendly */
-	.new-odo-container {
-		text-align: center;
-	}
-
-	.new-odo-input {
-		width: 100%;
-		padding: 1.5rem;
-		font-size: 2rem;
-		font-weight: 600;
-		text-align: center;
-		border: 3px solid #2563eb;
-		border-radius: 0.75rem;
-		background: white;
-		color: #1e293b;
-		margin-bottom: 0.5rem;
-		-webkit-appearance: none;
-		appearance: none;
-	}
-
-	.new-odo-input:focus {
-		outline: none;
-		border-color: #1d4ed8;
-		box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
-	}
-
-	.new-odo-input::placeholder {
-		color: #94a3b8;
-		font-weight: 400;
-	}
-
-	.new-odo-label {
-		font-size: 0.875rem;
-		color: #64748b;
-		font-weight: 500;
 	}
 
 	/* Distance Display */

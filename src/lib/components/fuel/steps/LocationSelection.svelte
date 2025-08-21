@@ -216,30 +216,35 @@
 				{searchTerm ? 'No fields found' : 'No fields available'}
 			</div>
 		{:else}
-			<div class="fields-grid">
-				{#each filteredFields as field (field.id)}
-					<button 
-						class="field-card {selectedField?.id === field.id ? 'selected' : ''}"
-						onclick={() => selectField(field)}
-					>
-						<div class="field-header">
-							<div class="field-icon" style="color: {getFieldColor(field.crop_type)}">
-								{getFieldIcon(field.crop_type)}
-							</div>
-							<div class="field-info">
-								<div class="field-code">{field.code}</div>
-								<div class="field-name">{field.name}</div>
-								{#if field.crop_type}
-									<div class="field-crop">{field.crop_type}</div>
-								{/if}
-							</div>
-						</div>
-						<div class="field-footer">
-							<span class="field-area">{formatArea(field.area)}</span>
-							<span class="field-type">{field.type || 'Arable'}</span>
-						</div>
-					</button>
-				{/each}
+			<div class="table-container">
+				<table class="table" id="field-table">
+					<thead>
+						<tr>
+							<th>Code</th>
+							<th>Name</th>
+							<th>Crop</th>
+							<th>Area</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each filteredFields as field (field.id)}
+							<tr 
+								class="field-row clickable {selectedField?.id === field.id ? 'selected' : ''}"
+								onclick={() => selectField(field)}
+							>
+								<td class="field-code">
+									<span class="field-icon" style="color: {getFieldColor(field.crop_type)}">
+										{getFieldIcon(field.crop_type)}
+									</span>
+									{field.code}
+								</td>
+								<td class="field-name">{field.name}</td>
+								<td class="field-crop">{field.crop_type || 'Not set'}</td>
+								<td class="field-area">{formatArea(field.area)}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			</div>
 		{/if}
 	{:else}
@@ -574,6 +579,68 @@
 	.field-card.selected .field-type {
 		background: rgba(255, 255, 255, 0.2);
 		color: white;
+	}
+
+	/* Table Container */
+	.table-container {
+		background: var(--white, #ffffff);
+		border: 1px solid var(--gray-200, #e2e8f0);
+		border-radius: 0.75rem;
+		overflow: hidden;
+	}
+
+	.table {
+		width: 100%;
+		border-collapse: collapse;
+	}
+
+	.table th {
+		background: var(--gray-50, #f8fafc);
+		border-bottom: 1px solid var(--gray-200, #e2e8f0);
+		color: var(--gray-700, #374151);
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 0.75rem;
+		text-align: left;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.table td {
+		border-bottom: 1px solid var(--gray-100, #f3f4f6);
+		padding: 0.75rem;
+		color: var(--gray-900, #111827);
+		font-size: 0.875rem;
+	}
+
+	.field-row {
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+
+	.field-row:hover {
+		background: var(--blue-50, #eff6ff);
+	}
+
+	.field-row.selected {
+		background: var(--blue-500, #3b82f6);
+		color: white;
+	}
+
+	.field-row.selected td {
+		color: white;
+		border-bottom-color: rgba(255, 255, 255, 0.2);
+	}
+
+	.field-code {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-weight: 600;
+	}
+
+	.field-icon {
+		font-size: 1.25rem;
 	}
 
 	/* Zones Grid */

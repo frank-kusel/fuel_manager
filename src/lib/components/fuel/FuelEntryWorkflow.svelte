@@ -447,9 +447,9 @@
 								<!-- Odometer -->
 								{#if $workflowData.gaugeWorking && $workflowData.odometerStart !== null && $workflowData.odometerEnd !== null}
 									<tr class="section-header"><td colspan="2">ODOMETER</td></tr>
-									<tr><td>Start</td><td>{new Intl.NumberFormat().format($workflowData.odometerStart)} km</td></tr>
-									<tr><td>End</td><td>{new Intl.NumberFormat().format($workflowData.odometerEnd)} km</td></tr>
-									<tr class="highlight"><td>Distance</td><td>{new Intl.NumberFormat().format($workflowData.odometerEnd - $workflowData.odometerStart)} km</td></tr>
+									<tr><td>Start</td><td>{new Intl.NumberFormat().format($workflowData.odometerStart)} {$workflowData.vehicle?.odometer_unit || 'km/hr'}</td></tr>
+									<tr><td>End</td><td>{new Intl.NumberFormat().format($workflowData.odometerEnd)} {$workflowData.vehicle?.odometer_unit || 'km/hr'}</td></tr>
+									<tr class="highlight"><td>Distance or time</td><td>{new Intl.NumberFormat().format($workflowData.odometerEnd - $workflowData.odometerStart)} {$workflowData.vehicle?.odometer_unit || 'km/hr'}</td></tr>
 								{:else if !$workflowData.gaugeWorking}
 									<tr class="section-header"><td colspan="2">ODOMETER</td></tr>
 									<tr><td>Status</td><td class="warning">Gauge broken</td></tr>
@@ -1214,6 +1214,13 @@
 		color: var(--gray-600);
 		border-top: 1px solid var(--gray-200);
 		margin-top: 2rem;
+	}
+
+	/* Hide keyboard hints on mobile */
+	@media (max-width: 768px) {
+		.keyboard-hints {
+			display: none;
+		}
 	}
 
 	.keyboard-hints kbd {
