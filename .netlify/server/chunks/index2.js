@@ -1858,15 +1858,6 @@ function unsubscribe_stores(store_values) {
     store_values[store_name][1]();
   }
 }
-function slot(payload, $$props, name, slot_props, fallback_fn) {
-  var slot_fn = $$props.$$slots?.[name];
-  if (slot_fn === true) {
-    slot_fn = $$props["children"];
-  }
-  if (slot_fn !== void 0) {
-    slot_fn(payload, slot_props);
-  }
-}
 function bind_props(props_parent, props_now) {
   for (const key in props_now) {
     const initial_value = props_parent[key];
@@ -1886,7 +1877,6 @@ function maybe_selected(payload, value) {
   return value === payload.select_value ? " selected" : "";
 }
 export {
-  object_prototype as $,
   setContext as A,
   pop as B,
   COMMENT_NODE as C,
@@ -1895,25 +1885,25 @@ export {
   head as F,
   attr_class as G,
   HYDRATION_ERROR as H,
-  slot as I,
-  unsubscribe_stores as J,
-  escape_html as K,
+  unsubscribe_stores as I,
+  escape_html as J,
+  attr as K,
   LEGACY_PROPS as L,
-  attr as M,
-  current_component as N,
-  attr_style as O,
-  stringify as P,
-  ensure_array_like as Q,
-  clsx as R,
-  bind_props as S,
-  maybe_selected as T,
-  copy_payload as U,
-  assign_payload as V,
-  noop as W,
-  safe_not_equal as X,
-  subscribe_to_store as Y,
-  run_all as Z,
-  get_prototype_of as _,
+  current_component as M,
+  attr_style as N,
+  stringify as O,
+  ensure_array_like as P,
+  clsx as Q,
+  bind_props as R,
+  maybe_selected as S,
+  copy_payload as T,
+  assign_payload as U,
+  noop as V,
+  safe_not_equal as W,
+  subscribe_to_store as X,
+  run_all as Y,
+  get_prototype_of as Z,
+  object_prototype as _,
   set_active_effect as a,
   active_effect as b,
   active_reaction as c,

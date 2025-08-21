@@ -3,6 +3,7 @@
 	
 	// Check environment variables
 	let envVars: Record<string, string> = {};
+	let connectionResult: any = null;
 	
 	if (browser) {
 		envVars = {
@@ -12,49 +13,6 @@
 			VITE_APP_VERSION: import.meta.env.VITE_APP_VERSION || 'NOT_SET'
 		};
 	}
-</script>
-
-<svelte:head>
-	<title>Debug - Environment Variables</title>
-</svelte:head>
-
-<div class="debug-container">
-	<h1>Environment Debug</h1>
-	
-	<div class="section">
-		<h2>Environment Variables</h2>
-		<div class="env-vars">
-			{#each Object.entries(envVars) as [key, value]}
-				<div class="env-var">
-					<strong>{key}:</strong> 
-					<span class:error={value === 'NOT_SET'}>
-						{key.includes('KEY') ? value.slice(0, 20) + '...' : value}
-					</span>
-				</div>
-			{/each}
-		</div>
-	</div>
-	
-	<div class="section">
-		<h2>Build Info</h2>
-		<p>Mode: {import.meta.env.MODE}</p>
-		<p>Dev: {import.meta.env.DEV}</p>
-		<p>Prod: {import.meta.env.PROD}</p>
-	</div>
-	
-	<div class="section">
-		<h2>Test Supabase Connection</h2>
-		<button on:click={testConnection}>Test Connection</button>
-		{#if connectionResult}
-			<div class="result" class:error={connectionResult.error}>
-				{connectionResult.message}
-			</div>
-		{/if}
-	</div>
-</div>
-
-<script>
-	let connectionResult = null;
 	
 	async function testConnection() {
 		try {
@@ -97,6 +55,45 @@
 		}
 	}
 </script>
+
+<svelte:head>
+	<title>Debug - Environment Variables</title>
+</svelte:head>
+
+<div class="debug-container">
+	<h1>Environment Debug</h1>
+	
+	<div class="section">
+		<h2>Environment Variables</h2>
+		<div class="env-vars">
+			{#each Object.entries(envVars) as [key, value]}
+				<div class="env-var">
+					<strong>{key}:</strong> 
+					<span class:error={value === 'NOT_SET'}>
+						{key.includes('KEY') ? value.slice(0, 20) + '...' : value}
+					</span>
+				</div>
+			{/each}
+		</div>
+	</div>
+	
+	<div class="section">
+		<h2>Build Info</h2>
+		<p>Mode: {import.meta.env.MODE}</p>
+		<p>Dev: {import.meta.env.DEV}</p>
+		<p>Prod: {import.meta.env.PROD}</p>
+	</div>
+	
+	<div class="section">
+		<h2>Test Supabase Connection</h2>
+		<button onclick={testConnection}>Test Connection</button>
+		{#if connectionResult}
+			<div class="result" class:error={connectionResult.error}>
+				{connectionResult.message}
+			</div>
+		{/if}
+	</div>
+</div>
 
 <style>
 	.debug-container {

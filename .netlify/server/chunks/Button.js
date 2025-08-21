@@ -1,4 +1,4 @@
-import { M as attr, G as attr_class, R as clsx, B as pop, z as push } from "./index2.js";
+import { K as attr, G as attr_class, Q as clsx, B as pop, z as push } from "./index2.js";
 function Button($$payload, $$props) {
   push();
   let {

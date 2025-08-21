@@ -3,6 +3,9 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 
+	// Svelte 5 children prop
+	let { children }: { children: any } = $props();
+
 	// Safe pathname access
 	const pathname = $derived($page?.url?.pathname || '/');
 
@@ -61,7 +64,7 @@
 
 	<!-- Main Content -->
 	<main class="main">
-		<slot />
+		{@render children()}
 	</main>
 
 	<!-- Mobile Bottom Navigation -->

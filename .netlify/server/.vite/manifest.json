@@ -232,6 +232,18 @@
       "_app/immutable/assets/_page.C4fyRst3.css"
     ]
   },
+  "src/routes/debug/+page.svelte": {
+    "file": "entries/pages/debug/_page.svelte.js",
+    "name": "entries/pages/debug/_page.svelte",
+    "src": "src/routes/debug/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.CR7OskTU.css"
+    ]
+  },
   "src/routes/fleet/+page.svelte": {
     "file": "entries/pages/fleet/_page.svelte.js",
     "name": "entries/pages/fleet/_page.svelte",

@@ -1,4 +1,4 @@
-import { O as attr_style, B as pop, z as push, P as stringify } from "./index2.js";
+import { N as attr_style, B as pop, z as push, O as stringify } from "./index2.js";
 function formatDate(date, format = "full") {
   const d = typeof date === "string" ? new Date(date) : date;
   if (isNaN(d.getTime())) {
