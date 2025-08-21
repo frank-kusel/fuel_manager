@@ -1,0 +1,417 @@
+{
+  ".svelte-kit/generated/server/internal.js": {
+    "file": "internal.js",
+    "name": "internal",
+    "src": ".svelte-kit/generated/server/internal.js",
+    "isEntry": true,
+    "imports": [
+      "_internal.js",
+      "_environment.js"
+    ]
+  },
+  "_Button.CrWfxE6r.css": {
+    "file": "_app/immutable/assets/Button.CrWfxE6r.css",
+    "src": "_Button.CrWfxE6r.css"
+  },
+  "_Button.js": {
+    "file": "chunks/Button.js",
+    "name": "Button",
+    "imports": [
+      "_index2.js"
+    ],
+    "css": [
+      "_app/immutable/assets/Button.CrWfxE6r.css"
+    ]
+  },
+  "_Card.BjmPV3zJ.css": {
+    "file": "_app/immutable/assets/Card.BjmPV3zJ.css",
+    "src": "_Card.BjmPV3zJ.css"
+  },
+  "_Card.js": {
+    "file": "chunks/Card.js",
+    "name": "Card",
+    "imports": [
+      "_index2.js"
+    ],
+    "css": [
+      "_app/immutable/assets/Card.BjmPV3zJ.css"
+    ]
+  },
+  "_Chart.js": {
+    "file": "chunks/Chart.js",
+    "name": "Chart",
+    "imports": [
+      "_index2.js"
+    ]
+  },
+  "_environment.js": {
+    "file": "chunks/environment.js",
+    "name": "environment"
+  },
+  "_event-state.js": {
+    "file": "chunks/event-state.js",
+    "name": "event-state",
+    "imports": [
+      "_utils.js"
+    ]
+  },
+  "_exports.js": {
+    "file": "chunks/exports.js",
+    "name": "exports"
+  },
+  "_false.js": {
+    "file": "chunks/false.js",
+    "name": "false"
+  },
+  "_index.js": {
+    "file": "chunks/index.js",
+    "name": "index",
+    "imports": [
+      "_index2.js"
+    ]
+  },
+  "_index2.js": {
+    "file": "chunks/index2.js",
+    "name": "index",
+    "imports": [
+      "_false.js"
+    ]
+  },
+  "_internal.js": {
+    "file": "chunks/internal.js",
+    "name": "internal",
+    "imports": [
+      "_index2.js",
+      "_environment.js"
+    ]
+  },
+  "_state.svelte.js": {
+    "file": "chunks/state.svelte.js",
+    "name": "state.svelte",
+    "imports": [
+      "_index2.js"
+    ]
+  },
+  "_utils.js": {
+    "file": "chunks/utils.js",
+    "name": "utils"
+  },
+  "node_modules/@sveltejs/kit/src/runtime/app/server/remote/index.js": {
+    "file": "remote-entry.js",
+    "name": "remote-entry",
+    "src": "node_modules/@sveltejs/kit/src/runtime/app/server/remote/index.js",
+    "isEntry": true,
+    "imports": [
+      "_event-state.js",
+      "_false.js",
+      "_environment.js"
+    ]
+  },
+  "node_modules/@sveltejs/kit/src/runtime/components/svelte-5/error.svelte": {
+    "file": "entries/fallbacks/error.svelte.js",
+    "name": "entries/fallbacks/error.svelte",
+    "src": "node_modules/@sveltejs/kit/src/runtime/components/svelte-5/error.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_state.svelte.js",
+      "_exports.js",
+      "_utils.js",
+      "_index.js"
+    ]
+  },
+  "node_modules/@sveltejs/kit/src/runtime/server/index.js": {
+    "file": "index.js",
+    "name": "index",
+    "src": "node_modules/@sveltejs/kit/src/runtime/server/index.js",
+    "isEntry": true,
+    "imports": [
+      "_false.js",
+      "_environment.js",
+      "_event-state.js",
+      "_exports.js",
+      "_utils.js",
+      "_index.js",
+      "_internal.js"
+    ]
+  },
+  "src/lib/services/auth.ts": {
+    "file": "chunks/auth.js",
+    "name": "auth",
+    "src": "src/lib/services/auth.ts",
+    "isDynamicEntry": true,
+    "imports": [
+      "src/lib/services/supabase.ts"
+    ]
+  },
+  "src/lib/services/offline.ts": {
+    "file": "chunks/offline.js",
+    "name": "offline",
+    "src": "src/lib/services/offline.ts",
+    "isDynamicEntry": true,
+    "imports": [
+      "_index.js",
+      "src/lib/services/supabase.ts"
+    ]
+  },
+  "src/lib/services/supabase.ts": {
+    "file": "chunks/supabase.js",
+    "name": "supabase",
+    "src": "src/lib/services/supabase.ts",
+    "isDynamicEntry": true
+  },
+  "src/routes/+layout.svelte": {
+    "file": "entries/pages/_layout.svelte.js",
+    "name": "entries/pages/_layout.svelte",
+    "src": "src/routes/+layout.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_exports.js",
+      "_utils.js",
+      "_state.svelte.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_layout.CokulyaN.css"
+    ]
+  },
+  "src/routes/+page.svelte": {
+    "file": "entries/pages/_page.svelte.js",
+    "name": "entries/pages/_page.svelte",
+    "src": "src/routes/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_exports.js",
+      "_utils.js",
+      "_state.svelte.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.BQu_2Vgr.css"
+    ]
+  },
+  "src/routes/auth/+page.svelte": {
+    "file": "entries/pages/auth/_page.svelte.js",
+    "name": "entries/pages/auth/_page.svelte",
+    "src": "src/routes/auth/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_exports.js",
+      "_utils.js",
+      "_state.svelte.js",
+      "_index.js",
+      "_Button.js"
+    ],
+    "dynamicImports": [
+      "src/lib/services/auth.ts",
+      "src/lib/services/auth.ts",
+      "src/lib/services/auth.ts",
+      "src/lib/services/auth.ts"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.DcI0GyCE.css"
+    ]
+  },
+  "src/routes/dashboard/+page.svelte": {
+    "file": "entries/pages/dashboard/_page.svelte.js",
+    "name": "entries/pages/dashboard/_page.svelte",
+    "src": "src/routes/dashboard/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_Card.js",
+      "_Button.js",
+      "_index.js"
+    ],
+    "dynamicImports": [
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.C4fyRst3.css"
+    ]
+  },
+  "src/routes/fleet/+page.svelte": {
+    "file": "entries/pages/fleet/_page.svelte.js",
+    "name": "entries/pages/fleet/_page.svelte",
+    "src": "src/routes/fleet/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_index.js",
+      "_Button.js",
+      "_Card.js"
+    ],
+    "dynamicImports": [
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/offline.ts",
+      "src/lib/services/supabase.ts"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.DJYJyNLf.css"
+    ]
+  },
+  "src/routes/fleet/activities/[id]/+page.server.ts": {
+    "file": "entries/pages/fleet/activities/_id_/_page.server.ts.js",
+    "name": "entries/pages/fleet/activities/_id_/_page.server.ts",
+    "src": "src/routes/fleet/activities/[id]/+page.server.ts",
+    "isEntry": true,
+    "imports": [
+      "src/lib/services/supabase.ts"
+    ]
+  },
+  "src/routes/fleet/activities/[id]/+page.svelte": {
+    "file": "entries/pages/fleet/activities/_id_/_page.svelte.js",
+    "name": "entries/pages/fleet/activities/_id_/_page.svelte",
+    "src": "src/routes/fleet/activities/[id]/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_exports.js",
+      "_utils.js",
+      "_state.svelte.js",
+      "_Chart.js"
+    ]
+  },
+  "src/routes/fleet/drivers/[id]/+page.server.ts": {
+    "file": "entries/pages/fleet/drivers/_id_/_page.server.ts.js",
+    "name": "entries/pages/fleet/drivers/_id_/_page.server.ts",
+    "src": "src/routes/fleet/drivers/[id]/+page.server.ts",
+    "isEntry": true,
+    "imports": [
+      "src/lib/services/supabase.ts"
+    ]
+  },
+  "src/routes/fleet/drivers/[id]/+page.svelte": {
+    "file": "entries/pages/fleet/drivers/_id_/_page.svelte.js",
+    "name": "entries/pages/fleet/drivers/_id_/_page.svelte",
+    "src": "src/routes/fleet/drivers/[id]/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_exports.js",
+      "_utils.js",
+      "_state.svelte.js",
+      "_Chart.js"
+    ]
+  },
+  "src/routes/fleet/vehicles/[id]/+page.server.ts": {
+    "file": "entries/pages/fleet/vehicles/_id_/_page.server.ts.js",
+    "name": "entries/pages/fleet/vehicles/_id_/_page.server.ts",
+    "src": "src/routes/fleet/vehicles/[id]/+page.server.ts",
+    "isEntry": true,
+    "imports": [
+      "src/lib/services/supabase.ts"
+    ]
+  },
+  "src/routes/fleet/vehicles/[id]/+page.svelte": {
+    "file": "entries/pages/fleet/vehicles/_id_/_page.svelte.js",
+    "name": "entries/pages/fleet/vehicles/_id_/_page.svelte",
+    "src": "src/routes/fleet/vehicles/[id]/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_exports.js",
+      "_utils.js",
+      "_state.svelte.js",
+      "_Chart.js"
+    ]
+  },
+  "src/routes/fleet/zones/+page.svelte": {
+    "file": "entries/pages/fleet/zones/_page.svelte.js",
+    "name": "entries/pages/fleet/zones/_page.svelte",
+    "src": "src/routes/fleet/zones/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_Card.js",
+      "_Button.js",
+      "src/lib/services/supabase.ts"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.BJkcyHjy.css"
+    ]
+  },
+  "src/routes/fleet/zones/print/+page.svelte": {
+    "file": "entries/pages/fleet/zones/print/_page.svelte.js",
+    "name": "entries/pages/fleet/zones/print/_page.svelte",
+    "src": "src/routes/fleet/zones/print/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.EQLPR_V3.css"
+    ]
+  },
+  "src/routes/fuel/+page.svelte": {
+    "file": "entries/pages/fuel/_page.svelte.js",
+    "name": "entries/pages/fuel/_page.svelte",
+    "src": "src/routes/fuel/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "_Button.js",
+      "_Card.js",
+      "_index.js"
+    ],
+    "dynamicImports": [
+      "src/lib/services/supabase.ts"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.CYIYY7Zn.css"
+    ]
+  },
+  "src/routes/fuel/summary/+page.svelte": {
+    "file": "entries/pages/fuel/summary/_page.svelte.js",
+    "name": "entries/pages/fuel/summary/_page.svelte",
+    "src": "src/routes/fuel/summary/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js",
+      "src/lib/services/supabase.ts",
+      "_Button.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.BvTGJLMa.css"
+    ]
+  }
+}
