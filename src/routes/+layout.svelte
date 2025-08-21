@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 
 	// Safe pathname access
-	$: pathname = $page?.url?.pathname || '/';
+	const pathname = $derived($page?.url?.pathname || '/');
 
 	// Progressive Web App Service Worker Registration
 	onMount(() => {
