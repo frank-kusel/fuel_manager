@@ -156,8 +156,10 @@
 			<table class="table field-table">
 				<thead>
 					<tr>
-						<th>Field/Location</th>
-						<th>Type</th>
+						<th>Name</th>
+						<th>Crop</th>
+						<th>Location</th>
+						<th>Area (ha)</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -175,7 +177,9 @@
 							}}
 						>
 							<td class="field-name">{field.name}</td>
-							<td class="field-type">{field.crop_type || '-'}</td>
+							<td class="field-crop">{field.crop_type || '-'}</td>
+							<td class="field-location">{field.location || '-'}</td>
+							<td class="field-area">{formatArea(field.area_hectares)}</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -764,14 +768,25 @@
 
 		/* Mobile Field Table Column Widths */
 		:global(.field-table th:nth-child(1)),
-		:global(.field-table td:nth-child(1)) { /* Field/Location */
-			width: 70%;
+		:global(.field-table td:nth-child(1)) { /* Name */
+			width: 30%;
 			font-weight: 500;
 		}
 
 		:global(.field-table th:nth-child(2)),
-		:global(.field-table td:nth-child(2)) { /* Type */
-			width: 30%;
+		:global(.field-table td:nth-child(2)) { /* Crop */
+			width: 25%;
+		}
+
+		:global(.field-table th:nth-child(3)),
+		:global(.field-table td:nth-child(3)) { /* Location */
+			width: 25%;
+		}
+
+		:global(.field-table th:nth-child(4)),
+		:global(.field-table td:nth-child(4)) { /* Area */
+			width: 20%;
+			text-align: right;
 		}
 
 		.search-input input {

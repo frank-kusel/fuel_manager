@@ -220,9 +220,9 @@
 				<table class="table" id="field-table">
 					<thead>
 						<tr>
-							<th>Code</th>
 							<th>Name</th>
 							<th>Crop</th>
+							<th>Location</th>
 							<th>Area</th>
 						</tr>
 					</thead>
@@ -232,14 +232,9 @@
 								class="field-row clickable {selectedField?.id === field.id ? 'selected' : ''}"
 								onclick={() => selectField(field)}
 							>
-								<td class="field-code">
-									<span class="field-icon" style="color: {getFieldColor(field.crop_type)}">
-										{getFieldIcon(field.crop_type)}
-									</span>
-									{field.code}
-								</td>
 								<td class="field-name">{field.name}</td>
 								<td class="field-crop">{field.crop_type || 'Not set'}</td>
+								<td class="field-location">{field.location || 'Not set'}</td>
 								<td class="field-area">{formatArea(field.area)}</td>
 							</tr>
 						{/each}

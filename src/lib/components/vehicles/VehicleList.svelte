@@ -12,6 +12,13 @@
 
 	let { onselect, oncreate }: Props = $props();
 
+	// Sort vehicles by type by default
+	let sortedVehicles = $derived($vehicles.sort((a, b) => {
+		if (a.type < b.type) return -1;
+		if (a.type > b.type) return 1;
+		return 0;
+	}));
+
 	onMount(() => {
 		vehicleStore.loadVehicles();
 	});
@@ -144,13 +151,10 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each $vehicles as vehicle (vehicle.id)}
+					{#each sortedVehicles as vehicle (vehicle.id)}
 						<tr class="vehicle-row" onclick={() => onselect?.(vehicle)}>
 							<td class="type-cell">
-								<div class="vehicle-type" style="color: {getVehicleTypeColor(vehicle.type)}">
-									<span class="type-icon">{getVehicleTypeIcon(vehicle.type)}</span>
-									<span class="type-label">{vehicle.type}</span>
-								</div>
+								<span class="type-text">{vehicle.type}</span>
 							</td>
 							<td class="code-cell">{vehicle.code}</td>
 							<td class="name-cell">{vehicle.name}</td>
@@ -375,20 +379,10 @@
 		background: #f8fafc;
 	}
 
-	.type-cell .vehicle-type {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-weight: 500;
-	}
-
-	.type-icon {
-		font-size: 1.125rem;
-	}
-
-	.type-label {
+	.type-cell .type-text {
 		text-transform: capitalize;
-		font-size: 0.75rem;
+		font-weight: 500;
+		color: #475569;
 	}
 
 	.code-cell {

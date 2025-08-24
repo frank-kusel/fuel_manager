@@ -28,6 +28,36 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	
+	// Group vehicles by type for better organization
+	let groupedVehicles = $derived.by(() => {
+		const groups: Record<string, Vehicle[]> = {};
+		
+		// Sort vehicles first
+		const sorted = [...vehicles].sort((a, b) => {
+			const typeA = a.type || 'Other';
+			const typeB = b.type || 'Other';
+			if (typeA < typeB) return -1;
+			if (typeA > typeB) return 1;
+			// If same type, sort by name
+			const nameA = a.name || '';
+			const nameB = b.name || '';
+			if (nameA < nameB) return -1;
+			if (nameA > nameB) return 1;
+			return 0;
+		});
+		
+		// Group by type
+		sorted.forEach(vehicle => {
+			const type = vehicle.type || 'Other';
+			if (!groups[type]) {
+				groups[type] = [];
+			}
+			groups[type].push(vehicle);
+		});
+		
+		return groups;
+	});
+
 	onMount(async () => {
 		try {
 			await supabaseService.init();
@@ -123,27 +153,37 @@
 					<tr>
 						<th>Code</th>
 						<th>Name</th>
-						<th>Type</th>
 						<th>Reg</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each vehicles as vehicle (vehicle.id)}
-						<tr 
-							class="vehicle-row clickable {selectedVehicle?.id === vehicle.id ? 'selected' : ''}"
-							onclick={() => {
-								console.log('=== VEHICLE ROW CLICK DETECTED ===');
-								console.log('Vehicle clicked:', vehicle.name, vehicle.code);
-								handleVehicleSelect(vehicle);
-							}}
-						>
-							<td class="vehicle-code vehicle-code-colored vehicle-type-{vehicle.type?.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')}">{vehicle.code || 'VEH'}</td>
-							<td class="vehicle-name">{vehicle.name || `${vehicle.make || ''} ${vehicle.model || ''}`.trim()}</td>
-							<td class="vehicle-type">
-								<span class="vehicle-type-icon">{getVehicleTypeIcon(vehicle.type || '')}</span>
+					{#each Object.entries(groupedVehicles) as [type, vehicleList]}
+						<!-- Type Group Header -->
+						<tr class="group-header">
+							<td colspan="3" class="group-title vehicle-type-{type.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')}">
+								<div class="group-content">
+									<span class="group-dot"></span>
+									<span class="group-label">{type}</span>
+									<span class="group-count">{vehicleList.length}</span>
+								</div>
 							</td>
-							<td class="vehicle-reg">{vehicle.registration || ''}</td>
 						</tr>
+						
+						<!-- Vehicles in this type group -->
+						{#each vehicleList as vehicle (vehicle.id)}
+							<tr 
+								class="vehicle-row clickable vehicle-type-{(vehicle.type || 'other').toLowerCase().replace(/\\s+/g, '-').replace(/[()]/g, '')} {selectedVehicle?.id === vehicle.id ? 'selected' : ''}"
+								onclick={() => {
+									console.log('=== VEHICLE ROW CLICK DETECTED ===');
+									console.log('Vehicle clicked:', vehicle.name, vehicle.code);
+									handleVehicleSelect(vehicle);
+								}}
+							>
+								<td class="vehicle-code">{vehicle.code || 'VEH'}</td>
+								<td class="vehicle-name">{vehicle.name || `${vehicle.make || ''} ${vehicle.model || ''}`.trim()}</td>
+								<td class="vehicle-reg">{vehicle.registration || ''}</td>
+							</tr>
+						{/each}
 					{/each}
 				</tbody>
 			</table>
@@ -227,9 +267,10 @@
 	.table-container {
 		background: var(--white, #ffffff);
 		border: 1px solid var(--gray-200, #e2e8f0);
-		border-radius: 0.5rem;
-		overflow-x: auto;
+		border-radius: 12px;
+		overflow: hidden;
 		margin: 0;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 	}
 
 	/* Table Styling - Original Design */
@@ -241,55 +282,130 @@
 
 	:global(.table th),
 	:global(.table td) {
-		padding: 0.75rem;
+		padding: 0.75rem 1rem;
 		text-align: left;
-		border-bottom: 1px solid var(--gray-200, #e2e8f0);
+		border-bottom: 1px solid var(--gray-100, #f3f4f6);
 	}
 
 	:global(.table th) {
 		background: var(--gray-50, #f8fafc);
-		font-weight: 600;
-		color: var(--gray-700, #334155);
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	:global(.table tbody tr:hover) {
-		background: var(--gray-50, #f8fafc);
+		font-weight: 500;
+		color: var(--gray-600, #475569);
+		font-size: 0.8rem;
+		letter-spacing: 0.02em;
+		border-bottom: 1px solid var(--gray-200, #e5e7eb);
 	}
 
 	:global(.table tbody tr.clickable) {
 		cursor: pointer;
 	}
 
-	:global(.table tbody tr.clickable:hover) {
-		background: var(--primary-light, #eff6ff);
+	/* Group Headers */
+	.group-header {
+		background: transparent !important;
+	}
+	
+	.group-title {
+		padding: 0.75rem 1rem !important;
+		background: var(--gray-50, #f8fafc);
+		border-bottom: 1px solid var(--gray-200, #e5e7eb);
+	}
+	
+	.group-content {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	
+	.group-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--type-color, var(--gray-400, #9ca3af));
+		flex-shrink: 0;
+	}
+	
+	.group-label {
+		font-weight: 500;
+		color: var(--gray-700, #374151);
+		font-size: 0.875rem;
+		text-transform: capitalize;
+	}
+	
+	.group-count {
+		color: var(--gray-500, #6b7280);
+		font-size: 0.75rem;
+		background: var(--gray-100, #f3f4f6);
+		padding: 0.125rem 0.375rem;
+		border-radius: 10px;
+		font-weight: 500;
+		margin-left: auto;
+	}
+
+	/* Vehicle rows */
+	.vehicle-row {
+		border-left: 3px solid transparent;
+		min-height: 48px; /* Touch-friendly height */
+	}
+	
+	.vehicle-row:not(.selected) {
+		background: white;
 	}
 
 	/* Selected rows */
 	:global(.table tbody tr.selected) {
 		background: var(--primary, #2563eb);
-		color: var(--white, #ffffff);
+		color: white;
+		border-left-color: var(--primary, #2563eb);
+		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
 	}
 
-	/* Vehicle Types - Based on original design */
-	.vehicle-type-excavator { --type-color: #dc2626; }
-	.vehicle-type-ldv-4wd { --type-color: #2563eb; }
-	.vehicle-type-loaders { --type-color: #7c3aed; }
-	.vehicle-type-lorry-d-axle { --type-color: #ea580c; }
-	.vehicle-type-lorry-s-axle { --type-color: #d97706; }
-	.vehicle-type-tractor-2-wd { --type-color: #16a34a; }
-	.vehicle-type-tractor-4-wd { --type-color: #15803d; }
-	.vehicle-type-d-axle-lorry { --type-color: #c2410c; }
-	.vehicle-type-other { --type-color: var(--gray-500, #64748b); }
-
-	/* Standard vehicle type colors */
-	.vehicle-type-tractor { --type-color: #16a34a; }
-	.vehicle-type-bakkie { --type-color: #2563eb; }
-	.vehicle-type-truck { --type-color: #ea580c; }
-	.vehicle-type-loader { --type-color: #7c3aed; }
-	.vehicle-type-utility { --type-color: #059669; }
+	/* Vehicle Types - Subtle background colors for easy identification */
+	.vehicle-type-tractor {
+		--type-color: #16a34a;
+		--type-bg: #f0fdf4;
+		--type-hover: #dcfce7;
+	}
+	.vehicle-type-bakkie {
+		--type-color: #2563eb;
+		--type-bg: #eff6ff;
+		--type-hover: #dbeafe;
+	}
+	.vehicle-type-truck {
+		--type-color: #ea580c;
+		--type-bg: #fff7ed;
+		--type-hover: #fed7aa;
+	}
+	.vehicle-type-loader {
+		--type-color: #7c3aed;
+		--type-bg: #f5f3ff;
+		--type-hover: #e0e7ff;
+	}
+	.vehicle-type-harvester {
+		--type-color: #ca8a04;
+		--type-bg: #fefce8;
+		--type-hover: #fef3c7;
+	}
+	.vehicle-type-sprayer {
+		--type-color: #059669;
+		--type-bg: #ecfdf5;
+		--type-hover: #d1fae5;
+	}
+	.vehicle-type-utility {
+		--type-color: #0891b2;
+		--type-bg: #f0f9ff;
+		--type-hover: #bae6fd;
+	}
+	.vehicle-type-excavator {
+		--type-color: #dc2626;
+		--type-bg: #fef2f2;
+		--type-hover: #fecaca;
+	}
+	.vehicle-type-other {
+		--type-color: #64748b;
+		--type-bg: #f8fafc;
+		--type-hover: #f1f5f9;
+	}
 
 	.vehicle-type-indicator {
 		width: 12px;
@@ -300,10 +416,23 @@
 		margin-right: 0.5rem;
 	}
 
-	/* Vehicle code colors for mobile */
-	.vehicle-code-colored {
-		font-weight: 700;
-		color: var(--type-color);
+	/* Vehicle code styling */
+	.vehicle-code {
+		font-weight: 600;
+		color: var(--type-color, var(--gray-700, #374151));
+		font-size: 0.875rem;
+	}
+	
+	.vehicle-name {
+		font-weight: 500;
+		color: var(--gray-900, #111827);
+	}
+	
+	.vehicle-reg {
+		font-family: ui-monospace, 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+		font-size: 0.8rem;
+		color: var(--gray-600, #475569);
+		font-weight: 500;
 	}
 
 	/* Selection Summary */
@@ -510,7 +639,7 @@
 
 		:global(.table th),
 		:global(.table td) {
-			padding: 0.5rem 0.375rem !important;
+			padding: 0.75rem 1rem !important;
 			border-bottom: 1px solid var(--gray-100, #f1f5f9);
 		}
 
@@ -525,11 +654,7 @@
 
 		:global(.table .clickable) {
 			cursor: pointer;
-			height: 48px;
-		}
-
-		:global(.table .clickable:hover) {
-			background-color: var(--gray-50, #f8fafc);
+			min-height: 56px; /* More touch-friendly */
 		}
 
 		:global(.table .selected) {
@@ -538,33 +663,20 @@
 			font-weight: 600;
 		}
 
-		/* Mobile table column widths - Optimized */
+		/* Mobile table column widths */
 		:global(#vehicle-table th:nth-child(1)),
-		:global(#vehicle-table td:nth-child(1)) { /* Code - Made narrower */
-			width: 15%;
-			font-weight: 600;
-			color: var(--primary, #2563eb);
-			font-size: 13px;
+		:global(#vehicle-table td:nth-child(1)) {
+			width: 25%;
 		}
 
 		:global(#vehicle-table th:nth-child(2)),
-		:global(#vehicle-table td:nth-child(2)) { /* Name */
-			width: 40%;
-			font-weight: 500;
+		:global(#vehicle-table td:nth-child(2)) {
+			width: 45%;
 		}
 
 		:global(#vehicle-table th:nth-child(3)),
-		:global(#vehicle-table td:nth-child(3)) { /* Type - Just icon, narrower */
-			width: 15%;
-			text-align: center;
-		}
-
-		:global(#vehicle-table th:nth-child(4)),
-		:global(#vehicle-table td:nth-child(4)) { /* Registration - More space */
+		:global(#vehicle-table td:nth-child(3)) {
 			width: 30%;
-			font-size: 13px;
-			font-family: monospace;
-			font-weight: 500;
 		}
 
 		:global(#vehicle-table .selected td:nth-child(1)) {
