@@ -24,222 +24,309 @@
 	}
 </script>
 
-<div class="dashboard-stats">
-	<div class="stats-grid">
-		<!-- Today's Fuel -->
-		<div class="stat-card">
-			<div class="stat-header">Today's Fuel</div>
+<div class="dashboard-overview">
+	<!-- Primary Metrics Row -->
+	<div class="primary-metrics">
+		<!-- Today's Fuel Consumption -->
+		<div class="metric-card primary">
+			<div class="metric-content">
+				<div class="metric-label">Today's Fuel</div>
+				{#if loading}
+					<div class="metric-skeleton"></div>
+				{:else}
+					<div class="metric-value">{formatDecimal(stats?.dailyFuel || 0)}<span class="unit">L</span></div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Tank Status -->
+		<div class="metric-card tank-status">
+			<div class="metric-content">
+				<div class="metric-label">Fuel Tank</div>
+				{#if loading}
+					<div class="metric-skeleton"></div>
+				{:else}
+					<div class="metric-value">{formatDecimal(stats?.tankPercentage || 0)}<span class="unit">%</span></div>
+					<div class="tank-visual">
+						<div class="tank-indicator {getTankLevelClass(stats?.tankPercentage || 0)}">
+							<div class="tank-level" style="height: {Math.min(stats?.tankPercentage || 0, 100)}%"></div>
+						</div>
+						<div class="tank-info">{formatNumber(stats?.tankLevel || 0)}L remaining</div>
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+
+	<!-- Secondary Metrics Grid -->
+	<div class="secondary-metrics">
+		<!-- Weekly Summary -->
+		<div class="metric-card compact">
+			<div class="compact-header">This Week</div>
 			{#if loading}
-				<div class="loading-skeleton"></div>
+				<div class="compact-skeleton"></div>
 			{:else}
-				<div class="stat-value">{formatDecimal(stats?.dailyFuel || 0)}L</div>
+				<div class="compact-value">{formatDecimal(stats?.weeklyFuel || 0)}L</div>
+				<div class="compact-subtitle">{stats?.entriesThisWeek || 0} entries</div>
 			{/if}
 		</div>
 
-		<!-- This Week -->
-		<div class="stat-card">
-			<div class="stat-header">This Week</div>
+		<!-- Monthly Summary -->
+		<div class="metric-card compact">
+			<div class="compact-header">This Month</div>
 			{#if loading}
-				<div class="loading-skeleton"></div>
+				<div class="compact-skeleton"></div>
 			{:else}
-				<div class="stat-value">{formatDecimal(stats?.weeklyFuel || 0)}L</div>
+				<div class="compact-value">{formatDecimal(stats?.monthlyFuel || 0)}L</div>
+				<div class="compact-subtitle">{formatNumber(stats?.monthlyDistance || 0)} km</div>
 			{/if}
 		</div>
 
-		<!-- This Month -->
-		<div class="stat-card">
-			<div class="stat-header">This Month</div>
+		<!-- Fleet Efficiency -->
+		<div class="metric-card compact">
+			<div class="compact-header">Fleet Average</div>
 			{#if loading}
-				<div class="loading-skeleton"></div>
+				<div class="compact-skeleton"></div>
 			{:else}
-				<div class="stat-value">{formatDecimal(stats?.monthlyFuel || 0)}L</div>
-				<div class="stat-subtitle">{formatNumber(stats?.monthlyDistance || 0)} km</div>
+				<div class="compact-value">{formatDecimal(stats?.averageEfficiency || 0)}</div>
+				<div class="compact-subtitle">L/100km</div>
 			{/if}
 		</div>
 
-		<!-- Tank Level -->
-		<div class="stat-card">
-			<div class="stat-header">Tank Level</div>
+		<!-- Active Fleet -->
+		<div class="metric-card compact">
+			<div class="compact-header">Active Fleet</div>
 			{#if loading}
-				<div class="loading-skeleton"></div>
+				<div class="compact-skeleton"></div>
 			{:else}
-				<div class="stat-value">{formatDecimal(stats?.tankPercentage || 0)}%</div>
-				<div class="stat-subtitle">{formatDecimal(stats?.tankLevel || 0)}L / {formatNumber(stats?.tankCapacity || 0)}L</div>
-				<div class="tank-bar">
-					<div 
-						class="tank-fill {getTankLevelClass(stats?.tankPercentage || 0)}" 
-						style="width: {Math.min(stats?.tankPercentage || 0, 100)}%"
-					></div>
-				</div>
-			{/if}
-		</div>
-
-		<!-- Fleet Status -->
-		<div class="stat-card">
-			<div class="stat-header">Active Vehicles</div>
-			{#if loading}
-				<div class="loading-skeleton"></div>
-			{:else}
-				<div class="stat-value">{stats?.activeVehicles || 0}</div>
-				<div class="stat-subtitle">{stats?.vehiclesWithOdometer || 0} with odometer data</div>
-			{/if}
-		</div>
-
-		<!-- Fuel Efficiency -->
-		<div class="stat-card">
-			<div class="stat-header">Fuel Efficiency</div>
-			{#if loading}
-				<div class="loading-skeleton"></div>
-			{:else}
-				<div class="stat-value">{formatDecimal(stats?.averageEfficiency || 0)}</div>
-				<div class="stat-subtitle">L/100km fleet average</div>
-			{/if}
-		</div>
-
-		<!-- Weekly Activity -->
-		<div class="stat-card">
-			<div class="stat-header">Weekly Activity</div>
-			{#if loading}
-				<div class="loading-skeleton"></div>
-			{:else}
-				<div class="stat-value">{stats?.entriesThisWeek || 0}</div>
-				<div class="stat-subtitle">{stats?.entriesThisMonth || 0} this month</div>
-			{/if}
-		</div>
-
-		<!-- Daily Average -->
-		<div class="stat-card">
-			<div class="stat-header">Daily Average</div>
-			{#if loading}
-				<div class="loading-skeleton"></div>
-			{:else}
-				<div class="stat-value">{formatDecimal(stats?.avgDailyUsage || 0)}L</div>
-				<div class="stat-subtitle">Per day this month</div>
+				<div class="compact-value">{stats?.activeVehicles || 0}</div>
+				<div class="compact-subtitle">vehicles</div>
 			{/if}
 		</div>
 	</div>
 </div>
 
 <style>
-	.dashboard-stats {
+	.dashboard-overview {
 		width: 100%;
 		margin-bottom: 2rem;
 	}
 
-	.stats-grid {
+	/* Primary Metrics - Large Hero Cards */
+	.primary-metrics {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+		grid-template-columns: 2fr 1fr;
+		gap: 1.5rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.metric-card.primary {
+		background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+		color: white;
+		border-radius: 16px;
+		padding: 2rem;
+		box-shadow: 0 8px 32px rgba(249, 115, 22, 0.3);
+		transition: all 0.3s ease;
+	}
+
+	.metric-card.primary:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 12px 40px rgba(249, 115, 22, 0.4);
+	}
+
+	.metric-card.tank-status {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 16px;
+		padding: 1.5rem;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+		transition: all 0.3s ease;
+	}
+
+	.metric-card.tank-status:hover {
+		border-color: #f97316;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+	}
+
+	.metric-label {
+		font-size: 0.875rem;
+		font-weight: 500;
+		opacity: 0.9;
+		margin-bottom: 0.5rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.metric-value {
+		font-size: 3rem;
+		font-weight: 700;
+		line-height: 1;
+		margin-bottom: 0.25rem;
+	}
+
+	.primary .metric-value {
+		color: white;
+	}
+
+	.tank-status .metric-value {
+		color: #111827;
+	}
+
+	.unit {
+		font-size: 1.5rem;
+		font-weight: 500;
+		opacity: 0.8;
+		margin-left: 0.25rem;
+	}
+
+	/* Tank Visual Indicator */
+	.tank-visual {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-top: 1rem;
+	}
+
+	.tank-indicator {
+		width: 24px;
+		height: 60px;
+		border: 2px solid #e5e7eb;
+		border-radius: 6px;
+		position: relative;
+		background: #f9fafb;
+		overflow: hidden;
+	}
+
+	.tank-level {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		border-radius: 3px;
+		transition: height 0.5s ease;
+	}
+
+	.tank-indicator.high .tank-level {
+		background: linear-gradient(180deg, #22c55e, #16a34a);
+	}
+
+	.tank-indicator.medium .tank-level {
+		background: linear-gradient(180deg, #f59e0b, #d97706);
+	}
+
+	.tank-indicator.low .tank-level {
+		background: linear-gradient(180deg, #ef4444, #dc2626);
+	}
+
+	.tank-info {
+		font-size: 0.875rem;
+		color: #6b7280;
+		font-weight: 500;
+	}
+
+	/* Secondary Metrics - Compact Cards */
+	.secondary-metrics {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
 		gap: 1rem;
 	}
 
-	.stat-card {
+	.metric-card.compact {
 		background: white;
-		border: 1px solid #e5e7eb;
+		border: 1px solid #f1f5f9;
 		border-radius: 12px;
-		padding: 1.5rem;
+		padding: 1.25rem;
 		text-align: center;
 		transition: all 0.2s ease;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 	}
 
-	.stat-card:hover {
-		border-color: #d1d5db;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+	.metric-card.compact:hover {
+		border-color: #f97316;
+		box-shadow: 0 4px 16px rgba(249, 115, 22, 0.1);
 		transform: translateY(-1px);
 	}
 
-	.stat-header {
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: #6b7280;
+	.compact-header {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #9ca3af;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		margin-bottom: 0.75rem;
 	}
 
-	.stat-value {
-		font-size: 2.25rem;
-		font-weight: 600;
+	.compact-value {
+		font-size: 1.5rem;
+		font-weight: 700;
 		color: #111827;
 		line-height: 1;
-		margin-bottom: 0.5rem;
+		margin-bottom: 0.25rem;
 	}
 
-	.stat-subtitle {
-		font-size: 0.875rem;
+	.compact-subtitle {
+		font-size: 0.75rem;
 		color: #6b7280;
-		font-weight: 400;
+		font-weight: 500;
 	}
 
-	/* Tank level specific styles */
-	.tank-bar {
-		width: 100%;
-		height: 6px;
-		background: #f3f4f6;
-		border-radius: 3px;
-		overflow: hidden;
-		margin-top: 0.75rem;
+	/* Loading States */
+	.metric-skeleton {
+		height: 3rem;
+		background: linear-gradient(90deg, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.3) 75%);
+		background-size: 200% 100%;
+		animation: loading 1.5s infinite;
+		border-radius: 8px;
+		margin-bottom: 0.25rem;
 	}
 
-	.tank-fill {
-		height: 100%;
-		border-radius: 3px;
-		transition: width 0.3s ease;
-	}
-
-	.tank-fill.high {
-		background: #059669;
-	}
-
-	.tank-fill.medium {
-		background: #f59e0b;
-	}
-
-	.tank-fill.low {
-		background: #dc2626;
-	}
-
-	/* Loading skeleton */
-	.loading-skeleton {
-		height: 2.25rem;
+	.compact-skeleton {
+		height: 1.5rem;
 		background: linear-gradient(90deg, #f9fafb 25%, #f3f4f6 50%, #f9fafb 75%);
 		background-size: 200% 100%;
 		animation: loading 1.5s infinite;
 		border-radius: 6px;
-		margin-bottom: 0.5rem;
+		margin-bottom: 0.25rem;
 	}
 
 	@keyframes loading {
-		0% {
-			background-position: 200% 0;
-		}
-		100% {
-			background-position: -200% 0;
+		0% { background-position: 200% 0; }
+		100% { background-position: -200% 0; }
+	}
+
+	/* Mobile Responsiveness */
+	@media (max-width: 1024px) {
+		.secondary-metrics {
+			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 
-	/* Mobile responsiveness */
 	@media (max-width: 768px) {
-		.stats-grid {
+		.primary-metrics {
+			grid-template-columns: 1fr;
+			gap: 1rem;
+		}
+
+		.metric-card.primary {
+			padding: 1.5rem;
+		}
+
+		.metric-value {
+			font-size: 2.5rem;
+		}
+
+		.secondary-metrics {
 			grid-template-columns: repeat(2, 1fr);
 			gap: 0.75rem;
 		}
 
-		.stat-card {
+		.metric-card.compact {
 			padding: 1rem;
 		}
 
-		.stat-header {
-			font-size: 0.75rem;
-			margin-bottom: 0.5rem;
-		}
-
-		.stat-value {
-			font-size: 1.75rem;
-		}
-
-		.stat-subtitle {
-			font-size: 0.8rem;
+		.compact-value {
+			font-size: 1.25rem;
 		}
 	}
+
 </style>
