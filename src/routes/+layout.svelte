@@ -113,14 +113,14 @@
 
 	/* Header Styles */
 	.header {
-		background: white;
-		border-bottom: 1px solid var(--gray-200);
+		background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+		border-bottom: none;
 		padding: 0 1rem;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		height: 4rem;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+		box-shadow: 0 4px 16px rgba(249, 115, 22, 0.2);
 	}
 
 	.header-brand {
@@ -131,13 +131,14 @@
 
 	.brand-icon {
 		font-size: 1.5rem;
+		filter: brightness(0) invert(1);
 	}
 
 	.header h1 {
 		margin: 0;
 		font-size: 1.5rem;
-		font-weight: 600;
-		color: var(--primary);
+		font-weight: 700;
+		color: white;
 	}
 
 	.nav {
@@ -148,28 +149,32 @@
 
 	.nav-btn {
 		padding: 0.5rem 1rem;
-		border-radius: 0.5rem;
+		border-radius: 12px;
 		text-decoration: none;
-		color: var(--gray-600);
+		color: rgba(255, 255, 255, 0.8);
 		font-weight: 500;
 		transition: all 0.2s;
+		border: 1px solid transparent;
 	}
 
 	.nav-btn:hover {
-		background: var(--gray-100);
-		color: var(--gray-900);
+		background: rgba(255, 255, 255, 0.1);
+		color: white;
+		border-color: rgba(255, 255, 255, 0.2);
 	}
 
 	.nav-btn.active {
-		background: var(--primary);
+		background: rgba(255, 255, 255, 0.15);
 		color: white;
+		border-color: rgba(255, 255, 255, 0.3);
+		font-weight: 600;
 	}
 
 
 	/* Main Content */
 	.main {
 		flex: 1;
-		padding: 1rem;
+		padding: 0.5rem;
 		margin-bottom: 4rem; /* Space for mobile nav */
 	}
 
@@ -180,10 +185,11 @@
 		left: 0;
 		right: 0;
 		background: white;
-		border-top: 1px solid var(--gray-200);
+		border-top: 1px solid #f1f5f9;
 		display: flex;
 		height: 4rem;
-		box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
+		box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+		backdrop-filter: blur(10px);
 	}
 
 	.mobile-nav-btn {
@@ -193,23 +199,52 @@
 		align-items: center;
 		justify-content: center;
 		text-decoration: none;
-		color: var(--gray-600);
+		color: #9ca3af;
 		font-size: 0.75rem;
 		gap: 0.25rem;
-		transition: color 0.2s;
+		transition: all 0.2s ease;
+		position: relative;
+		border-radius: 12px;
+		margin: 0.5rem 0.25rem;
 	}
 
-	.mobile-nav-btn:hover,
+	.mobile-nav-btn:hover {
+		color: #f97316;
+		background: rgba(249, 115, 22, 0.05);
+	}
+
 	.mobile-nav-btn.active {
-		color: var(--primary);
+		color: #f97316;
+		background: rgba(249, 115, 22, 0.1);
+		font-weight: 600;
+	}
+
+	.mobile-nav-btn.active::before {
+		content: '';
+		position: absolute;
+		top: -0.5rem;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 24px;
+		height: 3px;
+		background: linear-gradient(135deg, #f97316, #ea580c);
+		border-radius: 0 0 6px 6px;
 	}
 
 	.nav-icon {
-		font-size: 1.2rem;
+		font-size: 1.25rem;
+		transition: transform 0.2s ease;
+	}
+
+	.mobile-nav-btn.active .nav-icon {
+		transform: scale(1.1);
 	}
 
 	.nav-label {
 		font-weight: 500;
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.025em;
 	}
 
 	/* Desktop only */
