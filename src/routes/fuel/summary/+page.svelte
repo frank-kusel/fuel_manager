@@ -245,118 +245,142 @@
 		</div>
 	{/if}
 
-	<div class="header">
-		<h1>Fuel Entry Summary</h1>
-		<p class="subtitle">For manual book transcription</p>
-	</div>
-	
-	<div class="controls">
-		<div class="date-selector">
-			<label for="date">Date:</label>
-			<input 
-				id="date"
-				type="date" 
-				bind:value={selectedDate}
-				onchange={loadEntries}
-			/>
+	<div class="summary-header">
+		<div class="header-content">
+			<h1>Fuel Summary</h1>
+			<p class="header-subtitle">Logbook transcription ready</p>
 		</div>
 		
-		<div class="action-buttons desktop-only">
-			<Button size="sm" variant="outline" onclick={loadEntries}>
-				🔄 Refresh
-			</Button>
-			<Button size="sm" variant="outline" onclick={() => window.print()}>
-				🖨️ Print
-			</Button>
-			<Button size="sm" onclick={exportToCSV}>
-				📥 Export CSV
-			</Button>
+		<div class="header-controls">
+			<div class="date-control">
+				<label for="date">Date</label>
+				<input 
+					id="date"
+					type="date" 
+					bind:value={selectedDate}
+					onchange={loadEntries}
+					class="date-input"
+				/>
+			</div>
+			
+			<div class="action-controls desktop-only">
+				<Button size="sm" variant="outline" onclick={loadEntries}>
+					Refresh
+				</Button>
+				<Button size="sm" variant="outline" onclick={() => window.print()}>
+					Print
+				</Button>
+				<Button size="sm" onclick={exportToCSV}>
+					Export
+				</Button>
+			</div>
 		</div>
 	</div>
 	
 	{#if loading}
-		<div class="loading">Loading entries...</div>
+		<div class="loading-state">
+			<div class="loading-grid">
+				{#each Array(6) as _}
+					<div class="entry-skeleton">
+						<div class="skeleton-header"></div>
+						<div class="skeleton-body">
+							<div class="skeleton-line"></div>
+							<div class="skeleton-line short"></div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
 	{:else if error}
-		<div class="error">
-			<span class="error-icon">⚠️</span>
-			{error}
+		<div class="error-state">
+			<div class="error-visual">
+				<div class="error-icon">⚠</div>
+			</div>
+			<h4>Failed to load entries</h4>
+			<p>{error}</p>
 		</div>
 	{:else if entries.length === 0}
-		<div class="empty">
-			<span class="empty-icon">📭</span>
-			<p>No fuel entries for {selectedDate}</p>
+		<div class="empty-state">
+			<div class="empty-visual">
+				<div class="fuel-drop"></div>
+			</div>
+			<h4>No entries found</h4>
+			<p>No fuel entries recorded for {selectedDate}</p>
 		</div>
 	{:else}
 		
-		<!-- Desktop Table View -->
-		<div class="table-container desktop-only">
-			<table class="summary-table">
-				<thead>
-					<tr>
-						<th>Time</th>
-						<th>Vehicle</th>
-						<th>Driver</th>
-						<th>Activity</th>
-						<th>Location</th>
-						<th>Fuel (L)</th>
-						<th>Odometer</th>
-						<th>Bowser</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each entries as entry}
-						<tr>
-							<td>{entry.time}</td>
-							<td class="vehicle-cell">
-								<span class="code">{entry.vehicles?.code || 'N/A'}</span>
-								<span class="name">{entry.vehicles?.name || 'N/A'}</span>
-							</td>
-							<td>
-								<span class="code">{entry.drivers?.employee_code || 'N/A'}</span>
-								<span class="name">{entry.drivers?.name || 'N/A'}</span>
-							</td>
-							<td>{entry.activities?.name || 'N/A'}</td>
-							<td>{getLocation(entry)}</td>
-							<td class="fuel-cell">{entry.litres_dispensed.toFixed(1)}</td>
-							<td class="odo-cell">{formatOdometer(entry.odometer_start, entry.odometer_end, entry.gauge_working)}</td>
-							<td class="bowser-cell">{formatBowserReading(entry.bowser_reading_start, entry.bowser_reading_end)}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+		<!-- Desktop Card Grid -->
+		<div class="entries-container desktop-only">
+			<div class="entries-grid">
+				{#each entries as entry}
+					<div class="fuel-entry-card">
+						<div class="card-header">
+							<div class="time-badge">{entry.time}</div>
+							<div class="fuel-display">
+								{entry.litres_dispensed.toFixed(1)}<span class="fuel-unit">L</span>
+							</div>
+						</div>
+						
+						<div class="card-body">
+							<div class="vehicle-info">
+								<div class="vehicle-code">{entry.vehicles?.code || 'N/A'}</div>
+								<div class="vehicle-name">{entry.vehicles?.name || 'N/A'}</div>
+							</div>
+							
+							<div class="operation-details">
+								<div class="detail-item">
+									<span class="detail-label">Driver</span>
+									<span class="detail-value">{entry.drivers?.name || 'N/A'}</span>
+								</div>
+								<div class="detail-item">
+									<span class="detail-label">Activity</span>
+									<span class="detail-value">{entry.activities?.name || 'N/A'}</span>
+								</div>
+								<div class="detail-item">
+									<span class="detail-label">Location</span>
+									<span class="detail-value">{getLocation(entry)}</span>
+								</div>
+							</div>
+							
+							<div class="odometer-section">
+								<div class="odo-reading">
+									<span class="odo-label">Start</span>
+									<span class="odo-value">{formatOdometerValue(entry.odometer_start, entry.gauge_working)}</span>
+								</div>
+								<div class="odo-arrow">→</div>
+								<div class="odo-reading">
+									<span class="odo-label">End</span>
+									<span class="odo-value">{formatOdometerValue(entry.odometer_end, entry.gauge_working)}</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				{/each}
+			</div>
 		</div>
 		
-		<!-- Mobile Simple Table View (Simplified for logbook transcription) -->
-		<div class="simple-table-container mobile-only">
-			<table class="simple-summary-table">
-				<tbody>
-					{#each entries as entry}
-						<!-- Vehicle and Fuel Row -->
-						<tr class="vehicle-row">
-							<td class="vehicle-code">{entry.vehicles?.code || 'N/A'}</td>
-							<td class="vehicle-name">{entry.vehicles?.name || 'N/A'}</td>
-							<td class="fuel-amount">{entry.litres_dispensed.toFixed(1)}L</td>
-						</tr>
-						<!-- Odometer Start Row -->
-						<tr class="odo-row">
-							<td class="odo-label">Start</td>
-							<td class="odo-value" colspan="2">
-								{formatOdometerValue(entry.odometer_start, entry.gauge_working)}
-							</td>
-						</tr>
-						<!-- Odometer End Row -->
-						<tr class="odo-row">
-							<td class="odo-label">End</td>
-							<td class="odo-value" colspan="2">
-								{formatOdometerValue(entry.odometer_end, entry.gauge_working)}
-							</td>
-						</tr>
-						<tr class="spacer-row">
-							<td colspan="3"></td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+		<!-- Mobile Logbook View -->
+		<div class="logbook-container mobile-only">
+			{#each entries as entry}
+				<div class="logbook-entry">
+					<div class="logbook-header">
+						<div class="vehicle-badge">{entry.vehicles?.code || 'N/A'}</div>
+						<div class="vehicle-title">{entry.vehicles?.name || 'N/A'}</div>
+						<div class="fuel-badge">{entry.litres_dispensed.toFixed(1)}L</div>
+					</div>
+					
+					<div class="odometer-grid">
+						<div class="odo-item">
+							<div class="odo-label">Start</div>
+							<div class="odo-value">{formatOdometerValue(entry.odometer_start, entry.gauge_working)}</div>
+						</div>
+						<div class="odo-item">
+							<div class="odo-label">End</div>
+							<div class="odo-value">{formatOdometerValue(entry.odometer_end, entry.gauge_working)}</div>
+						</div>
+					</div>
+				</div>
+			{/each}
 		</div>
 	{/if}
 </div>
@@ -378,7 +402,7 @@
 		justify-content: center;
 		width: 40px;
 		height: 40px;
-		background: rgba(0, 0, 0, 0.1);
+		background: rgba(249, 115, 22, 0.1);
 		border-radius: 50%;
 		backdrop-filter: blur(10px);
 	}
@@ -386,7 +410,7 @@
 	.pull-arrow,
 	.refresh-ready {
 		font-size: 1.25rem;
-		color: #059669;
+		color: #f97316;
 		font-weight: bold;
 	}
 
@@ -399,6 +423,7 @@
 		to { transform: rotate(360deg); }
 	}
 
+	/* Main Container */
 	.fuel-summary {
 		position: relative;
 		max-width: 1400px;
@@ -407,220 +432,439 @@
 		min-height: 100vh;
 	}
 	
-	.header {
-		text-align: center;
-		margin-bottom: 1.5rem;
-		padding-bottom: 1rem;
-		border-bottom: 2px solid #e5e7eb;
+	/* Header */
+	.summary-header {
+		background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+		color: white;
+		padding: 2rem;
+		margin-bottom: 2rem;
+		border-radius: 0 0 24px 24px;
+		box-shadow: 0 8px 32px rgba(249, 115, 22, 0.2);
 	}
-	
-	.header h1 {
-		font-size: 1.875rem;
+
+	.header-content h1 {
+		font-size: 2.5rem;
 		font-weight: 700;
-		color: #0f172a;
-		margin: 0 0 0.25rem 0;
+		margin: 0 0 0.5rem 0;
+		line-height: 1.1;
 	}
-	
-	.subtitle {
-		color: #64748b;
-		font-size: 0.875rem;
+
+	.header-subtitle {
+		font-size: 1rem;
+		opacity: 0.9;
 		margin: 0;
+		font-weight: 400;
 	}
-	
-	.controls {
+
+	.header-controls {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-end;
+		margin-top: 1.5rem;
+		gap: 1rem;
+	}
+
+	.date-control {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.date-control label {
+		font-size: 0.875rem;
+		font-weight: 500;
+		opacity: 0.9;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.date-input {
+		background: rgba(255, 255, 255, 0.15);
+		border: 1px solid rgba(255, 255, 255, 0.3);
+		border-radius: 8px;
+		padding: 0.75rem;
+		color: white;
+		font-size: 1rem;
+		font-weight: 500;
+		backdrop-filter: blur(10px);
+	}
+
+	.date-input:focus {
+		outline: none;
+		border-color: rgba(255, 255, 255, 0.5);
+		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+	}
+
+	.action-controls {
+		display: flex;
+		gap: 0.75rem;
+	}
+
+	/* Desktop Card Grid */
+	.entries-container {
+		padding: 0 2rem;
+	}
+
+	.entries-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+		gap: 1.5rem;
+	}
+
+	.fuel-entry-card {
+		background: white;
+		border: 1px solid #f1f5f9;
+		border-radius: 16px;
+		padding: 1.5rem;
+		transition: all 0.3s ease;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+	}
+
+	.fuel-entry-card:hover {
+		border-color: #f97316;
+		box-shadow: 0 12px 32px rgba(249, 115, 22, 0.15);
+		transform: translateY(-4px);
+	}
+
+	.card-header {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		margin-bottom: 1.5rem;
-		flex-wrap: wrap;
-		gap: 1rem;
+		margin-bottom: 1rem;
+		padding-bottom: 1rem;
+		border-bottom: 1px solid #f3f4f6;
 	}
-	
-	.date-selector {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-	
-	.date-selector label {
+
+	.time-badge {
+		background: #f3f4f6;
+		color: #374151;
+		padding: 0.375rem 0.875rem;
+		border-radius: 20px;
+		font-size: 0.875rem;
 		font-weight: 600;
-		color: #334155;
+		font-family: monospace;
 	}
-	
-	.date-selector input {
-		padding: 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.875rem;
-	}
-	
-	.action-buttons {
+
+	.fuel-display {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: #059669;
 		display: flex;
-		gap: 0.5rem;
-		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.25rem;
 	}
-	
-	
-	/* Desktop Table */
-	.table-container {
-		overflow-x: auto;
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
+
+	.fuel-unit {
+		font-size: 1rem;
+		font-weight: 500;
+		opacity: 0.8;
 	}
-	
-	.summary-table {
-		width: 100%;
-		border-collapse: collapse;
-	}
-	
-	.summary-table th {
-		background: #f1f5f9;
-		padding: 0.75rem;
-		text-align: left;
-		font-weight: 600;
-		font-size: 0.875rem;
-		color: #475569;
-		border-bottom: 2px solid #e2e8f0;
-	}
-	
-	.summary-table td {
-		padding: 0.75rem;
-		font-size: 0.875rem;
-		border-bottom: 1px solid #f1f5f9;
-	}
-	
-	.summary-table tbody tr:hover {
-		background: #f8fafc;
-	}
-	
-	.vehicle-cell,
-	.driver-cell {
+
+	.card-body {
 		display: flex;
 		flex-direction: column;
-	}
-	
-	.code {
-		font-weight: 600;
-		color: #0f172a;
-	}
-	
-	.name {
-		font-size: 0.75rem;
-		color: #64748b;
-	}
-	
-	.fuel-cell {
-		font-weight: 600;
-		color: #059669;
-	}
-	
-	.odo-cell,
-	.bowser-cell {
-		font-family: monospace;
-		font-size: 0.8125rem;
-	}
-	
-	/* Mobile Simple Table */
-	.simple-table-container {
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
-		overflow: hidden;
-		background: white;
+		gap: 1rem;
 	}
 
-	.simple-summary-table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 0.875rem;
-	}
-
-	.vehicle-row {
-		background: #f8fafc;
-		border-bottom: 1px solid #e2e8f0;
-	}
-
-	.vehicle-row td {
+	.vehicle-info {
+		text-align: center;
 		padding: 0.75rem;
-		font-weight: 600;
-		border-right: 1px solid #e5e7eb;
-	}
-
-	.vehicle-row td:last-child {
-		border-right: none;
+		background: #fafbfc;
+		border-radius: 12px;
 	}
 
 	.vehicle-code {
-		color: #2563eb;
 		font-size: 1rem;
-		width: 25%;
+		font-weight: 700;
+		color: #2563eb;
+		margin-bottom: 0.25rem;
+		font-family: monospace;
 	}
 
 	.vehicle-name {
-		color: #0f172a;
-		font-size: 1rem;
-		width: 50%;
+		font-size: 0.875rem;
+		color: #6b7280;
+		font-weight: 500;
 	}
 
-	.fuel-amount {
-		color: #059669;
-		font-size: 1rem;
-		text-align: right;
-		width: 25%;
+	.operation-details {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.5rem;
 	}
 
-	.odo-row td {
-		padding: 0.5rem 0.75rem;
-		border-right: 1px solid #f1f5f9;
+	.detail-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.5rem 0;
+		font-size: 0.875rem;
+		border-bottom: 1px solid #f9fafb;
 	}
 
-	.odo-row td:last-child {
-		border-right: none;
+	.detail-item:last-child {
+		border-bottom: none;
 	}
 
-	.odo-label {
-		color: #64748b;
-		font-weight: 600;
-		font-size: 1rem;
-		width: 25%;
+	.detail-label {
+		color: #9ca3af;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		font-size: 0.75rem;
 	}
 
-	.odo-value {
+	.detail-value {
 		color: #374151;
-		font-family: monospace;
-		font-size: 1rem;
-		font-weight: 600;
+		font-weight: 500;
+		text-align: right;
 	}
 
-	.spacer-row td {
-		padding: 0.5rem;
-		border-bottom: 2px solid #e5e7eb;
+	.odometer-section {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		background: linear-gradient(135deg, #fef3e2, #fed7aa);
+		padding: 1rem;
+		border-radius: 12px;
+		gap: 1rem;
 	}
-	
-	
-	/* Loading, Error, Empty states */
-	.loading,
-	.error,
-	.empty {
+
+	.odo-reading {
 		text-align: center;
-		padding: 3rem 2rem;
-		color: #64748b;
+		flex: 1;
 	}
-	
-	.error {
-		color: #dc2626;
-		background: #fef2f2;
-		border: 1px solid #fecaca;
-		border-radius: 8px;
-	}
-	
-	.error-icon,
-	.empty-icon {
-		font-size: 2rem;
-		margin-bottom: 0.5rem;
+
+	.odo-reading .odo-label {
 		display: block;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #92400e;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.25rem;
 	}
-	
-	/* Mobile Responsive */
+
+	.odo-reading .odo-value {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: #92400e;
+		font-family: monospace;
+	}
+
+	.odo-arrow {
+		font-size: 1.5rem;
+		color: #f97316;
+		font-weight: bold;
+	}
+
+	/* Mobile Logbook View */
+	.logbook-container {
+		padding: 0 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.logbook-entry {
+		background: white;
+		border: 1px solid #f1f5f9;
+		border-radius: 16px;
+		padding: 1.25rem;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+	}
+
+	.logbook-header {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 1rem;
+		padding-bottom: 1rem;
+		border-bottom: 1px solid #f3f4f6;
+	}
+
+	.vehicle-badge {
+		background: #f3f4f6;
+		color: #374151;
+		padding: 0.5rem 0.875rem;
+		border-radius: 20px;
+		font-size: 0.875rem;
+		font-weight: 700;
+		font-family: monospace;
+		flex-shrink: 0;
+	}
+
+	.vehicle-title {
+		flex: 1;
+		font-size: 1rem;
+		font-weight: 600;
+		color: #111827;
+	}
+
+	.fuel-badge {
+		background: linear-gradient(135deg, #059669, #047857);
+		color: white;
+		padding: 0.5rem 1rem;
+		border-radius: 20px;
+		font-size: 1rem;
+		font-weight: 700;
+		box-shadow: 0 2px 8px rgba(5, 150, 105, 0.2);
+	}
+
+	.odometer-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+
+	.odo-item {
+		background: linear-gradient(135deg, #fef3e2, #fed7aa);
+		padding: 1rem;
+		border-radius: 12px;
+		text-align: center;
+	}
+
+	.odo-item .odo-label {
+		display: block;
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #92400e;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.5rem;
+	}
+
+	.odo-item .odo-value {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: #92400e;
+		font-family: monospace;
+	}
+
+	/* Loading States */
+	.loading-state {
+		padding: 2rem;
+	}
+
+	.loading-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+		gap: 1.5rem;
+	}
+
+	.entry-skeleton {
+		background: white;
+		border: 1px solid #f1f5f9;
+		border-radius: 16px;
+		padding: 1.5rem;
+	}
+
+	.skeleton-header {
+		height: 2rem;
+		background: linear-gradient(90deg, #f9fafb 25%, #f3f4f6 50%, #f9fafb 75%);
+		background-size: 200% 100%;
+		animation: loading 1.5s infinite;
+		border-radius: 8px;
+		margin-bottom: 1rem;
+	}
+
+	.skeleton-body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.skeleton-line {
+		height: 1rem;
+		background: linear-gradient(90deg, #f9fafb 25%, #f3f4f6 50%, #f9fafb 75%);
+		background-size: 200% 100%;
+		animation: loading 1.5s infinite;
+		border-radius: 6px;
+	}
+
+	.skeleton-line.short {
+		width: 60%;
+	}
+
+	@keyframes loading {
+		0% { background-position: 200% 0; }
+		100% { background-position: -200% 0; }
+	}
+
+	/* Empty & Error States */
+	.empty-state,
+	.error-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 4rem 2rem;
+		text-align: center;
+		min-height: 300px;
+	}
+
+	.empty-visual,
+	.error-visual {
+		margin-bottom: 1.5rem;
+	}
+
+	.fuel-drop {
+		width: 60px;
+		height: 80px;
+		background: linear-gradient(135deg, #f97316, #ea580c);
+		border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+		position: relative;
+		opacity: 0.6;
+		animation: float 3s ease-in-out infinite;
+	}
+
+	.fuel-drop::before {
+		content: '';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: 20px;
+		height: 20px;
+		background: rgba(255, 255, 255, 0.3);
+		border-radius: 50%;
+	}
+
+	.error-icon {
+		width: 60px;
+		height: 60px;
+		background: linear-gradient(135deg, #ef4444, #dc2626);
+		color: white;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.5rem;
+		font-weight: bold;
+	}
+
+	@keyframes float {
+		0%, 100% { transform: translateY(0px); }
+		50% { transform: translateY(-10px); }
+	}
+
+	.empty-state h4,
+	.error-state h4 {
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: #374151;
+		margin: 0 0 0.5rem 0;
+	}
+
+	.empty-state p,
+	.error-state p {
+		font-size: 0.875rem;
+		color: #6b7280;
+		margin: 0;
+		max-width: 350px;
+	}
+
+	/* Responsive Design */
 	.desktop-only {
 		display: block;
 	}
@@ -630,16 +874,22 @@
 	}
 	
 	@media (max-width: 768px) {
-		.fuel-summary {
-			padding: 0;
+		.summary-header {
+			padding: 1.5rem 1rem;
+			border-radius: 0 0 16px 16px;
 		}
-		
-		.controls {
+
+		.header-content h1 {
+			font-size: 2rem;
+		}
+
+		.header-controls {
 			flex-direction: column;
 			align-items: stretch;
+			gap: 1rem;
 		}
-		
-		.action-buttons {
+
+		.action-controls {
 			justify-content: center;
 		}
 		
@@ -650,37 +900,28 @@
 		.mobile-only {
 			display: block;
 		}
-		
-		.simple-table-container {
-			display: block;
+
+		.entries-container {
+			padding: 0 1rem;
+		}
+
+		.entries-grid {
+			grid-template-columns: 1fr;
+			gap: 1rem;
 		}
 	}
 	
 	/* Print Styles */
 	@media print {
-		.fuel-summary {
-			padding: 0;
+		.summary-header {
+			background: none;
+			color: #111827;
+			border-bottom: 2px solid #e5e7eb;
+			box-shadow: none;
 		}
 		
-		.controls {
+		.header-controls {
 			display: none;
-		}
-		
-		.header {
-			page-break-after: avoid;
-		}
-		
-		.summary-table {
-			font-size: 0.75rem;
-		}
-		
-		.summary-table th,
-		.summary-table td {
-			padding: 0.5rem;
-		}
-		
-		.simple-table-container {
-			page-break-inside: avoid;
 		}
 		
 		.mobile-only {
@@ -689,6 +930,11 @@
 		
 		.desktop-only {
 			display: block !important;
+		}
+
+		.fuel-entry-card {
+			page-break-inside: avoid;
+			margin-bottom: 1rem;
 		}
 	}
 </style>
