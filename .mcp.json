@@ -2,10 +2,16 @@
   "mcpServers": {
     "supabase": {
       "command": "cmd",
-      "args": ["/c", "npx", "@modelcontextprotocol/server-supabase"],
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--read-only",
+        "--project-ref=szskplrwmeuahwvicyos"
+      ],
       "env": {
-        "SUPABASE_URL": "https://szskplrwmeuahwvicyos.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzcwOTMxMSwiZXhwIjoyMDY5Mjg1MzExfQ.HIpUnovx2W9ZSqsfwBR0iGJJtCm3w6TU5oTMnphENdU"
+        "SUPABASE_ACCESS_TOKEN": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzcwOTMxMSwiZXhwIjoyMDY5Mjg1MzExfQ.HIpUnovx2W9ZSqsfwBR0iGJJtCm3w6TU5oTMnphENdU"
       }
     }
   }

@@ -21,7 +21,13 @@
       "Bash(npm run check:*)",
       "Bash(mcp list-tools:*)",
       "Bash(npm run dev:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Read(/C:\\Users\\frank\\AppData\\Roaming\\Claude/**)",
+      "Read(/C:\\Users\\frank\\AppData\\Roaming\\Claude/**)",
+      "Read(/C:\\Users\\frank\\AppData\\Roaming\\Claude/**)",
+      "Read(/C:\\Users\\frank\\AppData\\Roaming\\Claude\\Claude Extensions Settings/**)",
+      "Read(/C:\\Users\\frank\\AppData\\Roaming\\npm\\node_modules\\supabase-mcp/**)",
+      "mcp__supabase__list_tables"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
