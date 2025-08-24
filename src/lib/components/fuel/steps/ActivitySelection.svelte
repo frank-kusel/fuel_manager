@@ -45,16 +45,50 @@
 		}
 	});
 	
-	let filteredActivities = $derived(activities.filter(activity => {
-		if (!searchTerm) return true;
-		const search = searchTerm.toLowerCase();
-		return (
-			activity.name.toLowerCase().includes(search) ||
-			activity.name_zulu?.toLowerCase().includes(search) ||
-			activity.description?.toLowerCase().includes(search) ||
-			activity.code.toLowerCase().includes(search)
-		);
-	}));
+	// Group activities by category
+	let groupedActivities = $derived.by(() => {
+		const groups: Record<string, Activity[]> = {};
+		
+		// Filter activities first
+		const filtered = activities.filter(activity => {
+			if (!searchTerm) return true;
+			const search = searchTerm.toLowerCase();
+			return (
+				activity.name.toLowerCase().includes(search) ||
+				activity.name_zulu?.toLowerCase().includes(search) ||
+				activity.description?.toLowerCase().includes(search) ||
+				activity.code.toLowerCase().includes(search) ||
+				activity.category?.toLowerCase().includes(search)
+			);
+		});
+		
+		// Sort and group by category
+		const sorted = [...filtered].sort((a, b) => {
+			const categoryA = a.category || 'Other';
+			const categoryB = b.category || 'Other';
+			if (categoryA < categoryB) return -1;
+			if (categoryA > categoryB) return 1;
+			// If same category, sort by name
+			const nameA = a.name || '';
+			const nameB = b.name || '';
+			if (nameA < nameB) return -1;
+			if (nameA > nameB) return 1;
+			return 0;
+		});
+		
+		// Group by category
+		sorted.forEach(activity => {
+			const category = activity.category || 'Other';
+			if (!groups[category]) {
+				groups[category] = [];
+			}
+			groups[category].push(activity);
+		});
+		
+		return groups;
+	});
+	
+	let filteredActivitiesCount = $derived(Object.values(groupedActivities).flat().length);
 	
 	// Use the actual icon from database, fallback to generic icon
 	function getActivityIcon(activity: Activity): string {
@@ -117,26 +151,41 @@
 		</div>
 	{:else if activities.length === 0}
 		<div class="empty-state">No activities available</div>
-	{:else if filteredActivities.length === 0}
+	{:else if filteredActivitiesCount === 0}
 		<div class="empty-state">No activities found</div>
 	{:else}
-		<div class="activity-grid">
-			{#each filteredActivities as activity (activity.id)}
-				<button 
-					class="activity-btn {selectedActivity?.id === activity.id ? 'selected' : ''}"
-					onclick={() => {
-												handleActivitySelect(activity);
-					}}
-				>
-					<div class="activity-icon" style="color: {getActivityColor(activity.name)}">
-						{getActivityIcon(activity)}
+		<div class="activities-container">
+			{#each Object.entries(groupedActivities) as [category, activityList]}
+				<!-- Category Group Header -->
+				<div class="category-header">
+					<div class="category-title">
+						<span class="category-dot"></span>
+						<span class="category-label">{category}</span>
+						<span class="category-count">{activityList.length}</span>
 					</div>
-					<div class="activity-code">{activity.code || 'ACT'}</div>
-					<div class="activity-name">{activity.name}</div>
-					{#if activity.name_zulu}
-						<div class="activity-name-zulu">{activity.name_zulu}</div>
-					{/if}
-				</button>
+				</div>
+				
+				<!-- Activities in this category -->
+				<div class="activity-grid">
+					{#each activityList as activity (activity.id)}
+						<button 
+							class="activity-btn category-{(activity.category || 'other').toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')} {selectedActivity?.id === activity.id ? 'selected' : ''}"
+							onclick={() => {
+														handleActivitySelect(activity);
+							}}
+						>
+							<div class="activity-icon" style="color: {getActivityColor(activity.name)}">
+								{getActivityIcon(activity)}
+							</div>
+							<div class="activity-content">
+								<div class="activity-name">{activity.name}</div>
+								{#if activity.name_zulu}
+									<div class="activity-name-zulu">{activity.name_zulu}</div>
+								{/if}
+							</div>
+						</button>
+					{/each}
+				</div>
 			{/each}
 		</div>
 	{/if}
@@ -176,6 +225,52 @@
 
 <style>
 	.activity-selection {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem; /* More compact overall spacing */
+	}
+
+	/* Category Headers */
+	.category-header {
+		margin-bottom: 1rem;
+	}
+	
+	.category-title {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1rem;
+		background: var(--gray-50, #f8fafc);
+		border-radius: 8px;
+		border: 1px solid var(--gray-200, #e5e7eb);
+	}
+	
+	.category-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--blue-500, #3b82f6); /* Default blue for activities */
+		flex-shrink: 0;
+	}
+	
+	.category-label {
+		font-weight: 500;
+		color: var(--gray-700, #374151);
+		font-size: 0.875rem;
+		text-transform: capitalize;
+	}
+	
+	.category-count {
+		color: var(--gray-500, #6b7280);
+		font-size: 0.75rem;
+		background: var(--gray-100, #f3f4f6);
+		padding: 0.125rem 0.375rem;
+		border-radius: 10px;
+		font-weight: 500;
+		margin-left: auto;
+	}
+
+	.activities-container {
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
@@ -260,7 +355,7 @@
 	/* Activity Grid - Based on original design */
 	.activity-grid {
 		display: grid;
-		grid-template-columns: repeat(2, 1fr);
+		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 		gap: 0.5rem;
 		padding: 0;
 		margin: 0;
@@ -268,55 +363,57 @@
 
 	.activity-btn {
 		background: white;
-		border: 1px solid #e2e8f0;
-		border-radius: 8px;
-		padding: 0.8rem 0.5rem;
+		border: 1px solid #e5e7eb;
+		border-radius: 12px;
+		padding: 0.75rem 0.5rem;
 		cursor: pointer;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.35rem;
-		min-height: 110px;
-		font-size: 0.875rem;
+		gap: 0.5rem;
+		min-height: 90px; /* More compact */
 		text-align: center;
+		transition: all 0.15s ease;
+		position: relative;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 	}
 
-	.activity-btn:hover {
-		border-color: #2563eb;
-		background: #eff6ff;
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
-	}
+	/* Removed hover effects for mobile */
 
 	.activity-btn.selected {
 		border-color: #2563eb;
 		background: #2563eb;
 		color: white;
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+		transform: scale(1.02);
 	}
 
 	.activity-icon {
-		font-size: 1.5rem;
+		font-size: 2rem; /* Larger icon */
 		margin-bottom: 0.25rem;
+		flex-shrink: 0;
 	}
 
-	.activity-code {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #64748b;
-		margin-bottom: 0.25rem;
-	}
+	/* Removed activity-code styling since we're not showing codes */
 
-	.activity-btn.selected .activity-code {
-		color: rgba(255, 255, 255, 0.8);
+	/* Removed selected activity-code styling */
+
+	.activity-content {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.125rem;
+		flex: 1;
+		min-width: 0;
 	}
 
 	.activity-name {
-		font-size: 1rem;
-		font-weight: 500;
-		line-height: 1.1;
-		color: #334155;
+		font-size: 1.1rem; /* Larger for better readability */
+		font-weight: 600;
+		line-height: 1.2;
+		color: #1f2937;
+		text-align: center;
+		word-break: break-word;
 	}
 
 	.activity-btn.selected .activity-name {
@@ -324,11 +421,13 @@
 	}
 
 	.activity-name-zulu {
-		font-size: 0.75rem;
-		color: #64748b;
+		font-size: 0.9rem; /* Larger for better readability */
+		color: #6b7280;
 		font-style: italic;
-		line-height: 1.1;
-		margin-top: 0.125rem;
+		line-height: 1.2;
+		text-align: center;
+		word-break: break-word;
+		font-weight: 400;
 	}
 
 	.activity-btn.selected .activity-name-zulu {
@@ -577,19 +676,46 @@
 
 	/* Mobile Responsiveness */
 	@media (max-width: 768px) {
-		.activities-grid {
-			grid-template-columns: 1fr;
+		.activity-grid {
+			grid-template-columns: repeat(3, 1fr); /* 3 columns on mobile for compactness */
+			gap: 0.375rem;
 		}
-
-		.activity-header {
-			align-items: flex-start;
+		
+		.activity-btn {
+			padding: 0.625rem 0.375rem;
+			min-height: 85px; /* Even more compact on mobile */
 		}
-
+		
 		.activity-icon {
-			width: 2rem;
-			height: 2rem;
-			font-size: 1.25rem;
-			margin-top: 0.25rem;
+			font-size: 1.75rem; /* Still large but fits better */
+		}
+		
+		.activity-name {
+			font-size: 1rem;
+			line-height: 1.1;
+		}
+		
+		.activity-name-zulu {
+			font-size: 0.8rem;
+			line-height: 1.1;
+		}
+
+		.category-header {
+			margin-bottom: 0.5rem;
+		}
+
+		.activities-container {
+			gap: 0.75rem;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.activity-grid {
+			grid-template-columns: repeat(2, 1fr); /* 2 columns on very small screens */
+		}
+		
+		.activity-btn {
+			min-height: 80px;
 		}
 	}
 </style>

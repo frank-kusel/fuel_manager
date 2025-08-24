@@ -285,6 +285,7 @@
 		padding: 0.75rem 1rem;
 		text-align: left;
 		border-bottom: 1px solid var(--gray-100, #f3f4f6);
+		font-size: 0.95rem; /* Increased for mobile readability */
 	}
 
 	:global(.table th) {
@@ -328,7 +329,7 @@
 	.group-label {
 		font-weight: 500;
 		color: var(--gray-700, #374151);
-		font-size: 0.875rem;
+		font-size: 0.95rem; /* Increased for better visibility */
 		text-transform: capitalize;
 	}
 	
@@ -360,51 +361,39 @@
 		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
 	}
 
-	/* Vehicle Types - Subtle background colors for easy identification */
-	.vehicle-type-tractor {
-		--type-color: #16a34a;
-		--type-bg: #f0fdf4;
-		--type-hover: #dcfce7;
-	}
-	.vehicle-type-bakkie {
-		--type-color: #2563eb;
-		--type-bg: #eff6ff;
-		--type-hover: #dbeafe;
-	}
-	.vehicle-type-truck {
-		--type-color: #ea580c;
-		--type-bg: #fff7ed;
-		--type-hover: #fed7aa;
-	}
+	/* Vehicle Types - Updated color scheme */
 	.vehicle-type-loader {
-		--type-color: #7c3aed;
-		--type-bg: #f5f3ff;
-		--type-hover: #e0e7ff;
-	}
-	.vehicle-type-harvester {
-		--type-color: #ca8a04;
+		--type-color: #eab308; /* Yellow */
 		--type-bg: #fefce8;
 		--type-hover: #fef3c7;
 	}
-	.vehicle-type-sprayer {
-		--type-color: #059669;
-		--type-bg: #ecfdf5;
-		--type-hover: #d1fae5;
-	}
-	.vehicle-type-utility {
-		--type-color: #0891b2;
-		--type-bg: #f0f9ff;
-		--type-hover: #bae6fd;
-	}
-	.vehicle-type-excavator {
-		--type-color: #dc2626;
+	.vehicle-type-tractor {
+		--type-color: #dc2626; /* Red */
 		--type-bg: #fef2f2;
 		--type-hover: #fecaca;
 	}
-	.vehicle-type-other {
-		--type-color: #64748b;
+	.vehicle-type-truck {
+		--type-color: #2563eb; /* Blue */
+		--type-bg: #eff6ff;
+		--type-hover: #dbeafe;
+	}
+	.vehicle-type-utility {
+		--type-color: #64748b; /* Grey */
 		--type-bg: #f8fafc;
 		--type-hover: #f1f5f9;
+	}
+	.vehicle-type-excavator {
+		--type-color: #ea580c; /* Orange */
+		--type-bg: #fff7ed;
+		--type-hover: #fed7aa;
+	}
+	.vehicle-type-bakkie,
+	.vehicle-type-harvester,
+	.vehicle-type-sprayer,
+	.vehicle-type-other {
+		--type-color: #16a34a; /* Green for misc */
+		--type-bg: #f0fdf4;
+		--type-hover: #dcfce7;
 	}
 
 	.vehicle-type-indicator {
@@ -420,17 +409,18 @@
 	.vehicle-code {
 		font-weight: 600;
 		color: var(--type-color, var(--gray-700, #374151));
-		font-size: 0.875rem;
+		font-size: 0.95rem; /* Increased */
 	}
 	
 	.vehicle-name {
 		font-weight: 500;
 		color: var(--gray-900, #111827);
+		font-size: 0.95rem; /* Increased */
 	}
 	
 	.vehicle-reg {
 		font-family: ui-monospace, 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Liberation Mono', Menlo, monospace;
-		font-size: 0.8rem;
+		font-size: 0.9rem; /* Increased */
 		color: var(--gray-600, #475569);
 		font-weight: 500;
 	}
@@ -665,18 +655,18 @@
 
 		/* Mobile table column widths */
 		:global(#vehicle-table th:nth-child(1)),
-		:global(#vehicle-table td:nth-child(1)) {
-			width: 25%;
+		:global(#vehicle-table td:nth-child(1)) { /* Code - Narrower */
+			width: 18%;
 		}
 
 		:global(#vehicle-table th:nth-child(2)),
-		:global(#vehicle-table td:nth-child(2)) {
+		:global(#vehicle-table td:nth-child(2)) { /* Name */
 			width: 45%;
 		}
 
 		:global(#vehicle-table th:nth-child(3)),
-		:global(#vehicle-table td:nth-child(3)) {
-			width: 30%;
+		:global(#vehicle-table td:nth-child(3)) { /* Registration - Wider */
+			width: 37%;
 		}
 
 		:global(#vehicle-table .selected td:nth-child(1)) {

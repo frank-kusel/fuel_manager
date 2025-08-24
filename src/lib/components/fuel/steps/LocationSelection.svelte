@@ -52,16 +52,49 @@
 		}
 	});
 	
-	let filteredFields = $derived(fields.filter(field => {
-		if (!searchTerm) return true;
-		const search = searchTerm.toLowerCase();
-		return (
-			field.name.toLowerCase().includes(search) ||
-			field.code.toLowerCase().includes(search) ||
-			field.location?.toLowerCase().includes(search) ||
-			field.crop_type?.toLowerCase().includes(search)
-		);
-	}));
+	// Group fields by crop type
+	let groupedFields = $derived.by(() => {
+		const groups: Record<string, Field[]> = {};
+		
+		// Filter fields first
+		const filtered = fields.filter(field => {
+			if (!searchTerm) return true;
+			const search = searchTerm.toLowerCase();
+			return (
+				field.name.toLowerCase().includes(search) ||
+				field.code.toLowerCase().includes(search) ||
+				field.location?.toLowerCase().includes(search) ||
+				field.crop_type?.toLowerCase().includes(search)
+			);
+		});
+		
+		// Sort and group by crop type
+		const sorted = [...filtered].sort((a, b) => {
+			const cropA = a.crop_type || 'Other';
+			const cropB = b.crop_type || 'Other';
+			if (cropA < cropB) return -1;
+			if (cropA > cropB) return 1;
+			// If same crop, sort by name
+			const nameA = a.name || '';
+			const nameB = b.name || '';
+			if (nameA < nameB) return -1;
+			if (nameA > nameB) return 1;
+			return 0;
+		});
+		
+		// Group by crop type
+		sorted.forEach(field => {
+			const crop = field.crop_type || 'Other';
+			if (!groups[crop]) {
+				groups[crop] = [];
+			}
+			groups[crop].push(field);
+		});
+		
+		return groups;
+	});
+	
+	let filteredFieldsCount = $derived(Object.values(groupedFields).flat().length);
 	
 	let filteredZones = $derived(zones.filter(zone => {
 		if (!searchTerm) return true;
@@ -211,7 +244,7 @@
 			<small>{error}</small>
 		</div>
 	{:else if activeTab === 'fields'}
-		{#if filteredFields.length === 0}
+		{#if filteredFieldsCount === 0}
 			<div class="empty-state">
 				{searchTerm ? 'No fields found' : 'No fields available'}
 			</div>
@@ -221,22 +254,34 @@
 					<thead>
 						<tr>
 							<th>Name</th>
-							<th>Crop</th>
 							<th>Location</th>
 							<th>Area</th>
 						</tr>
 					</thead>
 					<tbody>
-						{#each filteredFields as field (field.id)}
-							<tr 
-								class="field-row clickable {selectedField?.id === field.id ? 'selected' : ''}"
-								onclick={() => selectField(field)}
-							>
-								<td class="field-name">{field.name}</td>
-								<td class="field-crop">{field.crop_type || 'Not set'}</td>
-								<td class="field-location">{field.location || 'Not set'}</td>
-								<td class="field-area">{formatArea(field.area)}</td>
+						{#each Object.entries(groupedFields) as [cropType, fieldList]}
+							<!-- Crop Type Group Header -->
+							<tr class="group-header">
+								<td colspan="3" class="group-title crop-type-{cropType.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')}">
+									<div class="group-content">
+										<span class="group-dot"></span>
+										<span class="group-label">{cropType}</span>
+										<span class="group-count">{fieldList.length}</span>
+									</div>
+								</td>
 							</tr>
+							
+							<!-- Fields in this crop group -->
+							{#each fieldList as field (field.id)}
+								<tr 
+									class="field-row clickable crop-type-{(field.crop_type || 'other').toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')} {selectedField?.id === field.id ? 'selected' : ''}"
+									onclick={() => selectField(field)}
+								>
+									<td class="field-name">{field.name}</td>
+									<td class="field-location">{field.location || 'Not set'}</td>
+									<td class="field-area">{formatArea(field.area)}</td>
+								</tr>
+							{/each}
 						{/each}
 					</tbody>
 				</table>
@@ -587,6 +632,54 @@
 	.table {
 		width: 100%;
 		border-collapse: collapse;
+		font-size: 0.95rem; /* Increased for mobile readability */
+	}
+
+	/* Group Headers for Fields */
+	.group-header {
+		background: transparent !important;
+	}
+	
+	.group-title {
+		padding: 0.75rem 1rem !important;
+		background: var(--gray-50, #f8fafc);
+		border-bottom: 1px solid var(--gray-200, #e5e7eb);
+	}
+	
+	.group-content {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	
+	.group-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--green-500, #10b981); /* Default green for crops */
+		flex-shrink: 0;
+	}
+	
+	.group-label {
+		font-weight: 500;
+		color: var(--gray-700, #374151);
+		font-size: 0.875rem;
+		text-transform: capitalize;
+	}
+	
+	.group-count {
+		color: var(--gray-500, #6b7280);
+		font-size: 0.75rem;
+		background: var(--gray-100, #f3f4f6);
+		padding: 0.125rem 0.375rem;
+		border-radius: 10px;
+		font-weight: 500;
+		margin-left: auto;
+	}
+
+	/* Field rows */
+	.field-row {
+		min-height: 48px; /* Touch-friendly height */
 	}
 
 	.table th {

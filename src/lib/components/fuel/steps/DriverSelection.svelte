@@ -111,7 +111,6 @@
 					<tr>
 						<th>Code</th>
 						<th>Name</th>
-						<th>Default Vehicle</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -124,16 +123,6 @@
 						>
 							<td class="driver-code">{driver.employee_code || 'DRV'}</td>
 							<td class="driver-name">{driver.name}</td>
-							<td class="driver-vehicle">
-								{#if driver.default_vehicle}
-									<div class="default-vehicle">
-										<span class="vehicle-code">{driver.default_vehicle.code}</span>
-										<span class="vehicle-name">{driver.default_vehicle.name}</span>
-									</div>
-								{:else}
-									<span class="no-default">-</span>
-								{/if}
-							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -522,8 +511,9 @@
 
 		:global(.table th),
 		:global(.table td) {
-			padding: 0.25rem 0.5rem !important;
+			padding: 0.75rem 1rem !important;
 			border-bottom: 1px solid var(--gray-100, #f1f5f9);
+			font-size: 0.95rem; /* Increased for mobile readability */
 		}
 
 		:global(.table th) {
@@ -539,8 +529,8 @@
 			cursor: pointer;
 		}
 
-		:global(.table .clickable:hover) {
-			background-color: var(--gray-100, #f1f5f9);
+		:global(.table .clickable) {
+			min-height: 56px; /* Touch-friendly */
 		}
 
 		:global(.table .selected) {
@@ -552,20 +542,15 @@
 		/* Mobile Driver Table Column Widths */
 		:global(#driver-table th:nth-child(1)),
 		:global(#driver-table td:nth-child(1)) { /* Code */
-			width: 15%;
+			width: 30%;
 			font-weight: 600;
 			color: var(--primary, #2563eb);
 		}
 
 		:global(#driver-table th:nth-child(2)),
 		:global(#driver-table td:nth-child(2)) { /* Name */
-			width: 55%;
+			width: 70%;
 			font-weight: 500;
-		}
-
-		:global(#driver-table th:nth-child(3)),
-		:global(#driver-table td:nth-child(3)) { /* Default Vehicle */
-			width: 30%;
 		}
 
 		.summary-content {
