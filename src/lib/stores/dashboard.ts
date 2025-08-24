@@ -106,7 +106,7 @@ function createDashboardStore() {
 						acc[date] = { date, recordCount: 0, totalFuel: 0 };
 					}
 					acc[date].recordCount++;
-					acc[date].totalFuel += entry.litres_used || 0;
+					acc[date].totalFuel += entry.litres_dispensed || 0;
 					return acc;
 				}, {});
 				

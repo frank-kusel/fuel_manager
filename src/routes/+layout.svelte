@@ -93,14 +93,6 @@
 			<span class="nav-icon">📊</span>
 			<span class="nav-label">Dashboard</span>
 		</a>
-		<a 
-			href="/fleet" 
-			class="mobile-nav-btn" 
-			class:active={pathname.startsWith('/fleet')}
-		>
-			<span class="nav-icon">🗄️</span>
-			<span class="nav-label">Database</span>
-		</a>
 	</nav>
 </div>
 

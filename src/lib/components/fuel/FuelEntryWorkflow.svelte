@@ -399,72 +399,38 @@
 				
 				<!-- Summary Table -->
 				<div class="summary">
-					<div class="summary-header">
-						<div class="summary-title">FUEL ENTRY SUMMARY</div>
-						<div class="summary-date">{new Date().toLocaleString()}</div>
-					</div>
-					
 					<div class="summary-body">
 						<table class="summary-table">
 							<tbody>
 								<!-- Vehicle -->
 								{#if $workflowData.vehicle}
-									<tr class="section-header"><td colspan="2">VEHICLE</td></tr>
-									<tr><td>Name</td><td>{$workflowData.vehicle.name || `${$workflowData.vehicle.make || ''} ${$workflowData.vehicle.model || ''}`.trim() || 'Unnamed'}</td></tr>
-									<tr><td>Code</td><td>{$workflowData.vehicle.code}</td></tr>
-									{#if $workflowData.vehicle.registration || $workflowData.vehicle.registration_number}
-										<tr><td>Registration</td><td>{$workflowData.vehicle.registration || $workflowData.vehicle.registration_number}</td></tr>
-									{/if}
+									<tr><td>Vehicle</td><td class="value">{$workflowData.vehicle.name || `${$workflowData.vehicle.make || ''} ${$workflowData.vehicle.model || ''}`.trim() || 'Unnamed'}</td></tr>
 								{/if}
 								
 								<!-- Driver -->
 								{#if $workflowData.driver}
-									<tr class="section-header"><td colspan="2">DRIVER</td></tr>
-									<tr><td>Name</td><td>{$workflowData.driver.name}</td></tr>
-									{#if $workflowData.driver.employee_code}
-										<tr><td>Code</td><td>#{$workflowData.driver.employee_code}</td></tr>
-									{/if}
+									<tr><td>Driver</td><td class="value">{$workflowData.driver.name}</td></tr>
 								{/if}
 								
 								<!-- Activity -->
 								{#if $workflowData.activity}
-									<tr class="section-header"><td colspan="2">ACTIVITY</td></tr>
-									<tr><td>Activity</td><td>{$workflowData.activity.name}</td></tr>
-									<tr><td>Code</td><td>{$workflowData.activity.code}</td></tr>
+									<tr><td>Activity</td><td class="value">{$workflowData.activity.name}</td></tr>
 								{/if}
 								
-								<!-- Location (Field or Zone - Optional) -->
+								<!-- Field -->
 								{#if $workflowData.field}
-									<tr class="section-header"><td colspan="2">LOCATION</td></tr>
-									<tr><td>Field</td><td>{$workflowData.field.code} - {$workflowData.field.name}</td></tr>
-									{#if $workflowData.field.crop_type}<tr><td>Crop</td><td>{$workflowData.field.crop_type}</td></tr>{/if}
-								{:else if $workflowData.zone}
-									<tr class="section-header"><td colspan="2">LOCATION</td></tr>
-									<tr><td>Zone</td><td>{$workflowData.zone.code} - {$workflowData.zone.name}</td></tr>
-									{#if $workflowData.zone.description}<tr><td>Description</td><td>{$workflowData.zone.description}</td></tr>{/if}
+									<tr><td>Field</td><td class="value">{$workflowData.field.name}</td></tr>
 								{/if}
 								
 								<!-- Odometer -->
 								{#if $workflowData.gaugeWorking && $workflowData.odometerStart !== null && $workflowData.odometerEnd !== null}
-									<tr class="section-header"><td colspan="2">ODOMETER</td></tr>
-									<tr><td>Start</td><td>{new Intl.NumberFormat().format($workflowData.odometerStart)} {$workflowData.vehicle?.odometer_unit || 'km/hr'}</td></tr>
-									<tr><td>End</td><td>{new Intl.NumberFormat().format($workflowData.odometerEnd)} {$workflowData.vehicle?.odometer_unit || 'km/hr'}</td></tr>
-									<tr class="highlight"><td>Distance or time</td><td>{new Intl.NumberFormat().format($workflowData.odometerEnd - $workflowData.odometerStart)} {$workflowData.vehicle?.odometer_unit || 'km/hr'}</td></tr>
-								{:else if !$workflowData.gaugeWorking}
-									<tr class="section-header"><td colspan="2">ODOMETER</td></tr>
-									<tr><td>Status</td><td class="warning">Gauge broken</td></tr>
+									<tr><td>ODO Start</td><td class="value">{new Intl.NumberFormat().format($workflowData.odometerStart)}</td></tr>
+									<tr><td><strong>ODO End</strong></td><td class="value"><strong>{new Intl.NumberFormat().format($workflowData.odometerEnd)}</strong></td></tr>
 								{/if}
 								
 								<!-- Fuel -->
 								{#if $workflowData.bowser && $workflowData.litresDispensed}
-									<tr class="section-header"><td colspan="2">FUEL</td></tr>
-									<tr><td>Bowser</td><td>{$workflowData.bowser.name}</td></tr>
-									<tr><td>Type</td><td>{$workflowData.bowser.fuel_type.charAt(0).toUpperCase() + $workflowData.bowser.fuel_type.slice(1)}</td></tr>
-									{#if $workflowData.bowserReadingStart !== null && $workflowData.bowserReadingEnd !== null}
-										<tr><td>Start reading</td><td>{new Intl.NumberFormat().format($workflowData.bowserReadingStart)}L</td></tr>
-										<tr><td>End reading</td><td>{new Intl.NumberFormat().format($workflowData.bowserReadingEnd)}L</td></tr>
-									{/if}
-									<tr class="total"><td><strong>LITRES DISPENSED</strong></td><td><strong>{new Intl.NumberFormat().format($workflowData.litresDispensed)}L</strong></td></tr>
+									<tr class="fuel-row"><td><strong>Fuel</strong></td><td class="value"><strong>{new Intl.NumberFormat().format($workflowData.litresDispensed)}L</strong></td></tr>
 								{/if}
 							</tbody>
 						</table>
@@ -636,28 +602,11 @@
 	/* Simple Table Summary */
 	.summary {
 		background: white;
-		border: 1px solid #e2e8f0;
-		border-radius: 0.5rem;
-		max-width: 400px;
-		margin: 0 auto;
-	}
-
-	.summary-header {
-		padding: 1rem;
-		text-align: center;
-		border-bottom: 1px solid #e2e8f0;
-	}
-
-	.summary-title {
-		font-size: 1rem;
-		font-weight: bold;
-		margin-bottom: 0.5rem;
-		letter-spacing: 0.05em;
-	}
-
-	.summary-date {
-		font-size: 0.75rem;
-		color: #666;
+		border: 1px solid #e5e7eb;
+		border-radius: 0.75rem;
+		width: 100%;
+		margin: 0 auto 1rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 	}
 
 	.summary-body {
@@ -667,26 +616,31 @@
 	.summary-table {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 0.8rem;
+		font-size: 1.1rem;
 	}
 
 	.summary-table td {
-		padding: 0.25rem 0.75rem;
+		padding: 1rem 1.25rem;
 		border: none;
-		vertical-align: top;
+		vertical-align: middle;
+		border-bottom: 1px solid #f3f4f6;
 	}
 
 	.summary-table td:first-child {
 		width: 40%;
-		font-weight: normal;
-		color: #666;
+		font-weight: 500;
+		color: #6b7280;
+		font-size: 1rem;
 	}
 
-	.summary-table td:last-child {
+	.summary-table .value {
 		width: 60%;
-		font-weight: bold;
+		font-weight: 600;
 		text-align: right;
+		color: #1f2937;
+		font-size: 1.1rem;
 	}
+
 
 	.section-header td {
 		padding: 0.5rem 0.75rem 0.25rem !important;
@@ -702,20 +656,14 @@
 		border-top: none;
 	}
 
-	.summary-table tr.highlight td {
-		background: #f3f4f6;
-		font-weight: bold;
+	.summary-table tr.fuel-row {
+		border-top: 2px solid #e5e7eb;
 	}
 
-	.summary-table tr.total {
-		border-top: 1px solid #000;
-		border-bottom: 1px solid #000;
-	}
-
-	.summary-table tr.total td {
-		padding: 0.5rem 0.75rem;
-		font-size: 0.9rem;
-		font-weight: bold;
+	.summary-table tr.fuel-row td {
+		padding: 1.25rem;
+		background: #f9fafb;
+		border-bottom: none;
 	}
 
 	.warning {
@@ -1066,10 +1014,11 @@
 
 		/* Mobile adjustments */
 		.summary {
-			max-width: 100%;
-			margin: 0;
-			border-left: none;
-			border-right: none;
+			width: 100%;
+			margin: 0 auto 1rem;
+			border-radius: 0.75rem;
+			box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+			border: 1px solid #e5e7eb;
 		}
 
 		.notes-section {
@@ -1081,11 +1030,19 @@
 		}
 
 		.summary-table {
-			font-size: 0.75rem;
+			font-size: 1.05rem;
 		}
 
 		.summary-table td {
-			padding: 0.2rem 0.5rem;
+			padding: 0.875rem 1rem;
+		}
+
+		.summary-table td:first-child {
+			font-size: 0.95rem;
+		}
+
+		.summary-table .value {
+			font-size: 1.05rem;
 		}
 
 		.notes-textarea {

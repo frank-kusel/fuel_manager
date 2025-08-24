@@ -2,7 +2,6 @@
 	import { onMount, onDestroy } from 'svelte';
 	import DashboardStats from '$lib/components/dashboard/DashboardStats.svelte';
 	import RecentActivity from '$lib/components/dashboard/RecentActivity.svelte';
-	import TankMonitoring from '$lib/components/dashboard/TankMonitoring.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import dashboardStore, { 
 		dashboardStats, 
@@ -43,12 +42,6 @@
 	<div class="dashboard-header">
 		<div class="header-content">
 			<h1>Dashboard</h1>
-			<p class="dashboard-subtitle">Farm operations overview and analytics</p>
-		</div>
-		<div class="header-actions">
-			<Button variant="outline" onclick={handleRefresh} disabled={$dashboardLoading === 'loading'}>
-				{$dashboardLoading === 'loading' ? 'Refreshing...' : 'Refresh'}
-			</Button>
 		</div>
 	</div>
 
@@ -74,7 +67,7 @@
 	/>
 
 	<!-- Main Dashboard Content -->
-	<div class="dashboard-grid">
+	<div class="dashboard-content">
 		<!-- Recent Activity Feed -->
 		<div class="dashboard-section activity-section">
 			<RecentActivity 
@@ -82,38 +75,8 @@
 				loading={$dashboardLoading === 'loading'} 
 			/>
 		</div>
-
-		<!-- Tank Level Monitoring -->
-		<div class="dashboard-section tanks-section">
-			<TankMonitoring 
-				bowsers={$dashboardStats?.bowserLevels || []} 
-				loading={$dashboardLoading === 'loading'} 
-			/>
-		</div>
 	</div>
 
-	<!-- Quick Actions -->
-	<div class="quick-actions">
-		<h3>Quick Actions</h3>
-		<div class="actions-grid">
-			<Button href="/fuel" variant="primary" class="action-button">
-				<span class="action-icon">⛽</span>
-				Add Fuel Entry
-			</Button>
-			<Button href="/fleet/vehicles" variant="outline" class="action-button">
-				<span class="action-icon">🚜</span>
-				Manage Vehicles
-			</Button>
-			<Button href="/fleet/drivers" variant="outline" class="action-button">
-				<span class="action-icon">👤</span>
-				Manage Drivers
-			</Button>
-			<Button href="/fleet/bowsers" variant="outline" class="action-button">
-				<span class="action-icon">🪣</span>
-				Tank Management
-			</Button>
-		</div>
-	</div>
 </div>
 
 <style>
@@ -121,7 +84,7 @@
 		width: 100%;
 		max-width: 1400px;
 		margin: 0 auto;
-		padding: 0.5rem;
+		padding: 0;
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
@@ -190,11 +153,8 @@
 		font-size: 0.875rem;
 	}
 
-	/* Dashboard Grid */
-	.dashboard-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
+	/* Dashboard Content */
+	.dashboard-content {
 		margin-bottom: 1rem;
 	}
 
@@ -202,51 +162,8 @@
 		min-height: 400px;
 	}
 
-	/* Quick Actions */
-	.quick-actions {
-		background: var(--color-background);
-		border: 1px solid var(--color-border);
-		border-radius: 12px;
-		padding: 1.5rem;
-	}
-
-	.quick-actions h3 {
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: var(--color-text-primary);
-		margin: 0 0 1rem 0;
-	}
-
-	.actions-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 1rem;
-	}
-
-	:global(.action-button) {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		text-decoration: none !important;
-	}
-
-	:global(.action-button:hover) {
-		transform: translateY(-1px);
-	}
-
-	.action-icon {
-		font-size: 1.125rem;
-	}
 
 	/* Mobile Responsiveness */
-	@media (max-width: 640px) {
-		.dashboard-grid {
-			grid-template-columns: 1fr;
-			gap: 1rem;
-		}
-	}
 
 	@media (max-width: 768px) {
 		.dashboard-page {
@@ -257,7 +174,7 @@
 		.dashboard-header {
 			flex-direction: column;
 			gap: 0.75rem;
-			padding: 0 0.5rem;
+			padding: 0.5rem;
 		}
 
 		.header-actions {
@@ -273,19 +190,10 @@
 			font-size: 0.9rem;
 		}
 
-		.dashboard-grid {
-			padding: 0 0.5rem;
+		.dashboard-content {
+			padding: 0;
 		}
 
-		.actions-grid {
-			grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-			gap: 0.5rem;
-		}
-
-		:global(.action-button) {
-			padding: 0.5rem 0.75rem;
-			font-size: 0.875rem;
-		}
 
 		.error-content {
 			flex-direction: column;
@@ -294,9 +202,4 @@
 		}
 	}
 
-	@media (max-width: 480px) {
-		.actions-grid {
-			grid-template-columns: 1fr;
-		}
-	}
 </style>

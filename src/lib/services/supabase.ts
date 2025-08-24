@@ -203,11 +203,11 @@ class SupabaseService {
 			.from('fuel_entries')
 			.select(`
 				*,
-				vehicles (code, name, registration),
-				drivers (employee_code, name),
-				activities (code, name),
-				fields (code, name),
-				bowsers (name)
+				vehicles!left (code, name, registration),
+				drivers!left (employee_code, name),
+				activities!left (code, name),
+				fields!left (code, name),
+				bowsers!left (name)
 			`)
 			.order('entry_date', { ascending: false });
 
@@ -366,7 +366,12 @@ class SupabaseService {
 		return this.query(async () => {
 			const today = new Date().toISOString().split('T')[0];
 			const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-			const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+			
+			// Calculate week start (Monday)
+			const now = new Date();
+			const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+			const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days to Monday
+			const weekStart = new Date(now.getTime() - daysToSubtract * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 			
 			// Get fuel entries for different periods
 			const [dailyFuel, weeklyFuel, monthlyFuel, recentEntries, bowsers, vehicles] = await Promise.all([
@@ -388,14 +393,14 @@ class SupabaseService {
 					.select('litres_used, litres_dispensed, odometer_start, odometer_end, vehicle_id, fuel_consumption_l_per_100km, gauge_working')
 					.gte('entry_date', monthStart),
 				
-				// Recent fuel entries with vehicle info
+				// Recent fuel entries with vehicle info - using LEFT JOINs to include entries with missing relationships
 				client
 					.from('fuel_entries')
 					.select(`
 						*,
-						vehicles(code, name, type),
-						drivers(employee_code, name),
-						activities(name, category)
+						vehicles!left(code, name, type),
+						drivers!left(employee_code, name),
+						activities!left(name, category)
 					`)
 					.order('entry_date', { ascending: false })
 					.order('time', { ascending: false })
@@ -415,9 +420,9 @@ class SupabaseService {
 			]);
 
 			// Calculate totals
-			const dailyUsage = dailyFuel.data?.reduce((sum, entry) => sum + (entry.litres_used || 0), 0) || 0;
-			const weeklyUsage = weeklyFuel.data?.reduce((sum, entry) => sum + (entry.litres_used || 0), 0) || 0;
-			const monthlyUsage = monthlyFuel.data?.reduce((sum, entry) => sum + (entry.litres_used || 0), 0) || 0;
+			const dailyUsage = dailyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+			const weeklyUsage = weeklyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+			const monthlyUsage = monthlyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
 			
 			// Calculate distance traveled this month (only valid entries)
 			const monthlyDistance = monthlyFuel.data?.reduce((sum, entry) => {
@@ -508,8 +513,8 @@ class SupabaseService {
 				.from('fuel_entries')
 				.select(`
 					*,
-					vehicles(code, name, type, fuel_type),
-					activities(name, category)
+					vehicles!left(code, name, type, fuel_type),
+					activities!left(name, category)
 				`)
 				.gte('entry_date', startDate)
 				.order('entry_date', { ascending: true });

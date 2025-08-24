@@ -28,12 +28,13 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	
-	// Group vehicles by type for better organization
+	// Group vehicles by type for better organization (active vehicles only)
 	let groupedVehicles = $derived.by(() => {
 		const groups: Record<string, Vehicle[]> = {};
 		
-		// Sort vehicles first
-		const sorted = [...vehicles].sort((a, b) => {
+		// Filter for active vehicles only, then sort
+		const activeVehicles = vehicles.filter(v => v.is_active !== false);
+		const sorted = [...activeVehicles].sort((a, b) => {
 			const typeA = a.type || 'Other';
 			const typeB = b.type || 'Other';
 			if (typeA < typeB) return -1;
@@ -420,9 +421,9 @@
 	
 	.vehicle-reg {
 		font-family: ui-monospace, 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Liberation Mono', Menlo, monospace;
-		font-size: 0.9rem; /* Increased */
-		color: var(--gray-600, #475569);
-		font-weight: 500;
+		font-size: 0.8rem; /* More subtle */
+		color: var(--gray-500, #6b7280); /* More subtle color */
+		font-weight: 400; /* Lighter weight */
 	}
 
 	/* Selection Summary */

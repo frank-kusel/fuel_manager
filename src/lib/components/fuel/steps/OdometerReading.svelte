@@ -53,7 +53,7 @@
 		<!-- Current ODO Display -->
 		<div class="odo-card current-odo">
 			<div class="odo-value">{currentOdo || 'No reading'}</div>
-			<div class="odo-label">Current ODO ({selectedVehicle?.odometer_unit || 'km/hr'})</div>
+			<div class="odo-label">Current</div>
 		</div>
 		
 		{#if !isBrokenGauge}
@@ -64,11 +64,11 @@
 					inputmode="numeric" 
 					pattern="[0-9]*" 
 					bind:value={newOdo}
-					placeholder="Enter reading"
+					placeholder="_"
 					class="new-odo-input"
 					autocomplete="off"
 				/>
-				<div class="odo-label">New ODO reading ({selectedVehicle?.odometer_unit || 'km/hr'})</div>
+				<div class="odo-label">New</div>
 			</div>
 			
 			<!-- Distance Display -->

@@ -27,17 +27,16 @@
 	let selectedDate = $state(new Date().toISOString().split('T')[0]);
 	let autoRefresh = $state(true);
 	let refreshInterval: number | null = null;
+	let isPulling = $state(false);
+	let pullDistance = $state(0);
+	let startY = 0;
+	let pullThreshold = 60;
 	
 	onMount(() => {
 		if (browser) {
 			loadEntries();
 			
-			// Auto-refresh every 15 seconds
-			if (autoRefresh) {
-				refreshInterval = setInterval(() => {
-					loadEntries();
-				}, 15000);
-			}
+			// Removed auto-refresh - user will manually refresh or pull-to-refresh
 		}
 		
 		return () => {
@@ -46,22 +45,72 @@
 			}
 		};
 	});
+
+	// Pull-to-refresh functionality
+	function handleTouchStart(e: TouchEvent) {
+		if (window.scrollY === 0) {
+			startY = e.touches[0].clientY;
+			isPulling = true;
+		}
+	}
+
+	function handleTouchMove(e: TouchEvent) {
+		if (!isPulling || loading) return;
+		
+		const currentY = e.touches[0].clientY;
+		const distance = currentY - startY;
+		
+		if (distance > 0 && window.scrollY === 0) {
+			e.preventDefault();
+			pullDistance = Math.min(distance * 0.5, pullThreshold + 20);
+		}
+	}
+
+	async function handleTouchEnd() {
+		if (!isPulling) return;
+		
+		if (pullDistance >= pullThreshold) {
+			await loadEntries();
+		}
+		
+		isPulling = false;
+		pullDistance = 0;
+		startY = 0;
+	}
 	
 	async function loadEntries() {
 		try {
 			loading = true;
 			await supabaseService.init();
 			
-			// Use direct client access like before but with proper error handling
+			// First get all entries to see what we have - using LEFT JOINs to include entries with missing relationships
+			const { data: allData, error: allError } = await supabaseService['client']
+				.from('fuel_entries')
+				.select(`
+					*,
+					vehicles!left(code, name),
+					drivers!left(employee_code, name),
+					activities!left(name),
+					fields!left(code, name),
+					zones!left(code, name)
+				`)
+				.order('entry_date', { ascending: false })
+				.order('time', { ascending: false });
+			
+			console.log('=== ALL FUEL ENTRIES ===');
+			console.log('Total entries in database:', allData?.length || 0);
+			console.log('All entries:', allData);
+			
+			// Now filter for selected date - using LEFT JOINs to include entries with missing relationships
 			const { data, error: fetchError } = await supabaseService['client']
 				.from('fuel_entries')
 				.select(`
 					*,
-					vehicles!inner(code, name),
-					drivers!inner(employee_code, name),
-					activities!inner(name),
-					fields(code, name),
-					zones(code, name)
+					vehicles!left(code, name),
+					drivers!left(employee_code, name),
+					activities!left(name),
+					fields!left(code, name),
+					zones!left(code, name)
 				`)
 				.eq('entry_date', selectedDate)
 				.order('time', { ascending: false });
@@ -69,7 +118,26 @@
 			if (fetchError) throw fetchError;
 			
 			entries = data || [];
-			console.log('Loaded entries:', $state.snapshot(entries));
+			console.log('=== FILTERED ENTRIES FOR', selectedDate, '===');
+			console.log('Filtered entries count:', entries.length);
+			console.log('Filtered entries:', entries);
+			
+			// Check for missing data
+			entries.forEach((entry, index) => {
+				console.log(`Entry ${index + 1}:`, {
+					id: entry.id,
+					date: entry.entry_date,
+					time: entry.time,
+					vehicle: entry.vehicles,
+					driver: entry.drivers,
+					activity: entry.activities,
+					field: entry.fields,
+					fuel: entry.litres_dispensed,
+					missingVehicle: !entry.vehicles,
+					missingDriver: !entry.drivers,
+					missingActivity: !entry.activities
+				});
+			});
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load entries';
 		} finally {
@@ -100,6 +168,16 @@
 	function formatBowserReading(start: number | null, end: number | null): string {
 		if (start === null || end === null) return '-';
 		return `${start} → ${end}`;
+	}
+
+	function formatOdometerValue(value: number | null, gaugeWorking: boolean): string {
+		if (value === null || value === undefined) return '-';
+		if (gaugeWorking === false) return 'Broken';
+		// Format number with spaces between thousands
+		return value.toLocaleString('en-US', { 
+			minimumFractionDigits: 1, 
+			maximumFractionDigits: 1 
+		}).replace(/,/g, ' ');
 	}
 	
 	function exportToCSV() {
@@ -143,24 +221,30 @@
 		return grouped;
 	});
 	
-	function toggleAutoRefresh() {
-		autoRefresh = !autoRefresh;
-		if (autoRefresh) {
-			refreshInterval = setInterval(() => {
-				loadEntries();
-			}, 15000);
-		} else if (refreshInterval) {
-			clearInterval(refreshInterval);
-			refreshInterval = null;
-		}
-	}
 </script>
 
 <svelte:head>
 	<title>Fuel Summary - {selectedDate}</title>
 </svelte:head>
 
-<div class="fuel-summary">
+<div class="fuel-summary" 
+	ontouchstart={handleTouchStart} 
+	ontouchmove={handleTouchMove} 
+	ontouchend={handleTouchEnd}
+>
+	<!-- Pull-to-refresh indicator -->
+	{#if isPulling}
+		<div class="pull-indicator" style="transform: translateY({pullDistance - 40}px)">
+			<div class="pull-icon" style="opacity: {Math.min(pullDistance / pullThreshold, 1)}">
+				{#if pullDistance >= pullThreshold}
+					<span class="refresh-ready">↻</span>
+				{:else}
+					<span class="pull-arrow">↓</span>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
 	<div class="header">
 		<h1>Fuel Entry Summary</h1>
 		<p class="subtitle">For manual book transcription</p>
@@ -177,10 +261,7 @@
 			/>
 		</div>
 		
-		<div class="action-buttons">
-			<Button size="sm" variant="outline" onclick={toggleAutoRefresh}>
-				{autoRefresh ? '⏸️ Pause' : '▶️ Auto-refresh'}
-			</Button>
+		<div class="action-buttons desktop-only">
 			<Button size="sm" variant="outline" onclick={loadEntries}>
 				🔄 Refresh
 			</Button>
@@ -206,20 +287,6 @@
 			<p>No fuel entries for {selectedDate}</p>
 		</div>
 	{:else}
-		<div class="summary-stats">
-			<div class="stat">
-				<span class="stat-label">Total Entries:</span>
-				<span class="stat-value">{entries.length}</span>
-			</div>
-			<div class="stat">
-				<span class="stat-label">Total Fuel:</span>
-				<span class="stat-value">{entries.reduce((sum, e) => sum + e.litres_dispensed, 0).toFixed(1)} L</span>
-			</div>
-			<div class="stat">
-				<span class="stat-label">Vehicles:</span>
-				<span class="stat-value">{Object.keys(groupedEntries()).length}</span>
-			</div>
-		</div>
 		
 		<!-- Desktop Table View -->
 		<div class="table-container desktop-only">
@@ -259,55 +326,84 @@
 			</table>
 		</div>
 		
-		<!-- Mobile Card View (Grouped by Vehicle) -->
-		<div class="mobile-cards mobile-only">
-			{#each Object.entries(groupedEntries()) as [vehicle, vehicleEntries]}
-				<div class="vehicle-group">
-					<h3 class="vehicle-header">{vehicle}</h3>
-					{#each vehicleEntries as entry}
-						<div class="entry-card">
-							<div class="entry-row">
-								<span class="label">Time:</span>
-								<span class="value">{entry.time}</span>
-							</div>
-							<div class="entry-row">
-								<span class="label">Driver:</span>
-								<span class="value">{entry.drivers?.employee_code || 'N/A'} - {entry.drivers?.name || 'N/A'}</span>
-							</div>
-							<div class="entry-row">
-								<span class="label">Activity:</span>
-								<span class="value">{entry.activities?.name || 'N/A'}</span>
-							</div>
-							<div class="entry-row">
-								<span class="label">Location:</span>
-								<span class="value">{getLocation(entry)}</span>
-							</div>
-							<div class="entry-row highlight">
-								<span class="label">Fuel:</span>
-								<span class="value">{entry.litres_dispensed.toFixed(1)} L</span>
-							</div>
-							<div class="entry-row">
-								<span class="label">Odometer:</span>
-								<span class="value">{formatOdometer(entry.odometer_start, entry.odometer_end, entry.gauge_working)}</span>
-							</div>
-							<div class="entry-row">
-								<span class="label">Bowser:</span>
-								<span class="value">{formatBowserReading(entry.bowser_reading_start, entry.bowser_reading_end)}</span>
-							</div>
-						</div>
+		<!-- Mobile Simple Table View (Simplified for logbook transcription) -->
+		<div class="simple-table-container mobile-only">
+			<table class="simple-summary-table">
+				<tbody>
+					{#each entries as entry}
+						<!-- Vehicle and Fuel Row -->
+						<tr class="vehicle-row">
+							<td class="vehicle-code">{entry.vehicles?.code || 'N/A'}</td>
+							<td class="vehicle-name">{entry.vehicles?.name || 'N/A'}</td>
+							<td class="fuel-amount">{entry.litres_dispensed.toFixed(1)}L</td>
+						</tr>
+						<!-- Odometer Start Row -->
+						<tr class="odo-row">
+							<td class="odo-label">Start</td>
+							<td class="odo-value" colspan="2">
+								{formatOdometerValue(entry.odometer_start, entry.gauge_working)}
+							</td>
+						</tr>
+						<!-- Odometer End Row -->
+						<tr class="odo-row">
+							<td class="odo-label">End</td>
+							<td class="odo-value" colspan="2">
+								{formatOdometerValue(entry.odometer_end, entry.gauge_working)}
+							</td>
+						</tr>
+						<tr class="spacer-row">
+							<td colspan="3"></td>
+						</tr>
 					{/each}
-				</div>
-			{/each}
+				</tbody>
+			</table>
 		</div>
 	{/if}
 </div>
 
 <style>
+	/* Pull-to-refresh styles */
+	.pull-indicator {
+		position: absolute;
+		top: -40px;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 50;
+		transition: opacity 0.2s ease;
+	}
+
+	.pull-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		background: rgba(0, 0, 0, 0.1);
+		border-radius: 50%;
+		backdrop-filter: blur(10px);
+	}
+
+	.pull-arrow,
+	.refresh-ready {
+		font-size: 1.25rem;
+		color: #059669;
+		font-weight: bold;
+	}
+
+	.refresh-ready {
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+
 	.fuel-summary {
+		position: relative;
 		max-width: 1400px;
 		margin: 0 auto;
-		padding: 1rem;
-		background: white;
+		padding: 0;
 		min-height: 100vh;
 	}
 	
@@ -364,35 +460,6 @@
 		flex-wrap: wrap;
 	}
 	
-	.summary-stats {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 1rem;
-		margin-bottom: 1.5rem;
-		padding: 1rem;
-		background: #f8fafc;
-		border-radius: 8px;
-	}
-	
-	.stat {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		text-align: center;
-	}
-	
-	.stat-label {
-		font-size: 0.75rem;
-		color: #64748b;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-	
-	.stat-value {
-		font-size: 1.5rem;
-		font-weight: 700;
-		color: #0f172a;
-	}
 	
 	/* Desktop Table */
 	.table-container {
@@ -453,60 +520,82 @@
 		font-size: 0.8125rem;
 	}
 	
-	/* Mobile Cards */
-	.mobile-cards {
-		display: none;
-	}
-	
-	.vehicle-group {
-		margin-bottom: 1.5rem;
+	/* Mobile Simple Table */
+	.simple-table-container {
 		border: 1px solid #e5e7eb;
 		border-radius: 8px;
 		overflow: hidden;
+		background: white;
 	}
-	
-	.vehicle-header {
-		background: #f1f5f9;
-		padding: 0.75rem 1rem;
-		margin: 0;
-		font-size: 1rem;
-		font-weight: 600;
-		color: #0f172a;
-		border-bottom: 2px solid #e2e8f0;
-	}
-	
-	.entry-card {
-		padding: 1rem;
-		border-bottom: 1px solid #f1f5f9;
-	}
-	
-	.entry-card:last-child {
-		border-bottom: none;
-	}
-	
-	.entry-row {
-		display: flex;
-		justify-content: space-between;
-		padding: 0.25rem 0;
+
+	.simple-summary-table {
+		width: 100%;
+		border-collapse: collapse;
 		font-size: 0.875rem;
 	}
-	
-	.entry-row.highlight {
-		background: #f0fdf4;
-		padding: 0.5rem;
-		margin: 0.25rem -0.5rem;
-		border-radius: 4px;
+
+	.vehicle-row {
+		background: #f8fafc;
+		border-bottom: 1px solid #e2e8f0;
 	}
-	
-	.entry-row .label {
-		color: #64748b;
+
+	.vehicle-row td {
+		padding: 0.75rem;
+		font-weight: 600;
+		border-right: 1px solid #e5e7eb;
 	}
-	
-	.entry-row .value {
-		font-weight: 500;
+
+	.vehicle-row td:last-child {
+		border-right: none;
+	}
+
+	.vehicle-code {
+		color: #2563eb;
+		font-size: 1rem;
+		width: 25%;
+	}
+
+	.vehicle-name {
 		color: #0f172a;
-		text-align: right;
+		font-size: 1rem;
+		width: 50%;
 	}
+
+	.fuel-amount {
+		color: #059669;
+		font-size: 1rem;
+		text-align: right;
+		width: 25%;
+	}
+
+	.odo-row td {
+		padding: 0.5rem 0.75rem;
+		border-right: 1px solid #f1f5f9;
+	}
+
+	.odo-row td:last-child {
+		border-right: none;
+	}
+
+	.odo-label {
+		color: #64748b;
+		font-weight: 600;
+		font-size: 1rem;
+		width: 25%;
+	}
+
+	.odo-value {
+		color: #374151;
+		font-family: monospace;
+		font-size: 1rem;
+		font-weight: 600;
+	}
+
+	.spacer-row td {
+		padding: 0.5rem;
+		border-bottom: 2px solid #e5e7eb;
+	}
+	
 	
 	/* Loading, Error, Empty states */
 	.loading,
@@ -542,7 +631,7 @@
 	
 	@media (max-width: 768px) {
 		.fuel-summary {
-			padding: 0.5rem;
+			padding: 0;
 		}
 		
 		.controls {
@@ -562,7 +651,7 @@
 			display: block;
 		}
 		
-		.mobile-cards {
+		.simple-table-container {
 			display: block;
 		}
 	}
@@ -590,7 +679,7 @@
 			padding: 0.5rem;
 		}
 		
-		.vehicle-group {
+		.simple-table-container {
 			page-break-inside: avoid;
 		}
 		

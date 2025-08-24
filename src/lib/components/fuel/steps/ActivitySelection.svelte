@@ -154,39 +154,49 @@
 	{:else if filteredActivitiesCount === 0}
 		<div class="empty-state">No activities found</div>
 	{:else}
-		<div class="activities-container">
-			{#each Object.entries(groupedActivities) as [category, activityList]}
-				<!-- Category Group Header -->
-				<div class="category-header">
-					<div class="category-title">
-						<span class="category-dot"></span>
-						<span class="category-label">{category}</span>
-						<span class="category-count">{activityList.length}</span>
-					</div>
-				</div>
-				
-				<!-- Activities in this category -->
-				<div class="activity-grid">
-					{#each activityList as activity (activity.id)}
-						<button 
-							class="activity-btn category-{(activity.category || 'other').toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')} {selectedActivity?.id === activity.id ? 'selected' : ''}"
-							onclick={() => {
-														handleActivitySelect(activity);
-							}}
-						>
-							<div class="activity-icon" style="color: {getActivityColor(activity.name)}">
-								{getActivityIcon(activity)}
-							</div>
-							<div class="activity-content">
-								<div class="activity-name">{activity.name}</div>
-								{#if activity.name_zulu}
-									<div class="activity-name-zulu">{activity.name_zulu}</div>
-								{/if}
-							</div>
-						</button>
+		<div class="table-container">
+			<table class="table" id="activity-table">
+				<thead>
+					<tr>
+						<th>Activity</th>
+						<th>Name (Zulu)</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each Object.entries(groupedActivities) as [category, activityList]}
+						<!-- Category Group Header -->
+						<tr class="group-header">
+							<td colspan="2" class="group-title category-{category.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')}">
+								<div class="group-content">
+									<span class="group-dot"></span>
+									<span class="group-label">{category}</span>
+									<span class="group-count">{activityList.length}</span>
+								</div>
+							</td>
+						</tr>
+						
+						<!-- Activities in this category -->
+						{#each activityList as activity (activity.id)}
+							<tr 
+								class="activity-row clickable category-{(activity.category || 'other').toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')} {selectedActivity?.id === activity.id ? 'selected' : ''}"
+								onclick={() => {
+									handleActivitySelect(activity);
+								}}
+							>
+								<td class="activity-name-cell">
+									<div class="activity-content">
+										<span class="activity-icon" style="color: {getActivityColor(activity.name)}">
+											{getActivityIcon(activity)}
+										</span>
+										<span class="activity-name">{activity.name}</span>
+									</div>
+								</td>
+								<td class="activity-zulu">{activity.name_zulu || ''}</td>
+							</tr>
+						{/each}
 					{/each}
-				</div>
-			{/each}
+				</tbody>
+			</table>
 		</div>
 	{/if}
 	
@@ -230,37 +240,77 @@
 		gap: 1rem; /* More compact overall spacing */
 	}
 
-	/* Category Headers */
-	.category-header {
-		margin-bottom: 1rem;
+	/* Table Container */
+	.table-container {
+		background: var(--white, #ffffff);
+		border: 1px solid var(--gray-200, #e2e8f0);
+		border-radius: 12px;
+		overflow: hidden;
+		margin: 0;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+	}
+
+	/* Table Styling */
+	:global(.table) {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.875rem;
+	}
+
+	:global(.table th),
+	:global(.table td) {
+		padding: 0.75rem 1rem;
+		text-align: left;
+		border-bottom: 1px solid var(--gray-100, #f3f4f6);
+		font-size: 0.95rem;
+	}
+
+	:global(.table th) {
+		background: var(--gray-50, #f8fafc);
+		font-weight: 500;
+		color: var(--gray-600, #475569);
+		font-size: 0.8rem;
+		letter-spacing: 0.02em;
+		border-bottom: 1px solid var(--gray-200, #e5e7eb);
+	}
+
+	:global(.table tbody tr.clickable) {
+		cursor: pointer;
+	}
+
+	/* Group Headers */
+	.group-header {
+		background: transparent !important;
 	}
 	
-	.category-title {
+	.group-title {
+		padding: 0.75rem 1rem !important;
+		background: var(--gray-50, #f8fafc);
+		border-bottom: 1px solid var(--gray-200, #e5e7eb);
+	}
+	
+	.group-content {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		background: var(--gray-50, #f8fafc);
-		border-radius: 8px;
-		border: 1px solid var(--gray-200, #e5e7eb);
 	}
 	
-	.category-dot {
+	.group-dot {
 		width: 8px;
 		height: 8px;
 		border-radius: 50%;
-		background: var(--blue-500, #3b82f6); /* Default blue for activities */
+		background: var(--blue-500, #3b82f6);
 		flex-shrink: 0;
 	}
 	
-	.category-label {
+	.group-label {
 		font-weight: 500;
 		color: var(--gray-700, #374151);
-		font-size: 0.875rem;
+		font-size: 0.95rem;
 		text-transform: capitalize;
 	}
 	
-	.category-count {
+	.group-count {
 		color: var(--gray-500, #6b7280);
 		font-size: 0.75rem;
 		background: var(--gray-100, #f3f4f6);
@@ -270,10 +320,51 @@
 		margin-left: auto;
 	}
 
-	.activities-container {
+	/* Activity rows */
+	.activity-row {
+		border-left: 3px solid transparent;
+		min-height: 48px;
+	}
+	
+	.activity-row:not(.selected) {
+		background: white;
+	}
+
+	/* Selected rows */
+	:global(.table tbody tr.selected) {
+		background: var(--primary, #2563eb);
+		color: white;
+		border-left-color: var(--primary, #2563eb);
+		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+	}
+
+	.activity-name-cell {
+		width: 60%;
+	}
+
+	.activity-content {
 		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.activity-icon {
+		font-size: 1.2rem;
+		flex-shrink: 0;
+	}
+
+	.activity-name {
+		font-weight: 500;
+		color: var(--gray-900, #111827);
+		font-size: 0.95rem;
+	}
+
+	.activity-zulu {
+		font-style: italic;
+		color: var(--gray-600, #475569);
+		font-size: 0.9rem;
+		font-weight: 400;
+		width: 40%;
 	}
 
 	/* Step Header */
@@ -352,87 +443,6 @@
 		color: var(--color-text-primary);
 	}
 
-	/* Activity Grid - Based on original design */
-	.activity-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-		gap: 0.5rem;
-		padding: 0;
-		margin: 0;
-	}
-
-	.activity-btn {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 0.75rem 0.5rem;
-		cursor: pointer;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.5rem;
-		min-height: 90px; /* More compact */
-		text-align: center;
-		transition: all 0.15s ease;
-		position: relative;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-	}
-
-	/* Removed hover effects for mobile */
-
-	.activity-btn.selected {
-		border-color: #2563eb;
-		background: #2563eb;
-		color: white;
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-		transform: scale(1.02);
-	}
-
-	.activity-icon {
-		font-size: 2rem; /* Larger icon */
-		margin-bottom: 0.25rem;
-		flex-shrink: 0;
-	}
-
-	/* Removed activity-code styling since we're not showing codes */
-
-	/* Removed selected activity-code styling */
-
-	.activity-content {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.125rem;
-		flex: 1;
-		min-width: 0;
-	}
-
-	.activity-name {
-		font-size: 1.1rem; /* Larger for better readability */
-		font-weight: 600;
-		line-height: 1.2;
-		color: #1f2937;
-		text-align: center;
-		word-break: break-word;
-	}
-
-	.activity-btn.selected .activity-name {
-		color: white;
-	}
-
-	.activity-name-zulu {
-		font-size: 0.9rem; /* Larger for better readability */
-		color: #6b7280;
-		font-style: italic;
-		line-height: 1.2;
-		text-align: center;
-		word-break: break-word;
-		font-weight: 400;
-	}
-
-	.activity-btn.selected .activity-name-zulu {
-		color: rgba(255, 255, 255, 0.7);
-	}
 
 	/* Activity Card Content */
 	.activity-header {
@@ -676,46 +686,64 @@
 
 	/* Mobile Responsiveness */
 	@media (max-width: 768px) {
-		.activity-grid {
-			grid-template-columns: repeat(3, 1fr); /* 3 columns on mobile for compactness */
-			gap: 0.375rem;
-		}
-		
-		.activity-btn {
-			padding: 0.625rem 0.375rem;
-			min-height: 85px; /* Even more compact on mobile */
-		}
-		
-		.activity-icon {
-			font-size: 1.75rem; /* Still large but fits better */
-		}
-		
-		.activity-name {
-			font-size: 1rem;
-			line-height: 1.1;
-		}
-		
-		.activity-name-zulu {
-			font-size: 0.8rem;
-			line-height: 1.1;
+		.table-container {
+			margin: 0 -0.5rem;
+			background: white;
+			border-radius: 0.5rem;
+			border: 1px solid var(--gray-200, #e2e8f0);
+			overflow: hidden;
 		}
 
-		.category-header {
-			margin-bottom: 0.5rem;
+		:global(.table) {
+			width: 100%;
+			font-size: 14px;
+			border-collapse: collapse;
+			table-layout: fixed;
 		}
 
-		.activities-container {
-			gap: 0.75rem;
+		:global(.table th),
+		:global(.table td) {
+			padding: 0.75rem 1rem !important;
+			border-bottom: 1px solid var(--gray-100, #f1f5f9);
 		}
-	}
 
-	@media (max-width: 480px) {
-		.activity-grid {
-			grid-template-columns: repeat(2, 1fr); /* 2 columns on very small screens */
+		:global(.table th) {
+			background-color: var(--gray-50, #f8fafc);
+			font-weight: 600;
+			color: var(--gray-700, #334155);
+			text-transform: uppercase;
+			font-size: 0.75rem;
+			height: 40px;
 		}
-		
-		.activity-btn {
-			min-height: 80px;
+
+		:global(.table .clickable) {
+			cursor: pointer;
+			min-height: 56px;
+		}
+
+		:global(.table .selected) {
+			background: var(--primary, #2563eb);
+			color: white;
+			font-weight: 600;
+		}
+
+		/* Mobile table column widths */
+		:global(#activity-table th:nth-child(1)),
+		:global(#activity-table td:nth-child(1)) { /* Activity name */
+			width: 60%;
+		}
+
+		:global(#activity-table th:nth-child(2)),
+		:global(#activity-table td:nth-child(2)) { /* Zulu name */
+			width: 40%;
+		}
+
+		:global(#activity-table .selected td:nth-child(1)) {
+			color: white;
+		}
+
+		:global(#activity-table .selected td:nth-child(2)) {
+			color: white;
 		}
 	}
 </style>

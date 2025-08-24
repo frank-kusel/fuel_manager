@@ -102,14 +102,14 @@
 		fieldStore.setSorting(sortBy, sortDirection);
 	}
 	
-	// Crop type area calculations
+	// Crop type area calculations (based on crop_type, not name)
 	const cropAreaStats = $derived($fields.reduce((acc, field) => {
-		if (field.name && field.active) {
-			const cropName = field.name.toLowerCase();
-			if (!acc[cropName]) {
-				acc[cropName] = 0;
+		if (field.crop_type && field.active) {
+			const cropType = field.crop_type.toLowerCase();
+			if (!acc[cropType]) {
+				acc[cropType] = 0;
 			}
-			acc[cropName] += field.area;
+			acc[cropType] += field.area;
 		}
 		return acc;
 	}, {} as Record<string, number>));
@@ -202,9 +202,9 @@
 			<Card>
 				<h3>Crop Area Summary</h3>
 				<div class="crop-stats">
-					{#each sortedCropStats as [cropName, totalArea]}
+					{#each sortedCropStats as [cropType, totalArea]}
 						<div class="crop-stat">
-							<span class="crop-name">{cropName}</span>
+							<span class="crop-name">{cropType}</span>
 							<span class="crop-area">{formatArea(totalArea)} ha</span>
 						</div>
 					{/each}
