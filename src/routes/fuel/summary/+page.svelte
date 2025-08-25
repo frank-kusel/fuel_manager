@@ -16,7 +16,7 @@
 		litres_dispensed: number;
 		odometer_start: number | null;
 		odometer_end: number | null;
-		gauge_working: boolean;
+		gauge_working: boolean | null;
 		bowser_reading_start: number | null;
 		bowser_reading_end: number | null;
 	}
@@ -124,18 +124,24 @@
 			
 			// Check for missing data
 			entries.forEach((entry, index) => {
-				console.log(`Entry ${index + 1}:`, {
-					id: entry.id,
-					date: entry.entry_date,
-					time: entry.time,
-					vehicle: entry.vehicles,
-					driver: entry.drivers,
-					activity: entry.activities,
-					field: entry.fields,
-					fuel: entry.litres_dispensed,
-					missingVehicle: !entry.vehicles,
-					missingDriver: !entry.drivers,
-					missingActivity: !entry.activities
+				// Debug vehicle data structure
+				console.log(`Entry ${index + 1} VEHICLE DEBUG:`, {
+					vehicles_raw: entry.vehicles,
+					vehicles_keys: entry.vehicles ? Object.keys(entry.vehicles) : 'null',
+					vehicles_code: entry.vehicles?.code,
+					vehicles_name: entry.vehicles?.name,
+					vehicles_stringified: JSON.stringify(entry.vehicles)
+				});
+				
+				console.log(`Entry ${index + 1} USAGE DEBUG:`, {
+					odometer_start: entry.odometer_start,
+					odometer_start_type: typeof entry.odometer_start,
+					odometer_end: entry.odometer_end,
+					odometer_end_type: typeof entry.odometer_end,
+					gauge_working: entry.gauge_working,
+					gauge_working_type: typeof entry.gauge_working,
+					calculation: entry.odometer_start !== null && entry.odometer_end !== null && entry.gauge_working !== false,
+					result: (entry.odometer_start !== null && entry.odometer_end !== null && entry.gauge_working !== false) ? (entry.odometer_end - entry.odometer_start) : 'N/A'
 				});
 			});
 		} catch (err) {
@@ -170,7 +176,7 @@
 		return `${start} → ${end}`;
 	}
 
-	function formatOdometerValue(value: number | null, gaugeWorking: boolean): string {
+	function formatOdometerValue(value: number | null, gaugeWorking: boolean | null): string {
 		if (value === null || value === undefined) return '-';
 		if (gaugeWorking === false) return 'Broken';
 		// Format number with spaces between thousands
@@ -313,55 +319,55 @@
 			<div class="entries-grid">
 				{#each entries as entry}
 					<div class="fuel-entry-card">
+						<!-- Primary Info Header -->
 						<div class="card-header">
-							<div class="time-badge">{entry.time}</div>
-							<div class="fuel-display">
-								{entry.litres_dispensed.toFixed(1)}<span class="fuel-unit">L</span>
+							<div class="vehicle-primary">
+								<div class="vehicle-code">
+									{entry.vehicles?.code || 'N/A'} • {entry.vehicles?.name || 'Vehicle'}
+								</div>
+							</div>
+							<div class="fuel-primary">
+								<div class="fuel-amount">{entry.litres_dispensed.toFixed(1)}L</div>
+								<div class="time-stamp">{entry.time}</div>
 							</div>
 						</div>
-						
-						<div class="card-body">
-							<div class="vehicle-info">
-								<div class="vehicle-code">{entry.vehicles?.code || 'N/A'}</div>
-								<div class="vehicle-name">{entry.vehicles?.name || 'N/A'}</div>
+
+						<!-- Key Metrics Row -->
+						<div class="metrics-row">
+							<div class="metric-item recorded">
+								<div class="metric-value recorded-value">{formatOdometerValue(entry.odometer_start, entry.gauge_working)}</div>
+								<div class="metric-label">Start ODO</div>
 							</div>
-							
-							<div class="operation-details">
-								<div class="detail-item">
+							<div class="metric-item recorded">
+								<div class="metric-value recorded-value">{formatOdometerValue(entry.odometer_end, entry.gauge_working)}</div>
+								<div class="metric-label">End ODO</div>
+							</div>
+							<div class="metric-item calculated">
+								<div class="metric-value calculated-value">{(typeof entry.odometer_start === 'number' && typeof entry.odometer_end === 'number' && entry.gauge_working !== false) ? (entry.odometer_end - entry.odometer_start).toFixed(1) : '-'}</div>
+								<div class="metric-label">Usage</div>
+							</div>
+						</div>
+
+						<!-- Details Grid -->
+						<div class="details-grid">
+							<div class="detail-group">
+								<div class="detail-row">
 									<span class="detail-label">Driver</span>
 									<span class="detail-value">{entry.drivers?.name || 'N/A'}</span>
 								</div>
-								<div class="detail-item">
+								<div class="detail-row">
 									<span class="detail-label">Activity</span>
-									<span class="detail-value">{entry.activities?.name || 'N/A'} {entry.activities?.code ? `(${entry.activities.code})` : ''}</span>
-								</div>
-								<div class="detail-item">
-									<span class="detail-label">Field</span>
-									<span class="detail-value">{getLocation(entry)}</span>
-								</div>
-								<div class="detail-item">
-									<span class="detail-label">Bowser End</span>
-									<span class="detail-value">{entry.bowser_reading_end || '-'}</span>
-								</div>
-								<div class="detail-item">
-									<span class="detail-label">Distance</span>
-									<span class="detail-value">{entry.odometer_start && entry.odometer_end && entry.gauge_working ? `${(entry.odometer_end - entry.odometer_start).toFixed(1)} km` : '-'}</span>
-								</div>
-								<div class="detail-item">
-									<span class="detail-label">Consumption</span>
-									<span class="detail-value">-</span>
+									<span class="detail-value activity-value">{entry.activities?.code || entry.activities?.name || 'N/A'}</span>
 								</div>
 							</div>
-							
-							<div class="odometer-section">
-								<div class="odo-reading">
-									<span class="odo-label">Start</span>
-									<span class="odo-value">{formatOdometerValue(entry.odometer_start, entry.gauge_working)}</span>
+							<div class="detail-group">
+								<div class="detail-row">
+									<span class="detail-label">Field</span>
+									<span class="detail-value field-value">{getLocation(entry)}</span>
 								</div>
-								<div class="odo-arrow">→</div>
-								<div class="odo-reading">
-									<span class="odo-label">End</span>
-									<span class="odo-value">{formatOdometerValue(entry.odometer_end, entry.gauge_working)}</span>
+								<div class="detail-row">
+									<span class="detail-label">Bowser</span>
+									<span class="detail-value bowser-value">{entry.bowser_reading_end || '-'}</span>
 								</div>
 							</div>
 						</div>
@@ -373,40 +379,45 @@
 		<!-- Mobile Logbook View -->
 		<div class="logbook-container mobile-only">
 			{#each entries as entry}
-				<div class="logbook-entry">
-					<div class="logbook-header">
-						<div class="vehicle-badge">{entry.vehicles?.code || 'N/A'}</div>
-						<div class="vehicle-title">{entry.vehicles?.name || 'N/A'}</div>
-						<div class="fuel-badge">{entry.litres_dispensed.toFixed(1)}L</div>
-					</div>
-					
-					<div class="logbook-details">
-						<div class="logbook-detail-item">
-							<span class="detail-label">Activity</span>
-							<span class="detail-value">{entry.activities?.code || entry.activities?.name || '-'}</span>
+				<div class="mobile-fuel-card">
+					<!-- Mobile Header -->
+					<div class="mobile-header">
+						<div class="mobile-vehicle-info">
+							<div class="mobile-vehicle-code">{entry.vehicles?.code || 'N/A'}</div>
+							<div class="mobile-vehicle-name">{entry.vehicles?.name || 'Vehicle'}</div>
 						</div>
-						<div class="logbook-detail-item">
-							<span class="detail-label">Field</span>
-							<span class="detail-value">{entry.fields?.code || '-'}</span>
-						</div>
-						<div class="logbook-detail-item">
-							<span class="detail-label">Bowser</span>
-							<span class="detail-value">{entry.bowser_reading_end || '-'}</span>
+						<div class="mobile-fuel-info">
+							<div class="mobile-fuel">{entry.litres_dispensed.toFixed(1)}L</div>
+							<div class="mobile-time">{entry.time}</div>
 						</div>
 					</div>
-					
-					<div class="odometer-grid">
-						<div class="odo-item">
-							<div class="odo-label">Start</div>
-							<div class="odo-value">{formatOdometerValue(entry.odometer_start, entry.gauge_working)}</div>
+
+					<!-- Mobile Odometer Row -->
+					<div class="mobile-odo-row">
+						<div class="mobile-odo-item recorded">
+							<div class="mobile-odo-value">{formatOdometerValue(entry.odometer_start, entry.gauge_working)}</div>
+							<div class="mobile-odo-label">Start</div>
 						</div>
-						<div class="odo-item">
-							<div class="odo-label">End</div>
-							<div class="odo-value">{formatOdometerValue(entry.odometer_end, entry.gauge_working)}</div>
+						<div class="mobile-odo-item recorded">
+							<div class="mobile-odo-value">{formatOdometerValue(entry.odometer_end, entry.gauge_working)}</div>
+							<div class="mobile-odo-label">End</div>
 						</div>
-						<div class="odo-item">
-							<div class="odo-label">Distance</div>
-							<div class="odo-value">{entry.odometer_start && entry.odometer_end && entry.gauge_working ? (entry.odometer_end - entry.odometer_start).toFixed(1) : '-'}</div>
+						<div class="mobile-odo-item calculated">
+							<div class="mobile-odo-value">{(typeof entry.odometer_start === 'number' && typeof entry.odometer_end === 'number' && entry.gauge_working !== false) ? (entry.odometer_end - entry.odometer_start).toFixed(1) : '-'}</div>
+							<div class="mobile-odo-label">Usage</div>
+						</div>
+					</div>
+
+					<!-- Mobile Details -->
+					<div class="mobile-details">
+						<div class="mobile-detail">
+							<span>{entry.activities?.code || entry.activities?.name || 'Activity'}</span>
+						</div>
+						<div class="mobile-detail">
+							<span>{entry.fields?.code || 'Field'}</span>
+						</div>
+						<div class="mobile-detail">
+							<span>B: {entry.bowser_reading_end || '-'}</span>
 						</div>
 					</div>
 				</div>
@@ -532,7 +543,7 @@
 
 	/* Desktop Card Grid */
 	.entries-container {
-		padding: 0 2rem;
+		padding: 0;
 	}
 
 	.entries-grid {
@@ -543,264 +554,332 @@
 
 	.fuel-entry-card {
 		background: white;
-		border: 1px solid #f1f5f9;
-		border-radius: 16px;
-		padding: 1.5rem;
-		transition: all 0.3s ease;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+		border: 1px solid #e5e7eb;
+		border-radius: 12px;
+		padding: 1.25rem;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 	}
 
 	.fuel-entry-card:hover {
 		border-color: #f97316;
-		box-shadow: 0 12px 32px rgba(249, 115, 22, 0.15);
-		transform: translateY(-4px);
+		box-shadow: 0 8px 25px rgba(249, 115, 22, 0.12);
+		transform: translateY(-2px);
 	}
 
+	/* Primary Header */
 	.card-header {
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
+		align-items: flex-start;
 		margin-bottom: 1rem;
-		padding-bottom: 1rem;
-		border-bottom: 1px solid #f3f4f6;
-	}
-
-	.time-badge {
-		background: #f3f4f6;
-		color: #374151;
-		padding: 0.375rem 0.875rem;
-		border-radius: 20px;
-		font-size: 0.875rem;
-		font-weight: 600;
-		font-family: monospace;
-	}
-
-	.fuel-display {
-		font-size: 1.5rem;
-		font-weight: 700;
-		color: #059669;
-		display: flex;
-		align-items: baseline;
-		gap: 0.25rem;
-	}
-
-	.fuel-unit {
-		font-size: 1rem;
-		font-weight: 500;
-		opacity: 0.8;
-	}
-
-	.card-body {
-		display: flex;
-		flex-direction: column;
 		gap: 1rem;
 	}
 
-	.vehicle-info {
-		text-align: center;
-		padding: 0.75rem;
-		background: #fafbfc;
-		border-radius: 12px;
+	.vehicle-primary {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.vehicle-code {
-		font-size: 1rem;
+		font-size: 0.95rem;
 		font-weight: 700;
-		color: #2563eb;
-		margin-bottom: 0.25rem;
-		font-family: monospace;
+		color: #111827;
+		line-height: 1.3;
+		word-break: break-word;
 	}
 
-	.vehicle-name {
-		font-size: 0.875rem;
+	.fuel-primary {
+		text-align: right;
+		flex-shrink: 0;
+	}
+
+	.fuel-amount {
+		font-size: 1.75rem;
+		font-weight: 800;
+		color: #059669;
+		line-height: 1;
+		margin-bottom: 0.25rem;
+	}
+
+	.time-stamp {
+		font-size: 0.75rem;
+		color: #9ca3af;
+		font-weight: 600;
+		font-family: monospace;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	/* Metrics Row */
+	.metrics-row {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		padding: 1rem;
+		background: #f8fafc;
+		border-radius: 8px;
+		margin-bottom: 1rem;
+		justify-content: space-between;
+	}
+
+	.metric-item {
+		text-align: center;
+		flex: 1;
+	}
+
+	.metric-value {
+		font-size: 1.375rem;
+		font-weight: 700;
+		color: #111827;
+		font-family: monospace;
+		margin-bottom: 0.25rem;
+		line-height: 1;
+	}
+
+	/* Recorded vs Calculated Value Styling */
+	.recorded-value {
+		border-bottom: 2px solid #e2e8f0;
+	}
+
+	.calculated-value {
+		font-style: italic;
+		color: #6b7280;
+	}
+
+	.metric-label {
+		font-size: 0.75rem;
 		color: #6b7280;
 		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
-	.operation-details {
+	.metric-separator {
+		font-size: 1.25rem;
+		color: #9ca3af;
+		font-weight: 600;
+		flex-shrink: 0;
+	}
+
+	/* Details Grid */
+	.details-grid {
 		display: grid;
-		grid-template-columns: 1fr;
+		grid-template-columns: 0.7fr 1.3fr;
+		gap: 1rem;
+	}
+
+	.detail-group {
+		display: flex;
+		flex-direction: column;
 		gap: 0.5rem;
 	}
 
-	.detail-item {
+	.detail-row {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 		padding: 0.5rem 0;
-		font-size: 0.875rem;
-		border-bottom: 1px solid #f9fafb;
+		border-bottom: 1px solid #f1f5f9;
 	}
 
-	.detail-item:last-child {
+	.detail-row:last-child {
 		border-bottom: none;
 	}
 
 	.detail-label {
-		color: #9ca3af;
+		font-size: 0.75rem;
+		color: #6b7280;
 		font-weight: 500;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		font-size: 0.75rem;
-	}
-
-	.detail-value {
-		color: #374151;
-		font-weight: 500;
-		text-align: right;
-	}
-
-	.odometer-section {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		background: linear-gradient(135deg, #fef3e2, #fed7aa);
-		padding: 1rem;
-		border-radius: 12px;
-		gap: 1rem;
-	}
-
-	.odo-reading {
-		text-align: center;
-		flex: 1;
-	}
-
-	.odo-reading .odo-label {
-		display: block;
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #92400e;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		margin-bottom: 0.25rem;
-	}
-
-	.odo-reading .odo-value {
-		font-size: 1.25rem;
-		font-weight: 700;
-		color: #92400e;
-		font-family: monospace;
-	}
-
-	.odo-arrow {
-		font-size: 1.5rem;
-		color: #f97316;
-		font-weight: bold;
-	}
-
-	/* Mobile Logbook View */
-	.logbook-container {
-		padding: 0 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.logbook-entry {
-		background: white;
-		border: 1px solid #f1f5f9;
-		border-radius: 16px;
-		padding: 1.25rem;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-	}
-
-	.logbook-header {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-bottom: 1rem;
-		padding-bottom: 1rem;
-		border-bottom: 1px solid #f3f4f6;
-	}
-
-	.vehicle-badge {
-		background: #f3f4f6;
-		color: #374151;
-		padding: 0.5rem 0.875rem;
-		border-radius: 20px;
-		font-size: 0.875rem;
-		font-weight: 700;
-		font-family: monospace;
 		flex-shrink: 0;
 	}
 
-	.vehicle-title {
-		flex: 1;
-		font-size: 1rem;
-		font-weight: 600;
-		color: #111827;
-	}
-
-	.fuel-badge {
-		background: linear-gradient(135deg, #059669, #047857);
-		color: white;
-		padding: 0.5rem 1rem;
-		border-radius: 20px;
-		font-size: 1rem;
-		font-weight: 700;
-		box-shadow: 0 2px 8px rgba(5, 150, 105, 0.2);
-	}
-
-	.logbook-details {
-		display: flex;
-		justify-content: space-between;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-		padding: 0.75rem;
-		background: #f9fafb;
-		border-radius: 8px;
-	}
-
-	.logbook-detail-item {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.25rem;
-	}
-
-	.logbook-detail-item .detail-label {
-		font-size: 0.75rem;
-		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		font-weight: 500;
-	}
-
-	.logbook-detail-item .detail-value {
+	.detail-value {
 		font-size: 0.875rem;
 		color: #111827;
 		font-weight: 600;
+		text-align: right;
+		font-family: monospace;
 	}
 
-	.odometer-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr 1fr;
+	/* Activity and Field styling */
+	.activity-value,
+	.field-value {
+		font-size: 1rem !important;
+		font-weight: 700 !important;
+	}
+
+	/* Bowser reading styling */
+	.bowser-value {
+		font-size: 1rem !important;
+		font-weight: 700 !important;
+	}
+
+
+	/* Mobile Logbook View */
+	/* Mobile Cards */
+	.logbook-container {
+		padding: 0;
+		display: flex;
+		flex-direction: column;
 		gap: 0.75rem;
 	}
 
-	.odo-item {
-		background: linear-gradient(135deg, #fef3e2, #fed7aa);
+	.mobile-fuel-card {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
 		padding: 1rem;
-		border-radius: 12px;
-		text-align: center;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 	}
 
-	.odo-item .odo-label {
-		display: block;
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: #92400e;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		margin-bottom: 0.5rem;
+	.mobile-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		margin-bottom: 0.75rem;
+		gap: 1rem;
 	}
 
-	.odo-item .odo-value {
-		font-size: 1.25rem;
+	.mobile-vehicle-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.mobile-vehicle-code {
+		font-size: 1rem;
 		font-weight: 700;
-		color: #92400e;
+		color: #111827;
 		font-family: monospace;
 	}
+
+	.mobile-vehicle-name {
+		font-size: 1rem;
+		font-weight: 600;
+		color: #4b5563;
+		line-height: 1.2;
+		word-break: break-word;
+	}
+
+	.mobile-fuel-info {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.25rem;
+		flex-shrink: 0;
+	}
+
+	.mobile-time {
+		font-size: 0.75rem;
+		color: #6b7280;
+		font-weight: 500;
+		font-family: monospace;
+	}
+
+	.mobile-fuel {
+		font-size: 1.25rem;
+		font-weight: 800;
+		color: #059669;
+		line-height: 1;
+	}
+
+	.mobile-odo-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.75rem;
+		background: #f8fafc;
+		border-radius: 6px;
+		margin-bottom: 0.75rem;
+		gap: 0.5rem;
+	}
+
+	.mobile-odo-item {
+		text-align: center;
+		flex: 1;
+	}
+
+	.mobile-odo-value {
+		font-size: 1rem;
+		font-weight: 700;
+		color: #111827;
+		font-family: monospace;
+		margin-bottom: 0.125rem;
+	}
+
+	/* Mobile Recorded vs Calculated Styling */
+	.mobile-odo-item.recorded .mobile-odo-value {
+		border-bottom: 2px solid #e2e8f0;
+	}
+
+	.mobile-odo-item.calculated .mobile-odo-value {
+		font-style: italic;
+		color: #6b7280;
+	}
+
+	.mobile-odo-label {
+		font-size: 0.625rem;
+		color: #6b7280;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.mobile-arrow {
+		font-size: 0.875rem;
+		color: #9ca3af;
+		flex-shrink: 0;
+	}
+
+	.mobile-details {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.mobile-detail {
+		text-align: center;
+		padding: 0.375rem;
+		background: #f1f5f9;
+		border-radius: 4px;
+	}
+
+	/* Activity and Field mobile details - smaller width */
+	.mobile-detail:nth-child(1),
+	.mobile-detail:nth-child(2) {
+		flex: 0.8;
+	}
+
+	/* Bowser mobile detail - larger width */
+	.mobile-detail:nth-child(3) {
+		flex: 1.4;
+	}
+
+	.mobile-detail span {
+		font-size: 0.75rem;
+		color: #374151;
+		font-weight: 500;
+	}
+
+	/* Activity and Field mobile text - larger font */
+	.mobile-detail:nth-child(1) span,
+	.mobile-detail:nth-child(2) span {
+		font-size: 0.875rem;
+		font-weight: 600;
+	}
+
+	/* Bowser mobile text - larger font */
+	.mobile-detail:nth-child(3) span {
+		font-size: 0.875rem;
+		font-weight: 600;
+		font-family: monospace;
+	}
+
 
 	/* Loading States */
 	.loading-state {
@@ -969,12 +1048,22 @@
 		}
 
 		.entries-container {
-			padding: 0 1rem;
+			padding: 0;
 		}
 
 		.entries-grid {
 			grid-template-columns: 1fr;
 			gap: 1rem;
+		}
+
+		.metrics-row {
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+
+		.details-grid {
+			grid-template-columns: 1fr;
+			gap: 0.75rem;
 		}
 	}
 	
