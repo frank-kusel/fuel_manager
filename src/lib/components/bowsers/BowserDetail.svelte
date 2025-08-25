@@ -12,6 +12,40 @@
 	
 	let { bowser, onedit, ondelete, onback }: Props = $props();
 	
+	let newReading: number = $state(bowser.current_reading || 0);
+	let isUpdatingReading = $state(false);
+	let updateMessage = $state('');
+	
+	async function updateBowserReading() {
+		if (newReading === bowser.current_reading) {
+			updateMessage = 'No change in reading';
+			setTimeout(() => updateMessage = '', 3000);
+			return;
+		}
+		
+		isUpdatingReading = true;
+		updateMessage = '';
+		
+		try {
+			const { default: supabaseService } = await import('$lib/services/supabase');
+			await supabaseService.init();
+			
+			const result = await supabaseService.updateBowserReading(bowser.id, newReading);
+			
+			if (result.error) {
+				updateMessage = `Error: ${result.error}`;
+			} else {
+				bowser.current_reading = newReading;
+				updateMessage = 'Reading updated successfully';
+			}
+		} catch (error) {
+			updateMessage = `Error: ${error instanceof Error ? error.message : 'Failed to update reading'}`;
+		}
+		
+		isUpdatingReading = false;
+		setTimeout(() => updateMessage = '', 5000);
+	}
+	
 	const formatDate = (date: string) => {
 		return new Date(date).toLocaleDateString('en-ZA', {
 			year: 'numeric',
@@ -98,6 +132,46 @@
 							{bowser.active ? 'Active' : 'Inactive'}
 						</span>
 					</span>
+				</div>
+			</div>
+		</Card>
+		
+		<Card>
+			<h3>Current Reading</h3>
+			<div class="reading-section">
+				<div class="current-reading">
+					<span class="label">Current Reading</span>
+					<span class="value reading-value">{bowser.current_reading?.toFixed(1) || '0.0'} L</span>
+				</div>
+				
+				<div class="manual-override">
+					<div class="override-header">
+						<span class="label">Manual Override</span>
+						<span class="description">Update reading manually (for broken bowser or missed entries)</span>
+					</div>
+					<div class="override-controls">
+						<input 
+							type="number" 
+							bind:value={newReading}
+							step="0.1"
+							min="0"
+							max={bowser.capacity}
+							class="reading-input"
+							disabled={isUpdatingReading}
+						/>
+						<Button 
+							onclick={updateBowserReading}
+							disabled={isUpdatingReading || newReading === bowser.current_reading}
+							size="sm"
+						>
+							{isUpdatingReading ? 'Updating...' : 'Update Reading'}
+						</Button>
+					</div>
+					{#if updateMessage}
+						<div class="update-message" class:success={updateMessage.includes('success')} class:error={updateMessage.includes('Error')}>
+							{updateMessage}
+						</div>
+					{/if}
 				</div>
 			</div>
 		</Card>
@@ -337,6 +411,96 @@
 		color: var(--color-text-secondary);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
+	}
+	
+	/* Reading Override Styles */
+	.reading-section {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+	
+	.current-reading {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 1rem;
+		background: var(--color-background-secondary);
+		border-radius: 0.5rem;
+		border: 1px solid var(--color-border);
+	}
+	
+	.reading-value {
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--color-primary);
+	}
+	
+	.manual-override {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		padding: 1rem;
+		border: 1px solid var(--color-border);
+		border-radius: 0.5rem;
+		background: #fefefe;
+	}
+	
+	.override-header {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+	
+	.description {
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+		font-style: italic;
+	}
+	
+	.override-controls {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+	}
+	
+	.reading-input {
+		flex: 1;
+		max-width: 200px;
+		padding: 0.5rem;
+		border: 1px solid var(--color-border);
+		border-radius: 0.25rem;
+		font-size: 0.875rem;
+	}
+	
+	.reading-input:focus {
+		outline: none;
+		border-color: var(--color-primary);
+		box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.1);
+	}
+	
+	.reading-input:disabled {
+		background: var(--color-background-secondary);
+		color: var(--color-text-secondary);
+	}
+	
+	.update-message {
+		padding: 0.5rem;
+		border-radius: 0.25rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+	}
+	
+	.update-message.success {
+		background: var(--color-success-light);
+		color: var(--color-success);
+		border: 1px solid var(--color-success);
+	}
+	
+	.update-message.error {
+		background: var(--color-error-light);
+		color: var(--color-error);
+		border: 1px solid var(--color-error);
 	}
 	
 	@media (max-width: 768px) {

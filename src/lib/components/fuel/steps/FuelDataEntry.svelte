@@ -25,9 +25,20 @@
 	// Bowser readings
 	let startReading = $state(bowserReadingStart || 0);
 	let endReading = $state(bowserReadingEnd || 0);
+	let isEditingStartReading = $state(false);
 	let isEditingEndReading = $state(false);
 	let expectedStartReading = $state<number | null>(null);
 	let readingMismatchWarning = $state<string | null>(null);
+	
+	// Resync function to reset to bowser's current reading
+	function resyncStartReading() {
+		const bowser = bowsers.find(b => b.id === selectedBowserId);
+		if (bowser) {
+			startReading = bowser.current_reading || 0;
+			expectedStartReading = bowser.current_reading || 0;
+			isEditingStartReading = false;
+		}
+	}
 	
 	onMount(async () => {
 		try {
@@ -59,7 +70,7 @@
 	
 	// Auto-calculate end reading when fuel amount changes (only if not manually edited)
 	$effect(() => {
-		if (!isEditingEndReading) {
+		if (!isEditingEndReading && !isEditingStartReading) {
 			const fuel = parseFloat(fuelAmount);
 			if (!isNaN(fuel) && fuel > 0 && startReading) {
 				endReading = startReading - fuel; // Bowser reading decreases as fuel is dispensed
@@ -124,45 +135,76 @@
 		<!-- Bowser Readings - Always visible -->
 		<div class="calculations">
 			<div class="calc-header">
-				<h3>Bowser</h3>
+				<h3>Bowser Readings</h3>
 			</div>
 			<div class="calc-item">
-				<span class="calc-label">Start reading:</span>
-				<span class="calc-value">
-					{#if selectedBowserInfo}
-						{new Intl.NumberFormat().format(startReading)}L
+				<span class="calc-label">Start:</span>
+				<div class="calc-item-right">
+					{#if isEditingStartReading}
+						<input 
+							type="number" 
+							inputmode="numeric" 
+							bind:value={startReading}
+							placeholder="Enter start reading"
+							class="start-reading-input"
+							onblur={() => isEditingStartReading = false}
+							onfocus={(e) => e.target.select()}
+							autocomplete="off"
+						/>
 					{:else}
-						-
+						<span class="calc-value editable" onclick={() => isEditingStartReading = true}>
+							{#if selectedBowserInfo}
+								{new Intl.NumberFormat().format(startReading)}L
+							{:else}
+								-
+							{/if}
+						</span>
 					{/if}
-				</span>
+					{#if selectedBowserInfo}
+						<div class="btn-group">
+							<button class="edit-btn" onclick={() => isEditingStartReading = !isEditingStartReading}>
+								{isEditingStartReading ? '✓' : '✏️'}
+							</button>
+							{#if isEditingStartReading}
+								<button class="resync-btn" onclick={resyncStartReading} title="Reset to bowser reading">
+									🔄
+								</button>
+							{/if}
+						</div>
+					{/if}
+				</div>
 			</div>
 			<div class="calc-item">
-				<span class="calc-label">End reading:</span>
-				{#if isEditingEndReading}
-					<input 
-						type="number" 
-						inputmode="numeric" 
-						bind:value={endReading}
-						placeholder="Enter end reading"
-						class="end-reading-input"
-						onblur={() => isEditingEndReading = false}
-						onfocus={(e) => e.target.select()}
-						autocomplete="off"
-					/>
-				{:else}
-					<span class="calc-value" class:editable={selectedBowserInfo}>
-						{#if fuelAmount && parseFloat(fuelAmount) > 0 && selectedBowserInfo}
-							{new Intl.NumberFormat().format(endReading)}L
-						{:else}
-							-
-						{/if}
-					</span>
-				{/if}
-				{#if selectedBowserInfo}
-					<button class="edit-btn" onclick={() => isEditingEndReading = true}>
-						{isEditingEndReading ? 'Save' : 'Edit'}
-					</button>
-				{/if}
+				<span class="calc-label">End:</span>
+				<div class="calc-item-right">
+					{#if isEditingEndReading}
+						<input 
+							type="number" 
+							inputmode="numeric" 
+							bind:value={endReading}
+							placeholder="Enter end reading"
+							class="end-reading-input"
+							onblur={() => isEditingEndReading = false}
+							onfocus={(e) => e.target.select()}
+							autocomplete="off"
+						/>
+					{:else}
+						<span class="calc-value" class:editable={selectedBowserInfo} onclick={() => selectedBowserInfo && (isEditingEndReading = true)}>
+							{#if fuelAmount && parseFloat(fuelAmount) > 0 && selectedBowserInfo}
+								{new Intl.NumberFormat().format(endReading)}L
+							{:else}
+								-
+							{/if}
+						</span>
+					{/if}
+					{#if selectedBowserInfo}
+						<div class="btn-group">
+							<button class="edit-btn" onclick={() => isEditingEndReading = !isEditingEndReading}>
+								{isEditingEndReading ? '✓' : '✏️'}
+							</button>
+						</div>
+					{/if}
+				</div>
 			</div>
 		</div>
 		
@@ -272,16 +314,19 @@
 		border-radius: 0.5rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.5rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 	}
 
 	.calc-header {
 		text-align: center;
-		margin-bottom: 0.5rem;
+		margin-bottom: 0.75rem;
+		padding-bottom: 0.75rem;
+		border-bottom: 1px solid #e2e8f0;
 	}
 
 	.calc-header h3 {
-		font-size: 1rem;
+		font-size: 1.125rem;
 		font-weight: 600;
 		color: #374151;
 		margin: 0;
@@ -291,57 +336,109 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 0.5rem 0;
+		padding: 0.75rem 0;
+		min-height: 3rem;
+		border-bottom: 1px solid #f1f5f9;
+	}
+	
+	.calc-item-right {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 220px;
+		justify-content: flex-end;
+	}
+	
+	.calc-item:last-child {
+		border-bottom: none;
 	}
 
 
 	.calc-label {
 		color: #64748b;
-		font-size: 0.875rem;
+		font-size: 1rem;
+		font-weight: 500;
 	}
 
 	.calc-value {
 		color: #1e293b;
 		font-weight: 600;
+		font-size: 1.25rem;
 	}
 
 	.calc-value.editable {
 		cursor: pointer;
-		text-decoration: underline;
-		text-decoration-style: dotted;
+		border-bottom: 1px dotted #d1d5db;
+		transition: border-color 0.2s ease;
+	}
+	
+	.calc-value.editable:hover {
+		border-bottom-color: #f97316;
 	}
 
+	.start-reading-input,
 	.end-reading-input {
-		padding: 0.25rem 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 0.25rem;
-		font-size: 0.875rem;
+		padding: 0.5rem 0.75rem;
+		border: 1px solid #e5e7eb;
+		border-radius: 0.375rem;
+		font-size: 1.25rem;
 		font-weight: 600;
-		color: #1e293b;
-		background: white;
-		width: 120px;
+		color: #374151;
+		background: #fefefe;
+		width: 150px;
 		text-align: right;
+		transition: all 0.2s ease;
+		-webkit-appearance: none;
+		appearance: none;
 	}
 
+	.start-reading-input:focus,
 	.end-reading-input:focus {
 		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+		border-color: #f97316;
+		box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+		background: white;
 	}
 
-	.edit-btn {
-		background: #3b82f6;
-		color: var(--gray-900, #0f172a);
-		border: none;
-		padding: 0.25rem 0.5rem;
+	.btn-group {
+		display: flex;
+		gap: 0.25rem;
+		align-items: center;
+	}
+	
+	.edit-btn,
+	.resync-btn {
+		background: transparent;
+		color: #6b7280;
+		border: 1px solid #e5e7eb;
+		padding: 0.375rem 0.5rem;
 		border-radius: 0.25rem;
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		cursor: pointer;
-		margin-left: 0.5rem;
+		transition: all 0.2s ease;
+		min-width: 2rem;
+		min-height: 2rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
-	.edit-btn:hover {
-		background: #2563eb;
+	.edit-btn:hover,
+	.resync-btn:hover {
+		background: #f9fafb;
+		border-color: #f97316;
+		color: #f97316;
+	}
+	
+	.edit-btn:active,
+	.resync-btn:active {
+		background: #fef3e2;
+	}
+	
+	.resync-btn {
+		background: #fef3e2;
+		border-color: #f97316;
+		color: #ea580c;
 	}
 
 	/* Warning message */
@@ -386,7 +483,42 @@
 		}
 
 		.calculations {
-			margin: 0 -0.5rem;
+			margin: 0 -0.25rem;
+			padding: 1rem;
+		}
+		
+		.calc-header h3 {
+			font-size: 1.25rem;
+		}
+		
+		.calc-item {
+			padding: 1rem 0;
+		}
+		
+		.calc-item-right {
+			min-width: 180px;
+		}
+		
+		.calc-label {
+			font-size: 1rem;
+		}
+		
+		.calc-value {
+			font-size: 1.25rem;
+		}
+		
+		.start-reading-input,
+		.end-reading-input {
+			width: 120px;
+			font-size: 1.25rem;
+			padding: 0.5rem;
+		}
+		
+		.edit-btn,
+		.resync-btn {
+			min-width: 2.5rem;
+			min-height: 2.5rem;
+			font-size: 1rem;
 		}
 	}
 </style>

@@ -1,0 +1,24 @@
+<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+    <!-- Orange background circle -->
+    <circle cx="256" cy="256" r="256" fill="#f97316"/>
+    
+    <!-- Tractor icon in white -->
+    <g transform="translate(76.8, 102.4)" fill="white">
+      <!-- Main body -->
+      <rect x="102.4" y="179.2" width="204.8" height="102.4" rx="10.24" fill="white"/>
+      
+      <!-- Cabin -->
+      <rect x="179.2" y="102.4" width="128" height="102.4" rx="5.12" fill="white"/>
+      
+      <!-- Large rear wheel -->
+      <circle cx="256" cy="332.8" r="40.96" fill="white"/>
+      <circle cx="256" cy="332.8" r="25.6" fill="#f97316"/>
+      
+      <!-- Small front wheel -->
+      <circle cx="128" cy="332.8" r="30.72" fill="white"/>
+      <circle cx="128" cy="332.8" r="17.92" fill="#f97316"/>
+      
+      <!-- Text fallback -->
+      <text x="189.44" y="230.4" font-family="Arial" font-size="153.6" font-weight="bold" fill="white" text-anchor="middle">F</text>
+    </g>
+  </svg>

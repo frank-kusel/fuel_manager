@@ -16,10 +16,31 @@
 	let currentOdo = $state(
 		selectedVehicle?.current_odometer?.toString() || ''
 	);
+	let isEditingCurrentOdo = $state(false);
+	let originalCurrentOdo = $state(selectedVehicle?.current_odometer || 0);
 	
 	// New odometer reading - the main input
 	let newOdo = $state(odometerEnd?.toString() || '');
 	let isBrokenGauge = $state(false); // Default to working
+	
+	// Reset function to restore original current odometer reading
+	function resetCurrentOdo() {
+		if (selectedVehicle) {
+			currentOdo = selectedVehicle.current_odometer?.toString() || '';
+			originalCurrentOdo = selectedVehicle.current_odometer || 0;
+			isEditingCurrentOdo = false;
+		}
+	}
+	
+	// Update original reading when vehicle changes
+	$effect(() => {
+		if (selectedVehicle) {
+			originalCurrentOdo = selectedVehicle.current_odometer || 0;
+			if (!isEditingCurrentOdo) {
+				currentOdo = selectedVehicle.current_odometer?.toString() || '';
+			}
+		}
+	});
 	
 	// Update parent when values change
 	$effect(() => {
@@ -50,10 +71,46 @@
 <div class="odometer-reading">
 	
 	{#if selectedVehicle}
-		<!-- Current ODO Display -->
+		<!-- Current ODO Display with Manual Override -->
 		<div class="odo-card current-odo">
-			<div class="odo-value">{currentOdo || 'No reading'}</div>
-			<div class="odo-label">Current</div>
+			<div class="current-odo-header">
+				<div class="odo-label">Current</div>
+				<div class="current-odo-controls">
+					{#if isEditingCurrentOdo}
+						<button class="odo-control-btn save-btn" onclick={() => isEditingCurrentOdo = false}>
+							✓
+						</button>
+						<button class="odo-control-btn reset-btn" onclick={resetCurrentOdo} title="Reset to vehicle reading">
+							🔄
+						</button>
+					{:else}
+						<button class="odo-control-btn edit-btn" onclick={() => isEditingCurrentOdo = true} title="Manual override">
+							✏️
+						</button>
+					{/if}
+				</div>
+			</div>
+			
+			{#if isEditingCurrentOdo}
+				<input 
+					type="number" 
+					inputmode="numeric" 
+					pattern="[0-9]*" 
+					bind:value={currentOdo}
+					placeholder="Enter current reading"
+					class="current-odo-input"
+					onfocus={(e) => e.target.select()}
+					autocomplete="off"
+				/>
+			{:else}
+				<div class="odo-value" class:editable={selectedVehicle} onclick={() => selectedVehicle && (isEditingCurrentOdo = true)}>
+					{currentOdo || 'No reading'}
+				</div>
+			{/if}
+			
+			{#if isEditingCurrentOdo && parseFloat(currentOdo) !== originalCurrentOdo}
+				<div class="override-notice">Manual override active</div>
+			{/if}
 		</div>
 		
 		{#if !isBrokenGauge}
@@ -140,6 +197,83 @@
 	.current-odo {
 		background: #f8fafc;
 		border: 2px solid #e2e8f0;
+		position: relative;
+	}
+	
+	.current-odo-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+	
+	.current-odo-controls {
+		display: flex;
+		gap: 0.25rem;
+	}
+	
+	.odo-control-btn {
+		background: transparent;
+		border: 1px solid #d1d5db;
+		padding: 0.25rem 0.375rem;
+		border-radius: 0.25rem;
+		font-size: 0.75rem;
+		color: #6b7280;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		min-width: 1.75rem;
+		min-height: 1.75rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	
+	.odo-control-btn:hover {
+		background: #f9fafb;
+		border-color: #9ca3af;
+		color: #374151;
+	}
+	
+	.odo-control-btn.reset-btn {
+		background: #fef3e2;
+		border-color: #f59e0b;
+		color: #d97706;
+	}
+	
+	.odo-control-btn.save-btn {
+		background: #f0f9ff;
+		border-color: #3b82f6;
+		color: #2563eb;
+	}
+	
+	.current-odo-input {
+		width: 100%;
+		padding: 0;
+		font-size: 2.5rem;
+		font-weight: 700;
+		text-align: center;
+		border: none;
+		background: transparent;
+		color: #6b7280;
+		margin-bottom: 0.5rem;
+		font-family: monospace;
+		-webkit-appearance: none;
+		appearance: none;
+	}
+	
+	.current-odo-input:focus {
+		outline: none;
+		color: #374151;
+	}
+	
+	.override-notice {
+		font-size: 0.75rem;
+		color: #d97706;
+		background: #fef3e2;
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.25rem;
+		text-align: center;
+		margin-top: 0.5rem;
 	}
 
 	.new-odo {
@@ -153,6 +287,16 @@
 		color: #64748b;
 		margin-bottom: 0.5rem;
 		font-family: monospace;
+	}
+	
+	.odo-value.editable {
+		cursor: pointer;
+		border-bottom: 1px dotted #d1d5db;
+		transition: border-color 0.2s ease;
+	}
+	
+	.odo-value.editable:hover {
+		border-bottom-color: #9ca3af;
 	}
 
 	.odo-label {

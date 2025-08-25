@@ -5,14 +5,25 @@
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="description" content="FarmTrack - Comprehensive Farm Management Platform" />
-		<meta name="theme-color" content="#f97316" />
+		<meta name="theme-color" content="#f8fafc" />
+		<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8fafc" />
+		<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1f2937" />
 		
 		<!-- PWA Meta Tags -->
 		<link rel="manifest" href="/manifest.json" />
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="light-content" />
 		<meta name="apple-mobile-web-app-title" content="FarmTrack" />
+		<meta name="msapplication-TileColor" content="#f97316" />
+		<meta name="msapplication-navbutton-color" content="#f8fafc" />
+		
+		<!-- Splash screens for iOS -->
+		<link rel="apple-touch-startup-image" href="/splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
+		<link rel="apple-touch-startup-image" href="/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
+		<link rel="apple-touch-startup-image" href="/splash-1242x2208.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">
+		<link rel="apple-touch-startup-image" href="/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+		<link rel="apple-touch-startup-image" href="/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">
 		
 		%sveltekit.head%
 	</head>

@@ -303,20 +303,6 @@ class SupabaseService {
 		);
 	}
 
-	async updateBowserReading(id: string, reading: number): Promise<ApiResponse<Bowser>> {
-		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('bowsers')
-				.update({ 
-					current_reading: reading,
-					updated_at: new Date().toISOString() 
-				})
-				.eq('id', id)
-				.select()
-				.single()
-		);
-	}
 
 	// Activity operations
 	async getActivities(): Promise<ApiResponse<Activity[]>> {
