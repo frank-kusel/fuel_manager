@@ -113,14 +113,14 @@
 
 	/* Header Styles */
 	.header {
-		background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+		background: var(--gray-50);
 		border-bottom: none;
 		padding: 0 1rem;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		height: 4rem;
-		box-shadow: 0 4px 16px rgba(249, 115, 22, 0.2);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 	}
 
 	.header-brand {
@@ -131,14 +131,14 @@
 
 	.brand-icon {
 		font-size: 1.5rem;
-		filter: brightness(0) invert(1);
+		color: #f97316;
 	}
 
 	.header h1 {
 		margin: 0;
 		font-size: 1.5rem;
 		font-weight: 700;
-		color: white;
+		color: #111827;
 	}
 
 	.nav {
@@ -151,22 +151,22 @@
 		padding: 0.5rem 1rem;
 		border-radius: 12px;
 		text-decoration: none;
-		color: rgba(255, 255, 255, 0.8);
+		color: #6b7280;
 		font-weight: 500;
 		transition: all 0.2s;
 		border: 1px solid transparent;
 	}
 
 	.nav-btn:hover {
-		background: rgba(255, 255, 255, 0.1);
-		color: white;
-		border-color: rgba(255, 255, 255, 0.2);
+		background: rgba(249, 115, 22, 0.05);
+		color: #f97316;
+		border-color: rgba(249, 115, 22, 0.2);
 	}
 
 	.nav-btn.active {
-		background: rgba(255, 255, 255, 0.15);
-		color: white;
-		border-color: rgba(255, 255, 255, 0.3);
+		background: rgba(249, 115, 22, 0.1);
+		color: #f97316;
+		border-color: rgba(249, 115, 22, 0.3);
 		font-weight: 600;
 	}
 

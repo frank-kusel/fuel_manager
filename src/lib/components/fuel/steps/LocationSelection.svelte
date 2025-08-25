@@ -530,7 +530,7 @@
 	.field-card.selected {
 		border-color: #2563eb;
 		background: #2563eb;
-		color: white;
+		color: var(--gray-900, #0f172a);
 		transform: translateY(-2px);
 		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 	}
@@ -571,7 +571,7 @@
 	}
 
 	.field-card.selected .field-name {
-		color: white;
+		color: var(--gray-900, #0f172a);
 	}
 
 	.field-crop {
@@ -618,7 +618,7 @@
 
 	.field-card.selected .field-type {
 		background: rgba(255, 255, 255, 0.2);
-		color: white;
+		color: var(--gray-900, #0f172a);
 	}
 
 	/* Table Container */
@@ -712,11 +712,11 @@
 
 	.field-row.selected {
 		background: var(--blue-500, #3b82f6);
-		color: white;
+		color: var(--gray-900, #0f172a);
 	}
 
 	.field-row.selected td {
-		color: white;
+		color: var(--gray-900, #0f172a);
 		border-bottom-color: rgba(255, 255, 255, 0.2);
 	}
 
@@ -763,7 +763,7 @@
 	.zone-card.selected {
 		border-color: #2563eb;
 		background: #2563eb;
-		color: white;
+		color: var(--gray-900, #0f172a);
 		transform: translateY(-2px);
 		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 	}
@@ -775,7 +775,7 @@
 	.zone-badge {
 		padding: 0.5rem 1rem;
 		border-radius: 8px;
-		color: white;
+		color: var(--gray-900, #0f172a);
 		font-weight: 600;
 		font-size: 1rem;
 	}
@@ -787,7 +787,7 @@
 	}
 
 	.zone-card.selected .zone-name {
-		color: white;
+		color: var(--gray-900, #0f172a);
 	}
 
 	.zone-description {
@@ -819,7 +819,7 @@
 
 	.summary-icon {
 		background: #10b981;
-		color: white;
+		color: var(--gray-900, #0f172a);
 		width: 1.5rem;
 		height: 1.5rem;
 		border-radius: 50%;
@@ -863,7 +863,7 @@
 	.summary-zone-badge {
 		padding: 0.5rem 0.75rem;
 		border-radius: 6px;
-		color: white;
+		color: var(--gray-900, #0f172a);
 		font-weight: 600;
 		font-size: 0.875rem;
 		flex-shrink: 0;

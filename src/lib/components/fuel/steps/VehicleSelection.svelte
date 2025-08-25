@@ -266,8 +266,8 @@
 
 	/* Table Container */
 	.table-container {
-		background: var(--white, #ffffff);
-		border: 1px solid var(--gray-200, #e2e8f0);
+		background: rgba(255, 255, 255, 0.95);
+		border: 1px solid rgba(255, 255, 255, 0.3);
 		border-radius: 12px;
 		overflow: hidden;
 		margin: 0;
@@ -357,7 +357,7 @@
 	/* Selected rows */
 	:global(.table tbody tr.selected) {
 		background: var(--primary, #2563eb);
-		color: white;
+		color: var(--gray-900, #0f172a);
 		border-left-color: var(--primary, #2563eb);
 		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
 	}
@@ -445,7 +445,7 @@
 
 	.summary-icon {
 		background: #10b981;
-		color: white;
+		color: var(--gray-900, #0f172a);
 		width: 1.5rem;
 		height: 1.5rem;
 		border-radius: 50%;
@@ -650,7 +650,7 @@
 
 		:global(.table .selected) {
 			background: var(--primary, #2563eb);
-			color: white;
+			color: var(--gray-900, #0f172a);
 			font-weight: 600;
 		}
 
@@ -671,7 +671,7 @@
 		}
 
 		:global(#vehicle-table .selected td:nth-child(1)) {
-			color: white;
+			color: var(--gray-900, #0f172a);
 		}
 
 		.summary-content {

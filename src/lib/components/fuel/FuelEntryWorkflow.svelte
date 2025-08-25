@@ -152,15 +152,17 @@
 </script>
 
 <div class="fuel-entry-workflow" bind:this={workflowContainer}>
-	<!-- Modern Workflow Header -->
-	<div class="workflow-header">
+	<!-- Dashboard Header -->
+	<div class="dashboard-header">
 		<div class="header-content">
 			<h1>Fuel Entry</h1>
-			<div class="step-info">
-				<span class="step-badge">Step {$currentStep + 1} of 7</span>
-				<span class="step-title">{$currentStepData?.title || ''}</span>
-			</div>
 		</div>
+	</div>
+	
+	<!-- Step Info -->
+	<div class="step-info">
+		<span class="step-badge">Step {$currentStep + 1} of 7</span>
+		<span class="step-title">{$currentStepData?.title || ''}</span>
 	</div>
 	
 	<!-- Step Content -->
@@ -168,7 +170,7 @@
 		{#if $currentStep === 0}
 			<!-- Vehicle Selection -->
 			<div class="step-container">
-				<div class="step-card">
+				
 					<VehicleSelection
 						selectedVehicle={$workflowData.vehicle}
 						onVehicleSelect={(vehicle) => {
@@ -178,7 +180,6 @@
 						onAutoAdvance={handleAutoAdvance}
 						errors={getCurrentStepErrors()}
 					/>
-				</div>
 			</div>
 		{:else if $currentStep === 1}
 			<!-- Driver Selection -->
@@ -196,7 +197,7 @@
 					{/if}
 				</div>
 				
-				<div class="step-card">
+				
 					<DriverSelection
 						selectedDriver={$workflowData.driver}
 						onDriverSelect={(driver) => {
@@ -212,7 +213,6 @@
 						onAutoAdvance={handleAutoAdvance}
 						errors={getCurrentStepErrors()}
 					/>
-				</div>
 			</div>
 		{:else if $currentStep === 2}
 			<!-- Activity Selection -->
@@ -230,7 +230,7 @@
 					{/if}
 				</div>
 				
-				<div class="step-card">
+				
 					<ActivitySelection
 						selectedActivity={$workflowData.activity}
 						onActivitySelect={(activity) => {
@@ -240,7 +240,6 @@
 						onAutoAdvance={handleAutoAdvance}
 						errors={getCurrentStepErrors()}
 					/>
-				</div>
 			</div>
 		{:else if $currentStep === 3}
 			<!-- Location Selection (Field or Zone - Optional) -->
@@ -258,7 +257,7 @@
 					{/if}
 				</div>
 				
-				<div class="step-card">
+				
 					<LocationSelection
 						selectedField={$workflowData.field}
 						selectedZone={$workflowData.zone}
@@ -269,7 +268,6 @@
 						onAutoAdvance={handleAutoAdvance}
 						errors={getCurrentStepErrors()}
 					/>
-				</div>
 			</div>
 		{:else if $currentStep === 4}
 			<!-- Odometer Reading -->
@@ -299,7 +297,7 @@
 					</button>
 				</div>
 				
-				<div class="step-card">
+				
 					<OdometerReading
 						selectedVehicle={$workflowData.vehicle}
 						odometerStart={$workflowData.odometerStart}
@@ -311,7 +309,6 @@
 						}}
 						errors={getCurrentStepErrors()}
 					/>
-				</div>
 			</div>
 		{:else if $currentStep === 5}
 			<!-- Fuel Data Entry -->
@@ -341,7 +338,7 @@
 					</button>
 				</div>
 				
-				<div class="step-card">
+				
 					<FuelDataEntry
 						selectedVehicle={$workflowData.vehicle}
 						selectedBowser={$workflowData.bowser}
@@ -354,7 +351,6 @@
 						}}
 						errors={getCurrentStepErrors()}
 					/>
-				</div>
 			</div>
 		{:else if $currentStep === 6}
 			<!-- Review & Submit -->
@@ -494,44 +490,45 @@
 
 <style>
 	.fuel-entry-workflow {
-		max-width: 100%;
-		margin: 0;
+		width: 100%;
+		max-width: 1400px;
+		margin: 0 auto;
 		padding: 0;
 		display: flex;
 		flex-direction: column;
+		gap: 1.5rem;
 		background: #f8fafc;
 		min-height: 100vh;
 	}
 	
-	/* Modern Workflow Header */
-	.workflow-header {
-		background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-		color: white;
-		padding: 2rem 0 1.5rem;
-		margin-bottom: 0;
-		position: relative;
-	}
-	
-	.header-content {
+	/* Header - matching Dashboard style */
+	.dashboard-header {
 		display: flex;
-		flex-direction: column;
-		align-items: center;
-		text-align: center;
-		gap: 0.5rem;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 1rem;
+		margin-bottom: 0.5rem;
 	}
 	
-	.workflow-header h1 {
-		font-size: 2rem;
+	.header-content h1 {
+		font-size: 2.25rem;
 		font-weight: 700;
-		margin: 0;
-		color: white;
+		color: var(--color-text-primary);
+		margin: 0 0 0.5rem 0;
+		line-height: 1.2;
 	}
 	
 	.step-info {
+		background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+		color: white;
+		padding: 1rem 1.5rem;
+		border-radius: 16px;
+		box-shadow: 0 8px 32px rgba(249, 115, 22, 0.2);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 0.25rem;
+		margin-bottom: 1.5rem;
 	}
 	
 	.step-badge {
@@ -561,19 +558,6 @@
 		margin: 0 auto;
 	}
 	
-	.step-card {
-		background: white;
-		border-radius: 16px;
-		padding: 2rem;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-		border: 1px solid #f1f5f9;
-		transition: all 0.2s ease;
-	}
-	
-	.step-card:hover {
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-		border-color: #f97316;
-	}
 	
 	/* Navigation */
 	.step-nav {
@@ -893,18 +877,19 @@
 	@media (max-width: 768px) {
 		.fuel-entry-workflow {
 			padding: 0;
-			max-width: 100%;
-			background: #f8fafc;
+			gap: 1rem;
 		}
 		
-		.workflow-header {
-			padding: 1.5rem 0 1rem;
-			margin-bottom: 0;
+		.dashboard-header {
+			flex-direction: column;
+			gap: 0.75rem;
+			padding: 0.5rem;
+		}
+
+		.header-content h1 {
+			font-size: 1.75rem;
 		}
 		
-		.workflow-header h1 {
-			font-size: 1.5rem;
-		}
 		
 		.step-container {
 			padding: 1rem;
@@ -912,10 +897,6 @@
 			max-width: 100%;
 		}
 		
-		.step-card {
-			padding: 1.5rem;
-			border-radius: 12px;
-		}
 		
 		.step-nav {
 			gap: 0.75rem;
@@ -1021,9 +1002,6 @@
 			margin: 1rem 0.75rem 0;
 		}
 		
-		.step-card {
-			padding: 1rem;
-		}
 		
 		.review-card {
 			padding: 1rem;

@@ -302,7 +302,7 @@
 
 	.edit-btn {
 		background: #3b82f6;
-		color: white;
+		color: var(--gray-900, #0f172a);
 		border: none;
 		padding: 0.25rem 0.5rem;
 		border-radius: 0.25rem;

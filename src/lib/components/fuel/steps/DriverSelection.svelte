@@ -322,7 +322,7 @@
 
 	.summary-icon {
 		background: #10b981;
-		color: white;
+		color: var(--gray-900, #0f172a);
 		width: 1.5rem;
 		height: 1.5rem;
 		border-radius: 50%;
@@ -358,7 +358,7 @@
 		height: 2rem;
 		border-radius: 50%;
 		background: #10b981;
-		color: white;
+		color: var(--gray-900, #0f172a);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -535,7 +535,7 @@
 
 		:global(.table .selected) {
 			background: var(--primary, #2563eb);
-			color: white;
+			color: var(--gray-900, #0f172a);
 			font-weight: 600;
 		}
 

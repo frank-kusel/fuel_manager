@@ -543,7 +543,7 @@
 
 	.summary-icon {
 		background: var(--color-success);
-		color: white;
+		color: var(--gray-900, #0f172a);
 		width: 1.5rem;
 		height: 1.5rem;
 		border-radius: 50%;
@@ -762,7 +762,7 @@
 
 		:global(.field-table .selected) {
 			background: var(--primary, #2563eb);
-			color: white;
+			color: var(--gray-900, #0f172a);
 			font-weight: 600;
 		}
 

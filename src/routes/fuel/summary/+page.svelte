@@ -90,7 +90,7 @@
 					*,
 					vehicles!left(code, name),
 					drivers!left(employee_code, name),
-					activities!left(name),
+					activities!left(name, code),
 					fields!left(code, name),
 					zones!left(code, name)
 				`)
@@ -108,7 +108,7 @@
 					*,
 					vehicles!left(code, name),
 					drivers!left(employee_code, name),
-					activities!left(name),
+					activities!left(name, code),
 					fields!left(code, name),
 					zones!left(code, name)
 				`)
@@ -245,35 +245,34 @@
 		</div>
 	{/if}
 
-	<div class="summary-header">
+	<div class="dashboard-header">
 		<div class="header-content">
 			<h1>Fuel Summary</h1>
-			<p class="header-subtitle">Logbook transcription ready</p>
+		</div>
+	</div>
+	
+	<div class="header-controls">
+		<div class="date-control">
+			<label for="date">Date</label>
+			<input 
+				id="date"
+				type="date" 
+				bind:value={selectedDate}
+				onchange={loadEntries}
+				class="date-input"
+			/>
 		</div>
 		
-		<div class="header-controls">
-			<div class="date-control">
-				<label for="date">Date</label>
-				<input 
-					id="date"
-					type="date" 
-					bind:value={selectedDate}
-					onchange={loadEntries}
-					class="date-input"
-				/>
-			</div>
-			
-			<div class="action-controls desktop-only">
-				<Button size="sm" variant="outline" onclick={loadEntries}>
-					Refresh
-				</Button>
-				<Button size="sm" variant="outline" onclick={() => window.print()}>
-					Print
-				</Button>
-				<Button size="sm" onclick={exportToCSV}>
-					Export
-				</Button>
-			</div>
+		<div class="action-controls desktop-only">
+			<Button size="sm" variant="outline" onclick={loadEntries}>
+				Refresh
+			</Button>
+			<Button size="sm" variant="outline" onclick={() => window.print()}>
+				Print
+			</Button>
+			<Button size="sm" onclick={exportToCSV}>
+				Export
+			</Button>
 		</div>
 	</div>
 	
@@ -334,11 +333,23 @@
 								</div>
 								<div class="detail-item">
 									<span class="detail-label">Activity</span>
-									<span class="detail-value">{entry.activities?.name || 'N/A'}</span>
+									<span class="detail-value">{entry.activities?.name || 'N/A'} {entry.activities?.code ? `(${entry.activities.code})` : ''}</span>
 								</div>
 								<div class="detail-item">
-									<span class="detail-label">Location</span>
+									<span class="detail-label">Field</span>
 									<span class="detail-value">{getLocation(entry)}</span>
+								</div>
+								<div class="detail-item">
+									<span class="detail-label">Bowser End</span>
+									<span class="detail-value">{entry.bowser_reading_end || '-'}</span>
+								</div>
+								<div class="detail-item">
+									<span class="detail-label">Distance</span>
+									<span class="detail-value">{entry.odometer_start && entry.odometer_end && entry.gauge_working ? `${(entry.odometer_end - entry.odometer_start).toFixed(1)} km` : '-'}</span>
+								</div>
+								<div class="detail-item">
+									<span class="detail-label">Consumption</span>
+									<span class="detail-value">-</span>
 								</div>
 							</div>
 							
@@ -369,6 +380,21 @@
 						<div class="fuel-badge">{entry.litres_dispensed.toFixed(1)}L</div>
 					</div>
 					
+					<div class="logbook-details">
+						<div class="logbook-detail-item">
+							<span class="detail-label">Activity</span>
+							<span class="detail-value">{entry.activities?.code || entry.activities?.name || '-'}</span>
+						</div>
+						<div class="logbook-detail-item">
+							<span class="detail-label">Field</span>
+							<span class="detail-value">{entry.fields?.code || '-'}</span>
+						</div>
+						<div class="logbook-detail-item">
+							<span class="detail-label">Bowser</span>
+							<span class="detail-value">{entry.bowser_reading_end || '-'}</span>
+						</div>
+					</div>
+					
 					<div class="odometer-grid">
 						<div class="odo-item">
 							<div class="odo-label">Start</div>
@@ -377,6 +403,10 @@
 						<div class="odo-item">
 							<div class="odo-label">End</div>
 							<div class="odo-value">{formatOdometerValue(entry.odometer_end, entry.gauge_working)}</div>
+						</div>
+						<div class="odo-item">
+							<div class="odo-label">Distance</div>
+							<div class="odo-value">{entry.odometer_start && entry.odometer_end && entry.gauge_working ? (entry.odometer_end - entry.odometer_start).toFixed(1) : '-'}</div>
 						</div>
 					</div>
 				</div>
@@ -425,42 +455,42 @@
 
 	/* Main Container */
 	.fuel-summary {
-		position: relative;
+		width: 100%;
 		max-width: 1400px;
 		margin: 0 auto;
 		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
 		min-height: 100vh;
 	}
 	
-	/* Header */
-	.summary-header {
-		background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-		color: white;
-		padding: 2rem;
-		margin-bottom: 2rem;
-		border-radius: 0 0 24px 24px;
-		box-shadow: 0 8px 32px rgba(249, 115, 22, 0.2);
+	/* Header - matching Dashboard style */
+	.dashboard-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 1rem;
+		margin-bottom: 0.5rem;
 	}
 
 	.header-content h1 {
-		font-size: 2.5rem;
+		font-size: 2.25rem;
 		font-weight: 700;
+		color: var(--color-text-primary);
 		margin: 0 0 0.5rem 0;
-		line-height: 1.1;
-	}
-
-	.header-subtitle {
-		font-size: 1rem;
-		opacity: 0.9;
-		margin: 0;
-		font-weight: 400;
+		line-height: 1.2;
 	}
 
 	.header-controls {
+		background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+		color: white;
+		padding: 1.5rem;
+		border-radius: 16px;
+		box-shadow: 0 8px 32px rgba(249, 115, 22, 0.2);
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-end;
-		margin-top: 1.5rem;
 		gap: 1rem;
 	}
 
@@ -711,10 +741,41 @@
 		box-shadow: 0 2px 8px rgba(5, 150, 105, 0.2);
 	}
 
+	.logbook-details {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+		padding: 0.75rem;
+		background: #f9fafb;
+		border-radius: 8px;
+	}
+
+	.logbook-detail-item {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.logbook-detail-item .detail-label {
+		font-size: 0.75rem;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		font-weight: 500;
+	}
+
+	.logbook-detail-item .detail-value {
+		font-size: 0.875rem;
+		color: #111827;
+		font-weight: 600;
+	}
+
 	.odometer-grid {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
+		grid-template-columns: 1fr 1fr 1fr;
+		gap: 0.75rem;
 	}
 
 	.odo-item {
@@ -874,13 +935,19 @@
 	}
 	
 	@media (max-width: 768px) {
-		.summary-header {
-			padding: 1.5rem 1rem;
-			border-radius: 0 0 16px 16px;
+		.fuel-summary {
+			padding: 0;
+			gap: 1rem;
+		}
+
+		.dashboard-header {
+			flex-direction: column;
+			gap: 0.75rem;
+			padding: 0.5rem;
 		}
 
 		.header-content h1 {
-			font-size: 2rem;
+			font-size: 1.75rem;
 		}
 
 		.header-controls {
