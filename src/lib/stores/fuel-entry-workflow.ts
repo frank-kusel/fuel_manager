@@ -343,6 +343,19 @@ function createFuelEntryWorkflowStore() {
 			updateStepValidation();
 		},
 		
+		setBowser: (bowser: Bowser | null) => {
+			update(state => ({
+				...state,
+				data: {
+					...state.data,
+					bowser,
+					// Pre-populate start reading with bowser's current reading
+					bowserReadingStart: bowser?.current_reading || state.data.bowserReadingStart
+				}
+			}));
+			updateStepValidation();
+		},
+		
 		setFuelData: (bowser: Bowser | null, startReading: number | null, endReading: number | null, litres: number | null) => {
 			update(state => ({
 				...state,
@@ -380,6 +393,8 @@ function createFuelEntryWorkflowStore() {
 			
 			try {
 				const { default: supabaseService } = await import('$lib/services/supabase');
+				const { offlineSyncService } = await import('$lib/services/offline-sync');
+				
 				await supabaseService.init();
 				
 				// Get current state for submission
@@ -422,19 +437,63 @@ function createFuelEntryWorkflowStore() {
 				
 				console.log('Submitting fuel entry data:', fuelEntryData);
 				
-				// Submit to database
-				const result = await supabaseService.createFuelEntry(fuelEntryData);
+				let result;
+				let isOffline = false;
 				
-				if (result.error) {
-					throw new Error(result.error);
+				// Try to submit online first
+				try {
+					result = await supabaseService.createFuelEntry(fuelEntryData);
+					if (result.error) {
+						throw new Error(result.error);
+					}
+				} catch (error) {
+					// If network error or offline, store for later sync
+					if (!navigator.onLine || error instanceof Error && (
+						error.message.includes('fetch') || 
+						error.message.includes('network') ||
+						error.message.includes('Failed to fetch')
+					)) {
+						console.log('Storing fuel entry offline for later sync');
+						const offlineId = await offlineSyncService.storeOfflineEntry('fuel_entry', fuelEntryData);
+						isOffline = true;
+						result = { data: { id: offlineId }, error: null };
+					} else {
+						throw error;
+					}
 				}
 				
-				// Update vehicle's current odometer
-				if (currentData!.odometerEnd && currentData!.gaugeWorking) {
-					await supabaseService.updateVehicleOdometer(
-						currentData!.vehicle!.id, 
-						currentData!.odometerEnd
-					);
+				// Update vehicle's current odometer (online only for now)
+				if (!isOffline && currentData!.odometerEnd && currentData!.gaugeWorking) {
+					try {
+						await supabaseService.updateVehicleOdometer(
+							currentData!.vehicle!.id, 
+							currentData!.odometerEnd
+						);
+					} catch (error) {
+						console.warn('Failed to update vehicle odometer:', error);
+					}
+				}
+				
+				// Update bowser's current reading
+				if (currentData!.bowserReadingEnd !== null && currentData!.bowser) {
+					if (isOffline) {
+						// Store bowser reading update for later sync
+						await offlineSyncService.storeOfflineEntry('bowser_reading', {
+							bowser_id: currentData!.bowser.id,
+							new_reading: currentData!.bowserReadingEnd,
+							fuel_entry_id: result.data?.id
+						});
+					} else {
+						try {
+							await supabaseService.updateBowserReading(
+								currentData!.bowser.id,
+								currentData!.bowserReadingEnd,
+								result.data?.id
+							);
+						} catch (error) {
+							console.warn('Failed to update bowser reading:', error);
+						}
+					}
 				}
 				
 				update(state => ({ 

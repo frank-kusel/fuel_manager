@@ -33,7 +33,13 @@
 	onMount(async () => {
 		try {
 			await supabaseService.init();
-			const result = await supabaseService.getActivities();
+			// Get activities with legacy field
+			const { data, error: fetchError } = await supabaseService['client']
+				.from('activities')
+				.select('*')
+				.order('name', { ascending: true });
+			
+			const result = { data, error: fetchError?.message };
 			if (result.error) {
 				throw new Error(result.error);
 			}
@@ -156,12 +162,6 @@
 	{:else}
 		<div class="table-container">
 			<table class="table" id="activity-table">
-				<thead>
-					<tr>
-						<th>Activity</th>
-						<th>Name (Zulu)</th>
-					</tr>
-				</thead>
 				<tbody>
 					{#each Object.entries(groupedActivities) as [category, activityList]}
 						<!-- Category Group Header -->
@@ -188,7 +188,15 @@
 										<span class="activity-icon" style="color: {getActivityColor(activity.name)}">
 											{getActivityIcon(activity)}
 										</span>
-										<span class="activity-name">{activity.name}</span>
+										<div class="activity-text">
+											<div class="activity-name">{activity.name}</div>
+											<div class="activity-codes">
+												<span class="activity-code">{activity.code}</span>
+												{#if activity.legacy}
+													<span class="activity-legacy">{activity.legacy}</span>
+												{/if}
+											</div>
+										</div>
 									</div>
 								</td>
 								<td class="activity-zulu">{activity.name_zulu || ''}</td>
@@ -259,10 +267,11 @@
 
 	:global(.table th),
 	:global(.table td) {
-		padding: 0.75rem 1rem;
+		padding: 0.875rem 1rem;
 		text-align: left;
 		border-bottom: 1px solid var(--gray-100, #f3f4f6);
-		font-size: 0.95rem;
+		font-size: 1rem;
+		vertical-align: top;
 	}
 
 	:global(.table th) {
@@ -306,7 +315,7 @@
 	.group-label {
 		font-weight: 500;
 		color: var(--gray-700, #374151);
-		font-size: 0.95rem;
+		font-size: 1rem;
 		text-transform: capitalize;
 	}
 	
@@ -333,38 +342,86 @@
 	/* Selected rows */
 	:global(.table tbody tr.selected) {
 		background: var(--primary, #2563eb);
-		color: var(--gray-900, #0f172a);
+		color: white;
 		border-left-color: var(--primary, #2563eb);
 		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
 	}
+	
+	:global(.table tbody tr.selected .activity-name) {
+		color: white;
+	}
+	
+	:global(.table tbody tr.selected .activity-code) {
+		color: white;
+		opacity: 0.95;
+	}
+	
+	:global(.table tbody tr.selected .activity-legacy) {
+		color: rgba(255, 255, 255, 0.6);
+	}
+	
+	:global(.table tbody tr.selected .activity-zulu) {
+		color: rgba(255, 255, 255, 0.85);
+	}
 
 	.activity-name-cell {
-		width: 60%;
+		width: 75%;
 	}
 
 	.activity-content {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.25rem;
 	}
 
 	.activity-icon {
-		font-size: 1.2rem;
+		font-size: 1.4rem;
 		flex-shrink: 0;
 	}
 
+	.activity-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
 	.activity-name {
-		font-weight: 500;
+		font-weight: 600;
 		color: var(--gray-900, #111827);
-		font-size: 0.95rem;
+		font-size: 1.05rem;
+		line-height: 1.2;
+	}
+
+	.activity-codes {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		white-space: nowrap;
+	}
+
+	.activity-code {
+		font-family: monospace;
+		font-weight: 600;
+		color: var(--gray-700, #374151);
+		font-size: 0.925rem;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+
+	.activity-legacy {
+		font-family: monospace;
+		font-size: 0.85rem;
+		color: var(--gray-400, #9ca3af);
+		font-weight: 400;
 	}
 
 	.activity-zulu {
 		font-style: italic;
 		color: var(--gray-600, #475569);
-		font-size: 0.9rem;
+		font-size: 1rem;
 		font-weight: 400;
-		width: 40%;
+		width: 25%;
+		padding-top: 0.125rem;
 	}
 
 	/* Step Header */
@@ -696,7 +753,7 @@
 
 		:global(.table) {
 			width: 100%;
-			font-size: 14px;
+			font-size: 16px;
 			border-collapse: collapse;
 			table-layout: fixed;
 		}
@@ -705,6 +762,7 @@
 		:global(.table td) {
 			padding: 0.75rem 1rem !important;
 			border-bottom: 1px solid var(--gray-100, #f1f5f9);
+			vertical-align: top !important;
 		}
 
 		:global(.table th) {
@@ -728,14 +786,20 @@
 		}
 
 		/* Mobile table column widths */
-		:global(#activity-table th:nth-child(1)),
 		:global(#activity-table td:nth-child(1)) { /* Activity name */
-			width: 60%;
+			width: 80% !important;
 		}
 
-		:global(#activity-table th:nth-child(2)),
 		:global(#activity-table td:nth-child(2)) { /* Zulu name */
-			width: 40%;
+			width: 20% !important;
+		}
+		
+		.activity-name-cell {
+			width: 80% !important;
+		}
+		
+		.activity-zulu {
+			width: 20% !important;
 		}
 
 		:global(#activity-table .selected td:nth-child(1)) {

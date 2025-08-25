@@ -30,7 +30,8 @@
       "mcp__supabase__list_tables",
       "Bash(for file in src/lib/components/fuel/steps/*.svelte)",
       "Bash(do sed -i \"s/color: var(--gray-900, #0f172a);/color: white;/g\" \"$file\")",
-      "Bash(done)"
+      "Bash(done)",
+      "mcp__supabase__apply_migration"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

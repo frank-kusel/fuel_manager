@@ -717,6 +717,75 @@
 		font-weight: 700 !important;
 	}
 
+	/* Activity display styling */
+	.activity-display {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.125rem;
+	}
+
+	.activity-name {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #111827;
+	}
+
+	.activity-codes {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-size: 0.75rem;
+	}
+
+	.activity-code {
+		font-family: monospace;
+		font-weight: 600;
+		color: #374151;
+	}
+
+	.activity-legacy {
+		font-family: monospace;
+		font-size: 0.625rem;
+		color: #9ca3af;
+		font-weight: 400;
+	}
+
+	/* Mobile activity display styling */
+	.mobile-activity-display {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.125rem;
+	}
+
+	.mobile-activity-name {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #374151;
+		line-height: 1.2;
+	}
+
+	.mobile-activity-codes {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-size: 0.625rem;
+	}
+
+	.mobile-activity-code {
+		font-family: monospace;
+		font-weight: 600;
+		color: #4b5563;
+	}
+
+	.mobile-activity-legacy {
+		font-family: monospace;
+		font-size: 0.5rem;
+		color: #9ca3af;
+		font-weight: 400;
+	}
+
 
 	/* Mobile Logbook View */
 	/* Mobile Cards */

@@ -142,6 +142,53 @@ class SupabaseService {
 		);
 	}
 
+	async updateBowserReading(id: string, newReading: number, fuelEntryId?: string): Promise<ApiResponse<Bowser>> {
+		const client = this.ensureInitialized();
+		
+		try {
+			// First get the current reading for history
+			const currentBowser = await client
+				.from('bowsers')
+				.select('current_reading')
+				.eq('id', id)
+				.single();
+			
+			const previousReading = currentBowser.data?.current_reading || null;
+			
+			// Update bowser reading with last_updated timestamp
+			const updateResult = await client
+				.from('bowsers')
+				.update({ 
+					current_reading: newReading, 
+					last_updated: new Date().toISOString(),
+					updated_at: new Date().toISOString() 
+				})
+				.eq('id', id)
+				.select()
+				.single();
+			
+			// Create history record (if table exists)
+			try {
+				await client
+					.from('bowser_reading_history')
+					.insert({
+						bowser_id: id,
+						fuel_entry_id: fuelEntryId || null,
+						previous_reading: previousReading,
+						new_reading: newReading,
+						created_by: null
+					});
+			} catch (historyError) {
+				// History table might not exist yet, log but don't fail the main operation
+				console.warn('Could not create bowser reading history:', historyError);
+			}
+			
+			return { data: updateResult.data, error: updateResult.error?.message };
+		} catch (error) {
+			return { data: null, error: error instanceof Error ? error.message : 'Failed to update bowser reading' };
+		}
+	}
+
 	async deleteVehicle(id: string): Promise<ApiResponse<null>> {
 		const client = this.ensureInitialized();
 		return this.query(() => 
@@ -488,6 +535,9 @@ class SupabaseService {
 					activeVehicles,
 					vehiclesWithOdometer,
 					totalBowsers: bowsers.data?.length || 0,
+					
+					// Bowser reading (Tank A - first bowser)
+					bowserReading: bowsers.data?.[0]?.current_reading || 0,
 					
 					// Recent activity
 					recentEntries: recentEntries.data || [],

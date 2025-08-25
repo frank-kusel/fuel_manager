@@ -93,14 +93,14 @@
 			{/if}
 		</div>
 
-		<!-- Active Fleet -->
+		<!-- Bowser Reading -->
 		<div class="metric-card compact">
-			<div class="compact-header">Active Fleet</div>
+			<div class="compact-header">Bowser Reading</div>
 			{#if loading}
 				<div class="compact-skeleton"></div>
 			{:else}
-				<div class="compact-value">{stats?.activeVehicles || 0}</div>
-				<div class="compact-subtitle">vehicles</div>
+				<div class="compact-value">{formatDecimal(stats?.bowserReading || 0)}</div>
+				<div class="compact-subtitle">litres</div>
 			{/if}
 		</div>
 	</div>

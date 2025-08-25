@@ -26,6 +26,8 @@
 	let startReading = $state(bowserReadingStart || 0);
 	let endReading = $state(bowserReadingEnd || 0);
 	let isEditingEndReading = $state(false);
+	let expectedStartReading = $state<number | null>(null);
+	let readingMismatchWarning = $state<string | null>(null);
 	
 	onMount(async () => {
 		try {
@@ -38,10 +40,15 @@
 				selectedVehicle ? bowser.fuel_type === selectedVehicle.fuel_type : true
 			);
 			
-			// Auto-select first bowser
+			// Auto-select first bowser and pre-populate its current reading
 			if (bowsers.length > 0 && !selectedBowserId) {
-				selectedBowserId = bowsers[0].id;
-				startReading = bowsers[0].current_reading || 0;
+				const firstBowser = bowsers[0];
+				selectedBowserId = firstBowser.id;
+				// Pre-populate start reading with bowser's current reading
+				expectedStartReading = firstBowser.current_reading || 0;
+				startReading = firstBowser.current_reading || 0;
+				// Update parent immediately with bowser selection
+				onFuelDataUpdate(firstBowser, firstBowser.current_reading || 0, endReading, null);
 			}
 		} catch (err) {
 			console.error('Failed to load bowsers:', err);
@@ -73,6 +80,20 @@
 	// Update selected bowser when values change
 	$effect(() => {
 		selectedBowserInfo = bowsers.find(b => b.id === selectedBowserId) || null;
+	});
+	
+	// Check for reading continuity
+	$effect(() => {
+		if (expectedStartReading !== null && startReading !== expectedStartReading) {
+			const diff = Math.abs(startReading - expectedStartReading);
+			if (diff > 0.1) { // Allow small rounding differences
+				readingMismatchWarning = `Warning: Start reading (${startReading}) doesn't match bowser's last reading (${expectedStartReading}). This may indicate a missing entry or manual adjustment.`;
+			} else {
+				readingMismatchWarning = null;
+			}
+		} else {
+			readingMismatchWarning = null;
+		}
 	});
 </script>
 
@@ -144,6 +165,14 @@
 				{/if}
 			</div>
 		</div>
+		
+		<!-- Reading continuity warning -->
+		{#if readingMismatchWarning}
+			<div class="warning-message">
+				<span class="warning-icon">⚠️</span>
+				<span class="warning-text">{readingMismatchWarning}</span>
+			</div>
+		{/if}
 		
 	{:else}
 		<div class="no-vehicle">Select a vehicle first</div>
@@ -313,6 +342,29 @@
 
 	.edit-btn:hover {
 		background: #2563eb;
+	}
+
+	/* Warning message */
+	.warning-message {
+		background: #fef3c7;
+		border: 1px solid #f59e0b;
+		border-radius: 8px;
+		padding: 0.75rem;
+		margin-top: 1rem;
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+	}
+
+	.warning-icon {
+		flex-shrink: 0;
+		font-size: 1rem;
+	}
+
+	.warning-text {
+		color: #92400e;
+		font-size: 0.875rem;
+		line-height: 1.4;
 	}
 
 	/* States */
