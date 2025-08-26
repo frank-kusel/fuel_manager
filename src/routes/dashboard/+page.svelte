@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import DashboardStats from '$lib/components/dashboard/DashboardStats.svelte';
 	import RecentActivity from '$lib/components/dashboard/RecentActivity.svelte';
+	import TankManagement from '$lib/components/dashboard/TankManagement.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import dashboardStore, { 
 		dashboardStats, 
@@ -76,6 +77,9 @@
 			/>
 		</div>
 	</div>
+
+	<!-- Tank Management Section -->
+	<TankManagement />
 
 </div>
 

@@ -73,7 +73,7 @@
 		if (!isEditingEndReading && !isEditingStartReading) {
 			const fuel = parseFloat(fuelAmount);
 			if (!isNaN(fuel) && fuel > 0 && startReading) {
-				endReading = startReading - fuel; // Bowser reading decreases as fuel is dispensed
+				endReading = startReading + fuel; // Bowser reading increases as fuel is dispensed (like odometer)
 			}
 		}
 	});

@@ -46,12 +46,12 @@
 				{#if loading}
 					<div class="metric-skeleton"></div>
 				{:else}
-					<div class="metric-value">{formatDecimal(stats?.tankPercentage || 0)}<span class="unit">%</span></div>
+					<div class="metric-value">{formatNumber(stats?.tankLevel || 0)}<span class="unit">L</span></div>
 					<div class="tank-visual">
 						<div class="tank-indicator {getTankLevelClass(stats?.tankPercentage || 0)}">
 							<div class="tank-level" style="height: {Math.min(stats?.tankPercentage || 0, 100)}%"></div>
 						</div>
-						<div class="tank-info">{formatNumber(stats?.tankLevel || 0)}L remaining</div>
+						<div class="tank-info">{formatDecimal(stats?.tankPercentage || 0)}%</div>
 					</div>
 				{/if}
 			</div>

@@ -304,6 +304,111 @@ class SupabaseService {
 	}
 
 
+	// Tank Management operations
+	async getTankConfig(): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('tank_config')
+				.select('*')
+				.eq('tank_id', 'tank_a')
+				.single()
+		);
+	}
+	
+	async getTankReadings(limit = 10): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('tank_readings')
+				.select('*')
+				.order('reading_date', { ascending: false })
+				.order('reading_time', { ascending: false })
+				.limit(limit)
+		);
+	}
+	
+	async getTankRefills(limit = 10): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('tank_refills')
+				.select('*')
+				.order('delivery_date', { ascending: false })
+				.limit(limit)
+		);
+	}
+	
+	async addTankReading(reading: {
+		reading_value: number;
+		reading_date: string;
+		notes?: string;
+	}): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		
+		try {
+			// Add the reading
+			const result = await client
+				.from('tank_readings')
+				.insert({
+					tank_id: 'tank_a',
+					...reading,
+					reading_type: 'dipstick'
+				})
+				.select()
+				.single();
+			
+			// Update tank config with latest dipstick reading
+			if (result.data) {
+				await client
+					.from('tank_config')
+					.update({
+						last_dipstick_level: reading.reading_value,
+						last_dipstick_date: reading.reading_date,
+						updated_at: new Date().toISOString()
+					})
+					.eq('tank_id', 'tank_a');
+			}
+			
+			return { data: result.data, error: result.error?.message };
+		} catch (error) {
+			return { data: null, error: error instanceof Error ? error.message : 'Failed to add tank reading' };
+		}
+	}
+	
+	async addTankRefill(refill: {
+		litres_added: number;
+		supplier?: string;
+		delivery_date: string;
+		invoice_number?: string;
+		total_cost?: number;
+		notes?: string;
+	}): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		
+		return this.query(() => 
+			client
+				.from('tank_refills')
+				.insert({
+					tank_id: 'tank_a',
+					...refill
+				})
+				.select()
+				.single()
+		);
+	}
+	
+	async getTankStatus(): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('tank_status')
+				.select('*')
+				.eq('tank_id', 'tank_a')
+				.single()
+		);
+	}
+	
 	// Activity operations
 	async getActivities(): Promise<ApiResponse<Activity[]>> {
 		const client = this.ensureInitialized();
@@ -407,7 +512,7 @@ class SupabaseService {
 			const weekStart = new Date(now.getTime() - daysToSubtract * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 			
 			// Get fuel entries for different periods
-			const [dailyFuel, weeklyFuel, monthlyFuel, recentEntries, bowsers, vehicles] = await Promise.all([
+			const [dailyFuel, weeklyFuel, monthlyFuel, recentEntries, bowsers, vehicles, tankStatus] = await Promise.all([
 				// Today's fuel usage
 				client
 					.from('fuel_entries')
@@ -449,7 +554,14 @@ class SupabaseService {
 				client
 					.from('vehicles')
 					.select('id, current_odometer')
-					.eq('active', true)
+					.eq('active', true),
+				
+				// Tank status for calculated level
+				client
+					.from('tank_config')
+					.select('current_calculated_level, capacity')
+					.eq('tank_id', 'tank_a')
+					.single()
 			]);
 
 			// Calculate totals
@@ -474,12 +586,12 @@ class SupabaseService {
 				? consumptionEntries.reduce((sum, entry) => sum + entry.fuel_consumption_l_per_100km, 0) / consumptionEntries.length
 				: (monthlyDistance > 0 ? (monthlyUsage / monthlyDistance * 100) : 0);
 			
-			// Total tank capacity and current levels
-			const totalTankCapacity = bowsers.data?.reduce((sum, bowser) => sum + (bowser.capacity || 0), 0) || 0;
-			const totalCurrentLevel = bowsers.data?.reduce((sum, bowser) => sum + (bowser.current_reading || 0), 0) || 0;
+			// Tank capacity and calculated level from tank_config
+			const tankCapacity = tankStatus.data?.capacity || 5000;
+			const calculatedTankLevel = tankStatus.data?.current_calculated_level || 0;
 			
 			// Calculate tank percentage
-			const tankPercentage = totalTankCapacity > 0 ? (totalCurrentLevel / totalTankCapacity * 100) : 0;
+			const tankPercentage = tankCapacity > 0 ? (calculatedTankLevel / tankCapacity * 100) : 0;
 			
 			// Active vehicles with odometer data
 			const activeVehicles = vehicles.data?.length || 0;
@@ -512,9 +624,9 @@ class SupabaseService {
 					bestEfficiencyThisMonth: bestEfficiency ? Math.round(bestEfficiency * 100) / 100 : null,
 					worstEfficiencyThisMonth: worstEfficiency ? Math.round(worstEfficiency * 100) / 100 : null,
 					
-					// Tank monitoring
-					tankLevel: Math.round(totalCurrentLevel * 100) / 100,
-					tankCapacity: totalTankCapacity,
+					// Tank monitoring (calculated level)
+					tankLevel: Math.round(calculatedTankLevel * 100) / 100,
+					tankCapacity: tankCapacity,
 					tankPercentage: Math.round(tankPercentage * 100) / 100,
 					
 					// Fleet status

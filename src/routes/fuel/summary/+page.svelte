@@ -83,25 +83,7 @@
 			loading = true;
 			await supabaseService.init();
 			
-			// First get all entries to see what we have - using LEFT JOINs to include entries with missing relationships
-			const { data: allData, error: allError } = await supabaseService['client']
-				.from('fuel_entries')
-				.select(`
-					*,
-					vehicles!left(code, name),
-					drivers!left(employee_code, name),
-					activities!left(name, code),
-					fields!left(code, name),
-					zones!left(code, name)
-				`)
-				.order('entry_date', { ascending: false })
-				.order('time', { ascending: false });
-			
-			console.log('=== ALL FUEL ENTRIES ===');
-			console.log('Total entries in database:', allData?.length || 0);
-			console.log('All entries:', allData);
-			
-			// Now filter for selected date - using LEFT JOINs to include entries with missing relationships
+			// Filter for selected date - using LEFT JOINs to include entries with missing relationships
 			const { data, error: fetchError } = await supabaseService['client']
 				.from('fuel_entries')
 				.select(`
@@ -118,32 +100,7 @@
 			if (fetchError) throw fetchError;
 			
 			entries = data || [];
-			console.log('=== FILTERED ENTRIES FOR', selectedDate, '===');
-			console.log('Filtered entries count:', entries.length);
-			console.log('Filtered entries:', entries);
 			
-			// Check for missing data
-			entries.forEach((entry, index) => {
-				// Debug vehicle data structure
-				console.log(`Entry ${index + 1} VEHICLE DEBUG:`, {
-					vehicles_raw: entry.vehicles,
-					vehicles_keys: entry.vehicles ? Object.keys(entry.vehicles) : 'null',
-					vehicles_code: entry.vehicles?.code,
-					vehicles_name: entry.vehicles?.name,
-					vehicles_stringified: JSON.stringify(entry.vehicles)
-				});
-				
-				console.log(`Entry ${index + 1} USAGE DEBUG:`, {
-					odometer_start: entry.odometer_start,
-					odometer_start_type: typeof entry.odometer_start,
-					odometer_end: entry.odometer_end,
-					odometer_end_type: typeof entry.odometer_end,
-					gauge_working: entry.gauge_working,
-					gauge_working_type: typeof entry.gauge_working,
-					calculation: entry.odometer_start !== null && entry.odometer_end !== null && entry.gauge_working !== false,
-					result: (entry.odometer_start !== null && entry.odometer_end !== null && entry.gauge_working !== false) ? (entry.odometer_end - entry.odometer_start) : 'N/A'
-				});
-			});
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load entries';
 		} finally {
@@ -226,6 +183,44 @@
 		});
 		return grouped;
 	});
+
+	// Calculate summary statistics for the selected date
+	let summaryStats = $derived.by(() => {
+		const currentEntries = entries; // Access the reactive state
+		
+		if (!currentEntries || currentEntries.length === 0) {
+			return {
+				totalFuel: 0,
+				openingReading: null,
+				closingReading: null,
+				entryCount: 0
+			};
+		}
+
+		// Sort entries by time to get chronological order
+		const sortedEntries = [...currentEntries].sort((a, b) => {
+			return a.time.localeCompare(b.time);
+		});
+
+		const totalFuel = currentEntries.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0);
+		const firstEntry = sortedEntries[0];
+		const lastEntry = sortedEntries[sortedEntries.length - 1];
+		
+		// Opening reading is the start reading of the first entry
+		const openingReading = firstEntry?.bowser_reading_start || null;
+		// Closing reading is the end reading of the last entry  
+		const closingReading = lastEntry?.bowser_reading_end || null;
+
+		const stats = {
+			totalFuel,
+			openingReading,
+			closingReading,
+			entryCount: currentEntries.length
+		};
+
+
+		return stats;
+	});
 	
 </script>
 
@@ -281,6 +276,40 @@
 			</Button>
 		</div>
 	</div>
+	
+	<!-- Summary Statistics -->
+	{#if !loading && entries.length > 0}
+		<div class="summary-stats">
+			<div class="summary-card unified">
+				<div class="summary-header">
+					<div class="total-fuel-section">
+						<div class="total-fuel-label">Total Fuel</div>
+						<div class="total-fuel-value">{(summaryStats.totalFuel || 0).toFixed(1)}<span class="fuel-unit">l</span></div>
+					</div>
+				</div>
+				<div class="bowser-readings-section">
+					<div class="bowser-readings-header">Bowser Reading</div>
+					<div class="bowser-readings-row">
+						<div class="bowser-reading-item">
+							<div class="bowser-reading-label">Opening</div>
+							<div class="bowser-reading-value">{summaryStats.openingReading !== null && summaryStats.openingReading !== undefined ? summaryStats.openingReading.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '-'}{#if summaryStats.openingReading !== null && summaryStats.openingReading !== undefined}<span class="bowser-unit">l</span>{/if}</div>
+						</div>
+						<div class="bowser-reading-item">
+							<div class="bowser-reading-label">Closing</div>
+							<div class="bowser-reading-value">
+								{#if summaryStats.openingReading !== null && summaryStats.openingReading !== undefined && summaryStats.closingReading !== null && summaryStats.closingReading !== undefined}
+									{@const difference = summaryStats.closingReading - summaryStats.openingReading}
+									{@const matches = Math.abs(difference - summaryStats.totalFuel) < 0.1}
+									<span class="validation-dot {matches ? 'match' : 'mismatch'}">●</span>
+								{/if}
+								{summaryStats.closingReading !== null && summaryStats.closingReading !== undefined ? summaryStats.closingReading.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '-'}{#if summaryStats.closingReading !== null && summaryStats.closingReading !== undefined}<span class="bowser-unit">l</span>{/if}
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	{/if}
 	
 	{#if loading}
 		<div class="loading-state">
@@ -539,6 +568,175 @@
 	.action-controls {
 		display: flex;
 		gap: 0.75rem;
+	}
+
+	/* Summary Statistics */
+	.summary-stats {
+		margin-bottom: 1.5rem;
+	}
+
+	.summary-card {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 12px;
+		padding: 1.25rem;
+		text-align: center;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+	}
+
+	.summary-card:hover {
+		border-color: #f97316;
+		box-shadow: 0 4px 16px rgba(249, 115, 22, 0.1);
+		transform: translateY(-1px);
+	}
+
+	.summary-card.unified {
+		background: white;
+		border: 2px solid #f97316;
+		color: #111827;
+		box-shadow: 0 4px 16px rgba(249, 115, 22, 0.1);
+		padding: 1.5rem;
+	}
+
+	.summary-card.unified:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 8px 24px rgba(249, 115, 22, 0.2);
+		border-color: #ea580c;
+	}
+
+	.summary-header {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 1.5rem;
+	}
+
+	.total-fuel-section {
+		text-align: center;
+	}
+
+	.total-fuel-label {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #f97316;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.5rem;
+	}
+
+	.total-fuel-value {
+		font-size: 2.5rem;
+		font-weight: 700;
+		color: #111827;
+		line-height: 1;
+	}
+
+	.fuel-unit {
+		font-size: 1.25rem;
+		font-weight: 500;
+		opacity: 0.8;
+		margin-left: 0.25rem;
+	}
+
+	.bowser-readings-section {
+		border-top: 1px solid #f1f5f9;
+		padding-top: 1.5rem;
+	}
+
+	.bowser-readings-header {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		text-align: center;
+		margin-bottom: 1rem;
+	}
+
+	.bowser-readings-row {
+		display: flex;
+		gap: 1rem;
+		margin-top: 0.75rem;
+	}
+
+	.bowser-reading-item {
+		flex: 1;
+		text-align: center;
+	}
+
+	.bowser-reading-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.5rem;
+	}
+
+	.bowser-reading-value {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: #111827;
+		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+	}
+
+	.bowser-unit {
+		font-size: 0.875rem;
+		font-weight: 500;
+		opacity: 0.8;
+		margin-left: 0.25rem;
+	}
+
+	.validation-dot {
+		font-size: 1rem;
+		margin-right: 0.5rem;
+	}
+
+	.validation-dot.match {
+		color: #22c55e;
+	}
+
+	.validation-dot.mismatch {
+		color: #ef4444;
+	}
+
+	.summary-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.75rem;
+		opacity: 0.9;
+	}
+
+	.summary-card:not(.primary) .summary-label {
+		color: #6b7280;
+	}
+
+	.summary-value {
+		font-size: 2rem;
+		font-weight: 700;
+		line-height: 1;
+	}
+
+	.summary-card:not(.primary) .summary-value {
+		color: #111827;
+	}
+
+	.summary-card.calculated .summary-value {
+		color: #6b7280;
+		font-style: italic;
+	}
+
+	.summary-unit {
+		font-size: 1rem;
+		font-weight: 500;
+		opacity: 0.8;
+		margin-left: 0.25rem;
 	}
 
 	/* Desktop Card Grid */
@@ -1106,6 +1304,30 @@
 
 		.action-controls {
 			justify-content: center;
+		}
+
+		.summary-card.unified {
+			padding: 1.25rem;
+		}
+
+		.summary-header {
+			margin-bottom: 1.25rem;
+		}
+
+		.total-fuel-value {
+			font-size: 2rem;
+		}
+
+		.bowser-readings-section {
+			padding-top: 1.25rem;
+		}
+
+		.bowser-readings-row {
+			gap: 0.75rem;
+		}
+
+		.bowser-reading-value {
+			font-size: 1.25rem;
 		}
 		
 		.desktop-only {

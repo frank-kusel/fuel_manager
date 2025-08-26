@@ -53,6 +53,10 @@
 			driver.employee_code?.toLowerCase().includes(search) ||
 			driver.license_number?.toLowerCase().includes(search)
 		);
+	}).sort((a, b) => {
+		const codeA = a.employee_code || 'ZZZ';
+		const codeB = b.employee_code || 'ZZZ';
+		return codeA.localeCompare(codeB);
 	}));
 </script>
 

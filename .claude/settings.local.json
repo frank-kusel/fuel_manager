@@ -34,7 +34,10 @@
       "mcp__supabase__apply_migration"
     ],
     "deny": [],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "C:\\c\\Sandbox\\claude\\fuel_manager\\migrations"
+    ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
