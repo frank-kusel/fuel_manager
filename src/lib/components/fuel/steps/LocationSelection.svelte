@@ -182,7 +182,7 @@
 	<!-- Skip Option -->
 	<div class="skip-option">
 		<div class="skip-message" onclick={skipLocation}>
-			⏭️ Skip Location Selection (Optional)
+			Skip Location
 		</div>
 	</div>
 	
@@ -250,7 +250,7 @@
 			</div>
 		{:else}
 			<div class="table-container">
-				<table class="table" id="field-table">
+				<table id="field-table">
 					<thead>
 						<tr>
 							<th>Name</th>
@@ -264,9 +264,7 @@
 							<tr class="group-header">
 								<td colspan="3" class="group-title crop-type-{cropType.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')}">
 									<div class="group-content">
-										<span class="group-dot"></span>
 										<span class="group-label">{cropType}</span>
-										<span class="group-count">{fieldList.length}</span>
 									</div>
 								</td>
 							</tr>
@@ -365,7 +363,7 @@
 	.location-selection {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 0.5rem;
 	}
 
 	/* Tab Switcher */
@@ -423,7 +421,6 @@
 	/* Skip Option */
 	.skip-option {
 		padding: 0.75rem;
-		background: #f0f9ff;
 		border: 1px solid #bae6fd;
 		border-radius: 6px;
 		display: flex;
@@ -621,60 +618,96 @@
 		color: var(--gray-900, #0f172a);
 	}
 
-	/* Table Container */
+	/* Ultra-clean table container */
 	.table-container {
-		background: var(--white, #ffffff);
-		border: 1px solid var(--gray-200, #e2e8f0);
-		border-radius: 0.75rem;
-		overflow: hidden;
+		background: transparent;
+		margin: 0;
 	}
 
-	.table {
+	/* Ultra-clean table design with subtle row lines */
+	:global(#field-table) {
 		width: 100%;
-		border-collapse: collapse;
-		font-size: 0.95rem; /* Increased for mobile readability */
+		border-collapse: separate;
+		border-spacing: 0;
+		table-layout: fixed;
 	}
 
-	/* Group Headers for Fields */
+	:global(#field-table th) {
+		padding: 0.5rem;
+		text-align: left;
+		border: none;
+		background: transparent;
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: #9ca3af;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		line-height: 1;
+	}
+
+	:global(#field-table td) {
+		padding: 0.55rem;
+		text-align: left;
+		border: none;
+		font-size: 0.875rem;
+		vertical-align: middle;
+	}
+
+	/* Subtle row lines for all rows */
+	:global(#field-table tbody tr) {
+		border-bottom: 1px solid rgba(248, 250, 252, 0.8);
+	}
+
+	:global(#field-table tbody tr.clickable) {
+		cursor: pointer;
+		transition: all 0.15s ease;
+		border-bottom-color: rgba(241, 245, 249, 0.6);
+	}
+
+	:global(#field-table tbody tr.clickable:hover) {
+		background: rgba(0, 0, 0, 0.02);
+		border-bottom-color: rgba(203, 213, 225, 0.4);
+	}
+
+	:global(#field-table tbody tr:last-child) {
+		border-bottom: none;
+	}
+
+	/* Clean selected state */
+	:global(#field-table tbody tr.selected) {
+		background: rgba(37, 99, 235, 0.08);
+		border-radius: 0.5rem;
+		border-bottom-color: rgba(37, 99, 235, 0.2);
+	}
+
+	/* Group Headers for Fields - Match vehicle table style */
 	.group-header {
 		background: transparent !important;
 	}
 	
 	.group-title {
-		padding: 0.75rem 1rem !important;
-		background: var(--gray-50, #f8fafc);
-		border-bottom: 1px solid var(--gray-200, #e5e7eb);
+		padding: 0.5rem;
+		font-size: 1rem;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		border: none;
+		text-align: center;
 	}
 	
 	.group-content {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-	}
-	
-	.group-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: var(--green-500, #10b981); /* Default green for crops */
-		flex-shrink: 0;
+		justify-content: center;
 	}
 	
 	.group-label {
-		font-weight: 500;
-		color: var(--gray-700, #374151);
-		font-size: 0.875rem;
-		text-transform: capitalize;
-	}
-	
-	.group-count {
-		color: var(--gray-500, #6b7280);
-		font-size: 0.75rem;
-		background: var(--gray-100, #f3f4f6);
-		padding: 0.125rem 0.375rem;
-		border-radius: 10px;
-		font-weight: 500;
-		margin-left: auto;
+		font-weight: 600;
+		color: #6b7280;
+		font-size: 1rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
 	}
 
 	/* Field rows */
@@ -682,43 +715,7 @@
 		min-height: 48px; /* Touch-friendly height */
 	}
 
-	.table th {
-		background: var(--gray-50, #f8fafc);
-		border-bottom: 1px solid var(--gray-200, #e2e8f0);
-		color: var(--gray-700, #374151);
-		font-size: 0.75rem;
-		font-weight: 600;
-		padding: 0.75rem;
-		text-align: left;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
 
-	.table td {
-		border-bottom: 1px solid var(--gray-100, #f3f4f6);
-		padding: 0.75rem;
-		color: var(--gray-900, #111827);
-		font-size: 0.875rem;
-	}
-
-	.field-row {
-		cursor: pointer;
-		transition: background-color 0.15s ease;
-	}
-
-	.field-row:hover {
-		background: var(--blue-50, #eff6ff);
-	}
-
-	.field-row.selected {
-		background: var(--blue-500, #3b82f6);
-		color: var(--gray-900, #0f172a);
-	}
-
-	.field-row.selected td {
-		color: var(--gray-900, #0f172a);
-		border-bottom-color: rgba(255, 255, 255, 0.2);
-	}
 
 	.field-code {
 		display: flex;

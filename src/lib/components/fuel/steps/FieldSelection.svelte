@@ -20,17 +20,22 @@
 	let searchTerm = $state('');
 	
 	onMount(async () => {
+		console.log('FieldSelection: onMount called');
 		try {
 			await supabaseService.init();
 			const result = await supabaseService.getFields();
+			console.log('FieldSelection: getFields result:', result);
 			if (result.error) {
 				throw new Error(result.error);
 			}
 			fields = result.data || [];
+			console.log('FieldSelection: fields loaded:', fields.length);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load fields';
+			console.log('FieldSelection: error:', error);
 		} finally {
 			loading = false;
+			console.log('FieldSelection: loading complete, fields.length:', fields.length);
 		}
 	});
 	
@@ -153,7 +158,7 @@
 		</div>
 	{:else}
 		<div class="table-container">
-			<table class="table field-table">
+			<table id="field-table">
 				<thead>
 					<tr>
 						<th>Name</th>
@@ -233,73 +238,109 @@
 		letter-spacing: 0.05em;
 	}
 
-	/* Consistent table styling */
+	/* Ultra-clean table container */
 	.table-container {
-		background: white;
-		border: 1px solid #f1f5f9;
-		border-radius: 0.5rem;
-		overflow: hidden;
+		background: transparent;
 		margin: 0;
 	}
 
-	:global(.field-table) {
+	/* Ultra-clean table design with subtle row lines */
+	:global(#field-table) {
 		width: 100%;
-		border-collapse: collapse;
+		border-collapse: separate;
+		border-spacing: 0;
 		table-layout: fixed;
 	}
 
-	:global(.field-table th),
-	:global(.field-table td) {
-		padding: 12px 16px;
+	:global(#field-table th) {
+		padding: 0.5rem;
 		text-align: left;
-		border-bottom: 1px solid #f1f5f9;
-		font-size: 14px;
-		vertical-align: top;
-	}
-
-	:global(.field-table th) {
-		background: #f8fafc;
-		font-size: 12px;
-		font-weight: 600;
-		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		height: 44px;
-	}
-
-	:global(.field-table tbody tr.clickable) {
-		cursor: pointer;
-		transition: background 0.2s ease;
-		min-height: 48px;
-	}
-
-	:global(.field-table tbody tr.clickable:hover) {
-		background: #f8fafc;
-	}
-
-	.field-row.selected {
-		background: #2563eb;
-		color: white;
-	}
-
-	/* Field cell styling */
-	.field-name {
-		font-weight: 600;
-		color: #2563eb;
-		font-size: 14px;
-	}
-
-	.field-crop,
-	.field-location,
-	.field-area {
+		border: none;
+		background: transparent;
+		font-size: 0.6875rem;
 		font-weight: 500;
-		color: #111827;
-		font-size: 14px;
+		color: #9ca3af;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		line-height: 1;
 	}
 
-	.field-area {
-		font-family: monospace;
+	:global(#field-table td) {
+		padding: 0.5rem;
+		text-align: left;
+		border: none;
+		font-size: 0.875rem;
+		vertical-align: middle;
+	}
+
+	/* Add left padding to first column */
+	:global(#field-table th:nth-child(1)),
+	:global(#field-table td:nth-child(1)) {
+		padding-left: 1rem;
+	}
+
+	/* Subtle row lines for all rows */
+	:global(#field-table tbody tr) {
+		border-bottom: 1px solid rgba(248, 250, 252, 0.8);
+	}
+
+	:global(#field-table tbody tr.clickable) {
+		cursor: pointer;
+		transition: all 0.15s ease;
+		border-bottom-color: rgba(241, 245, 249, 0.6);
+	}
+
+	:global(#field-table tbody tr.clickable:hover) {
+		background: rgba(0, 0, 0, 0.02);
+		border-bottom-color: rgba(203, 213, 225, 0.4);
+	}
+
+	:global(#field-table tbody tr:last-child) {
+		border-bottom: none;
+	}
+
+	/* Clean selected state */
+	:global(#field-table tbody tr.selected) {
+		background: rgba(37, 99, 235, 0.08);
+		border-radius: 0.5rem;
+		border-bottom-color: rgba(37, 99, 235, 0.2);
+	}
+
+	/* Clean field cell styling */
+	:global(#field-table .field-name) {
+		font-weight: 600;
+		color: #374151;
+		font-size: 0.875rem;
+	}
+
+	:global(#field-table .field-crop),
+	:global(#field-table .field-location) {
+		font-weight: 400;
+		color: #111827;
+		font-size: 0.875rem;
+	}
+
+	:global(#field-table .field-area) {
+		font-variant-numeric: tabular-nums;
 		color: #6b7280;
+		font-size: 0.8125rem;
+		font-weight: 400;
+	}
+
+	/* Selected state text colors */
+	:global(#field-table tbody tr.selected .field-name) {
+		color: #2563eb;
+		font-weight: 600;
+	}
+
+	:global(#field-table tbody tr.selected .field-crop),
+	:global(#field-table tbody tr.selected .field-location) {
+		color: #1e293b;
+		font-weight: 500;
+	}
+
+	:global(#field-table tbody tr.selected .field-area) {
+		color: #475569;
 	}
 
 	/* Mobile Responsiveness */
@@ -308,27 +349,63 @@
 			margin: 0;
 		}
 
-		:global(.field-table th),
-		:global(.field-table td) {
-			padding: 10px 12px;
+		:global(#field-table th) {
+			padding: 0.625rem 0;
+			font-size: 0.625rem;
+		}
+
+		:global(#field-table td) {
+			padding: 0.875rem 0;
+			font-size: 0.8125rem;
+		}
+
+		/* Mobile Field Table Column Widths */
+		:global(#field-table th:nth-child(1)),
+		:global(#field-table td:nth-child(1)) { /* Name */
+			width: 35%;
+			padding-left: 1rem;
+		}
+
+		:global(#field-table th:nth-child(2)),
+		:global(#field-table td:nth-child(2)) { /* Crop */
+			width: 25%;
+		}
+
+		:global(#field-table th:nth-child(3)),
+		:global(#field-table td:nth-child(3)) { /* Location */
+			width: 25%;
+		}
+
+		:global(#field-table th:nth-child(4)),
+		:global(#field-table td:nth-child(4)) { /* Area */
+			width: 15%;
+			text-align: right;
 		}
 	}
 
 	@media (max-width: 480px) {
-		:global(.field-table th),
-		:global(.field-table td) {
-			padding: 8px 10px;
-			font-size: 13px;
+		:global(#field-table th) {
+			padding: 0.5rem 0;
+		}
+
+		:global(#field-table td) {
+			padding: 0.75rem 0;
+			font-size: 0.75rem;
+		}
+
+		:global(#field-table th:nth-child(1)),
+		:global(#field-table td:nth-child(1)) {
+			padding-left: 1rem;
 		}
 	}
 
 	/* Selected summary */
+	/* Clean selected summary */
 	.selected-summary {
-		margin-top: 1rem;
-		padding: 1rem;
-		background: #f0fdf4;
-		border: 1px solid #bbf7d0;
-		border-radius: 0.5rem;
+		margin-top: 2rem;
+		padding: 1.5rem 0;
+		background: transparent;
+		border-top: 1px solid #f1f5f9;
 	}
 
 	.selected-item {
@@ -336,52 +413,29 @@
 	}
 
 	.selected-label {
-		font-size: 0.75rem;
-		color: #059669;
-		font-weight: 600;
+		font-size: 0.6875rem;
+		color: #9ca3af;
+		font-weight: 500;
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.1em;
 		margin-bottom: 0.5rem;
 	}
 
 	.selected-name {
 		font-size: 1rem;
-		font-weight: 700;
+		font-weight: 500;
 		color: #111827;
 		margin-bottom: 0.25rem;
 	}
 
 	.selected-detail {
-		font-size: 0.875rem;
+		font-size: 0.8125rem;
 		color: #6b7280;
+		font-variant-numeric: tabular-nums;
+		font-weight: 400;
 	}
 
-	:global(.field-table th) {
-		background: var(--gray-50, #f8fafc);
-		font-weight: 600;
-		color: var(--gray-700, #334155);
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	:global(.field-table tbody tr:hover) {
-		background: var(--gray-50, #f8fafc);
-	}
-
-	:global(.field-table tbody tr.clickable) {
-		cursor: pointer;
-	}
-
-	:global(.field-table tbody tr.clickable:hover) {
-		background: var(--primary-light, #eff6ff);
-	}
-
-	/* Selected rows */
-	:global(.field-table tbody tr.selected) {
-		background: var(--primary, #2563eb);
-		color: var(--white, #ffffff);
-	}
+	/* Old conflicting styles removed - using ultra-clean styling above */
 
 	/* Skip Option */
 	.skip-option {
@@ -448,23 +502,23 @@
 	.search-input input {
 		width: 100%;
 		padding: 0.75rem 1rem 0.75rem 2.5rem;
-		border: 1px solid var(--color-border);
+		border: 1px solid #e2e8f0;
 		border-radius: 8px;
 		font-size: 0.875rem;
-		background: var(--color-background);
-		color: var(--color-text-primary);
+		background: #ffffff;
+		color: #111827;
 	}
 
 	.search-input input:focus {
 		outline: none;
-		border-color: var(--color-primary);
-		box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+		border-color: #2563eb;
+		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 	}
 
 	.search-icon {
 		position: absolute;
 		left: 0.75rem;
-		color: var(--color-text-secondary);
+		color: #6b7280;
 		pointer-events: none;
 		font-size: 1rem;
 	}
@@ -474,7 +528,7 @@
 		right: 0.75rem;
 		background: none;
 		border: none;
-		color: var(--color-text-secondary);
+		color: #6b7280;
 		font-size: 1.25rem;
 		cursor: pointer;
 		padding: 0;
@@ -487,218 +541,17 @@
 	}
 
 	.clear-search:hover {
-		background: var(--color-background-secondary);
-		color: var(--color-text-primary);
+		background: #f8fafc;
+		color: #111827;
 	}
 
-	/* Fields Grid */
-	.fields-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-		gap: 1rem;
-	}
 
-	:global(.field-card) {
-		cursor: pointer;
-		border: 2px solid transparent;
-		position: relative;
-	}
-
-	:global(.field-card:hover) {
-		transform: translateY(-2px);
-		border-color: var(--color-primary-200);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-	}
-
-	:global(.field-card.selected) {
-		border-color: var(--color-primary);
-		background: var(--color-primary-50);
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	}
-
-	/* Field Card Content */
-	.field-header {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-bottom: 1rem;
-		padding-bottom: 1rem;
-		border-bottom: 1px solid var(--color-border);
-	}
-
-	.field-icon {
-		font-size: 1.5rem;
-		width: 2.5rem;
-		height: 2.5rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--color-background-secondary);
-		border-radius: 8px;
-		flex-shrink: 0;
-	}
-
-	.field-info {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.field-name {
-		font-weight: 600;
-		font-size: 1rem;
-		color: var(--color-text-primary);
-		margin-bottom: 0.25rem;
-	}
-
-	.field-location {
-		font-size: 0.875rem;
-		color: var(--color-text-secondary);
-	}
-
-	.selected-icon {
-		color: var(--color-primary);
-		font-size: 1.25rem;
-		font-weight: bold;
-		flex-shrink: 0;
-	}
-
-	/* Field Details */
-	.field-details {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.detail-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		font-size: 0.875rem;
-	}
-
-	.detail-label {
-		color: var(--color-text-secondary);
-		font-weight: 500;
-	}
-
-	.detail-value {
-		color: var(--color-text-primary);
-		font-weight: 600;
-	}
-
-	.crop-badge {
-		padding: 0.25rem 0.5rem;
-		border-radius: 12px;
-		font-size: 0.75rem;
-		font-weight: 600;
-	}
-
-	/* Selection Summary */
-	.selection-summary {
-		margin-top: 1rem;
-	}
-
-	:global(.selected-field-summary) {
-		border: 2px solid var(--color-success-200);
-		background: var(--color-success-50);
-	}
-
-	.summary-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-	}
-
-	.summary-icon {
-		background: var(--color-success);
-		color: var(--gray-900, #0f172a);
-		width: 1.5rem;
-		height: 1.5rem;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.875rem;
-		font-weight: bold;
-	}
-
-	.summary-header h3 {
-		color: var(--color-success-700);
-		font-size: 1rem;
-		font-weight: 600;
-		margin: 0;
-	}
-
-	.summary-content {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		margin-bottom: 1rem;
-		gap: 1rem;
-	}
-
-	.summary-field {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.summary-field-icon {
-		font-size: 1.25rem;
-		width: 2rem;
-		height: 2rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--color-background);
-		border-radius: 6px;
-		flex-shrink: 0;
-	}
-
-	.summary-name {
-		font-weight: 600;
-		color: var(--color-text-primary);
-		margin-bottom: 0.25rem;
-	}
-
-	.summary-location {
-		font-size: 0.875rem;
-		color: var(--color-text-secondary);
-	}
-
-	.summary-details {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		align-items: flex-end;
-	}
-
-	.summary-detail {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 0.25rem;
-		font-size: 0.875rem;
-		text-align: right;
-	}
-
-	.summary-detail span {
-		color: var(--color-text-secondary);
-	}
-
-	.summary-actions {
-		display: flex;
-		justify-content: flex-end;
-	}
-
-	/* Loading, Empty, Error States */
+	/* Loading States - Simplified for table layout */
 	.field-card-skeleton {
 		padding: 1rem;
-		border: 1px solid var(--color-border);
+		border: 1px solid #e2e8f0;
 		border-radius: 8px;
-		background: var(--color-background);
+		background: #ffffff;
 	}
 
 	.skeleton-header,
@@ -724,9 +577,9 @@
 	}
 
 	.skeleton-icon {
-		width: 2.5rem;
-		height: 2.5rem;
-		border-radius: 8px;
+		width: 1.5rem;
+		height: 1.5rem;
+		border-radius: 50%;
 		flex-shrink: 0;
 	}
 
@@ -759,7 +612,7 @@
 		justify-content: center;
 		padding: 3rem 1rem;
 		text-align: center;
-		color: var(--color-text-secondary);
+		color: #6b7280;
 	}
 
 	.empty-icon,
@@ -779,126 +632,10 @@
 	.empty-state small,
 	.error-state small {
 		font-size: 0.875rem;
-		color: var(--color-text-muted);
+		color: #9ca3af;
 		max-width: 300px;
 		line-height: 1.4;
 	}
 
-	/* Mobile Responsiveness - Following original design */
-	@media (max-width: 768px) {
-		.step-header h2 {
-			font-size: 1.25rem;
-			margin-bottom: 1rem;
-		}
 
-		.table-container {
-			margin: 0;
-			background: white;
-			border-radius: 8px;
-			border: 1px solid var(--gray-200, #e2e8f0);
-			overflow: hidden;
-			box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-		}
-
-		:global(.field-table) {
-			width: 100%;
-			font-size: 13px;
-			border-collapse: collapse;
-			table-layout: fixed;
-		}
-
-		:global(.field-table th),
-		:global(.field-table td) {
-			padding: 0.25rem 0.5rem !important;
-			border-bottom: 1px solid var(--gray-100, #f1f5f9);
-		}
-
-		:global(.field-table th) {
-			background-color: var(--gray-50, #f8fafc);
-			font-weight: 600;
-			color: var(--gray-700, #334155);
-			text-transform: uppercase;
-			font-size: 0.75rem;
-			letter-spacing: 0.05em;
-		}
-
-		:global(.field-table .clickable) {
-			cursor: pointer;
-		}
-
-		:global(.field-table .clickable:hover) {
-			background-color: var(--gray-100, #f1f5f9);
-		}
-
-		:global(.field-table .selected) {
-			background: var(--primary, #2563eb);
-			color: var(--gray-900, #0f172a);
-			font-weight: 600;
-		}
-
-		/* Mobile Field Table Column Widths */
-		:global(.field-table th:nth-child(1)),
-		:global(.field-table td:nth-child(1)) { /* Name */
-			width: 30%;
-			font-weight: 500;
-		}
-
-		:global(.field-table th:nth-child(2)),
-		:global(.field-table td:nth-child(2)) { /* Crop */
-			width: 25%;
-		}
-
-		:global(.field-table th:nth-child(3)),
-		:global(.field-table td:nth-child(3)) { /* Location */
-			width: 25%;
-		}
-
-		:global(.field-table th:nth-child(4)),
-		:global(.field-table td:nth-child(4)) { /* Area */
-			width: 20%;
-			text-align: right;
-		}
-
-		.search-input input {
-			padding: 0.75rem 1rem 0.75rem 2.5rem;
-			font-size: 0.875rem;
-		}
-
-		.summary-content {
-			flex-direction: column;
-			gap: 1rem;
-		}
-
-		.summary-details {
-			align-items: flex-start;
-		}
-
-		.summary-detail {
-			align-items: flex-start;
-			text-align: left;
-		}
-	}
-
-	/* Touch-friendly improvements */
-	@media (max-width: 768px) {
-		:global(.field-card) {
-			padding: 1.25rem;
-			min-height: 120px;
-		}
-
-		.field-icon {
-			width: 3rem;
-			height: 3rem;
-			font-size: 1.75rem;
-		}
-
-		.field-name {
-			font-size: 1.125rem;
-		}
-
-		.selected-icon {
-			font-size: 1.5rem;
-			padding: 0.25rem;
-		}
-	}
 </style>

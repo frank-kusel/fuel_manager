@@ -146,7 +146,7 @@
 		</div>
 	{:else}
 		<div class="table-container">
-			<table class="table" id="vehicle-table">
+			<table id="vehicle-table">
 				<thead>
 					<tr>
 						<th>Code</th>
@@ -160,9 +160,7 @@
 						<tr class="group-header">
 							<td colspan="3" class="group-title vehicle-type-{type.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')}">
 								<div class="group-content">
-									<span class="group-dot"></span>
 									<span class="group-label">{type}</span>
-									<span class="group-count">{vehicleList.length}</span>
 								</div>
 							</td>
 						</tr>
@@ -241,116 +239,135 @@
 		flex-shrink: 0;
 	}
 
-	/* Consistent table styling */
+	/* Ultra-clean table container */
 	.table-container {
-		background: white;
-		border: 1px solid #f1f5f9;
-		border-radius: 0.5rem;
-		overflow: hidden;
+		background: transparent;
 		margin: 0;
 	}
 
-	:global(.table) {
+	/* Ultra-clean table design with subtle row borders */
+	:global(#vehicle-table) {
 		width: 100%;
-		border-collapse: collapse;
+		border-collapse: separate;
+		border-spacing: 0;
 		table-layout: fixed;
 	}
 
-	:global(.table th),
-	:global(.table td) {
-		padding: 12px 16px;
+	:global(#vehicle-table th) {
+		padding: 0.75rem 0;
 		text-align: left;
-		border-bottom: 1px solid #f1f5f9;
-		font-size: 14px;
-		vertical-align: top;
-	}
-
-	:global(.table th) {
-		background: #f8fafc;
-		font-size: 12px;
-		font-weight: 600;
-		color: #6b7280;
+		border: none;
+		background: transparent;
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: #9ca3af;
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		height: 44px;
+		letter-spacing: 0.1em;
+		line-height: 1;
 	}
 
-	:global(.table tbody tr.clickable) {
+	:global(#vehicle-table td) {
+		padding: 1rem 0.5rem;
+		text-align: left;
+		border: none;
+		font-size: 0.875rem;
+		vertical-align: middle;
+	}
+
+	/* Subtle row lines for all rows */
+	:global(#vehicle-table tbody tr) {
+		border-bottom: 1px solid rgba(248, 250, 252, 0.8);
+	}
+
+	:global(#vehicle-table tbody tr.clickable) {
 		cursor: pointer;
-		transition: background 0.2s ease;
-		min-height: 48px;
+		transition: all 0.15s ease;
+		border-bottom-color: rgba(241, 245, 249, 0.6);
 	}
 
-	:global(.table tbody tr.clickable:hover) {
-		background: #f8fafc;
+	:global(#vehicle-table tbody tr.clickable:hover) {
+		background: rgba(0, 0, 0, 0.02);
+		border-bottom-color: rgba(203, 213, 225, 0.4);
 	}
 
-	/* Group Headers */
-	.group-header {
-		background: #f1f5f9 !important;
+	:global(#vehicle-table tbody tr:last-child) {
+		border-bottom: none;
+	}
+
+	/* Clean group headers */
+	:global(#vehicle-table tbody tr.group-header) {
+		background: transparent;
+		border: none;
 	}
 	
 	.group-title {
-		padding: 0.5rem 0.75rem !important;
-		font-size: 0.75rem;
+		padding: 1.5rem 0 0.75rem 0;
+		font-size: 0.8125rem;
 		font-weight: 600;
-		color: #374151;
+		color: #6b7280;
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.1em;
+		border: none;
+		text-align: center;
 	}
 	
 	.group-content {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-	}
-	
-	.group-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: #9ca3af;
-		flex-shrink: 0;
+		justify-content: center;
 	}
 	
 	.group-label {
-		flex: 1;
-	}
-	
-	.group-count {
-		color: #6b7280;
-		font-size: 0.7rem;
-	}
-
-	/* Vehicle rows */
-	.vehicle-row.selected {
-		background: #2563eb;
-		color: white;
-	}
-
-	.vehicle-row.selected .vehicle-code,
-	.vehicle-row.selected .vehicle-name,
-	.vehicle-row.selected .vehicle-reg {
-		color: white;
-	}
-
-	/* Vehicle styling */
-	.vehicle-code {
 		font-weight: 600;
-		color: #2563eb;
-		font-size: 14px;
-	}
-	
-	.vehicle-name {
-		font-weight: 500;
-		color: #111827;
-		font-size: 14px;
-	}
-	
-	.vehicle-reg {
-		font-size: 12px;
 		color: #6b7280;
-		font-family: monospace;
+		font-size: 1rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+	}
+
+	/* Clean vehicle rows - selected state */
+	:global(#vehicle-table tbody tr.vehicle-row.selected) {
+		background: rgba(37, 99, 235, 0.08);
+		border-radius: 0.5rem;
+		border-bottom-color: rgba(37, 99, 235, 0.2);
+	}
+
+	:global(#vehicle-table tbody tr.vehicle-row.selected .vehicle-code) {
+		color: #2563eb;
+		font-weight: 600;
+	}
+
+	:global(#vehicle-table tbody tr.vehicle-row.selected .vehicle-name) {
+		color: #1e293b;
+		font-weight: 500;
+	}
+
+	:global(#vehicle-table tbody tr.vehicle-row.selected .vehicle-reg) {
+		color: #475569;
+	}
+
+	/* Clean vehicle cell styling */
+	:global(#vehicle-table .vehicle-code) {
+		font-weight: 600;
+		color: #374151;
+		font-size: 0.875rem;
+		font-variant-numeric: tabular-nums;
+	}
+	
+	:global(#vehicle-table .vehicle-name) {
+		font-weight: 400;
+		color: #111827;
+		font-size: 0.875rem;
+	}
+	
+	:global(#vehicle-table .vehicle-reg) {
+		font-size: 0.75rem;
+		color: #6b7280;
+		font-variant-numeric: tabular-nums;
+		font-weight: 400;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	/* Selection Summary */
@@ -397,13 +414,12 @@
 		margin-bottom: 1rem;
 	}
 
-	/* Selected summary */
+	/* Clean selected summary */
 	.selected-summary {
-		margin-top: 1rem;
-		padding: 1rem;
-		background: #f0fdf4;
-		border: 1px solid #bbf7d0;
-		border-radius: 0.5rem;
+		margin-top: 2rem;
+		padding: 1.5rem 0;
+		background: transparent;
+		border-top: 1px solid #f1f5f9;
 	}
 
 	.selected-item {
@@ -411,25 +427,26 @@
 	}
 
 	.selected-label {
-		font-size: 0.75rem;
-		color: #059669;
-		font-weight: 600;
+		font-size: 0.6875rem;
+		color: #9ca3af;
+		font-weight: 500;
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.1em;
 		margin-bottom: 0.5rem;
 	}
 
 	.selected-name {
 		font-size: 1rem;
-		font-weight: 700;
+		font-weight: 500;
 		color: #111827;
 		margin-bottom: 0.25rem;
 	}
 
 	.selected-detail {
-		font-size: 0.875rem;
+		font-size: 0.8125rem;
 		color: #6b7280;
-		font-family: monospace;
+		font-variant-numeric: tabular-nums;
+		font-weight: 400;
 	}
 
 	/* Loading State */
