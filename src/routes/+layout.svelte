@@ -39,9 +39,9 @@
 				Fuel Management
 			</a>
 			<a 
-				href="/fuel/summary" 
+				href="/summary" 
 				class="nav-btn" 
-				class:active={pathname === '/fuel/summary'}
+				class:active={pathname === '/summary'}
 			>
 				Fuel Summary
 			</a>
@@ -78,9 +78,9 @@
 			<span class="nav-label">Fuel</span>
 		</a>
 		<a 
-			href="/fuel/summary" 
+			href="/summary" 
 			class="mobile-nav-btn" 
-			class:active={pathname === '/fuel/summary'}
+			class:active={pathname === '/summary'}
 		>
 			<span class="nav-icon">📋</span>
 			<span class="nav-label">Summary</span>

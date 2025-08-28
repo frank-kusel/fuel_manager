@@ -81,7 +81,7 @@
 <div class="fuel-activity">
 	<div class="activity-header">
 		<h3>Recent Fuel Activity</h3>
-		<Button variant="outline" size="sm" href="/fuel/summary">View All</Button>
+		<Button variant="outline" size="sm" href="/summary">View All</Button>
 	</div>
 	
 	{#if loading}

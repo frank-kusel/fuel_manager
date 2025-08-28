@@ -497,7 +497,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
-		background: #f8fafc;
 		min-height: 100vh;
 	}
 	
