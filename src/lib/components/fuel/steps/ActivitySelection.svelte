@@ -209,34 +209,12 @@
 	{/if}
 	
 	{#if selectedActivity}
-		<div class="selection-summary">
-			<Card class="selected-activity-summary">
-				<div class="summary-header">
-					<span class="summary-icon">✓</span>
-					<h3>Selected Activity</h3>
-				</div>
-				<div class="summary-content">
-					<div class="summary-activity">
-						<div class="summary-activity-icon" style="color: {getActivityColor(selectedActivity.name)}">
-							{getActivityIcon(selectedActivity)}
-						</div>
-						<div class="summary-info">
-							<div class="summary-name">{selectedActivity.name}</div>
-							{#if selectedActivity.name_zulu}
-								<div class="summary-name-zulu">{selectedActivity.name_zulu}</div>
-							{/if}
-							{#if selectedActivity.description}
-								<div class="summary-description">{selectedActivity.description}</div>
-							{/if}
-						</div>
-					</div>
-				</div>
-				<div class="summary-actions">
-					<Button variant="outline" size="sm" onclick={() => onActivitySelect(null)}>
-						Change Activity
-					</Button>
-				</div>
-			</Card>
+		<div class="selected-summary">
+			<div class="selected-item">
+				<div class="selected-label">Selected Activity</div>
+				<div class="selected-name">{selectedActivity.name}</div>
+				<div class="selected-detail">{selectedActivity.code}</div>
+			</div>
 		</div>
 	{/if}
 </div>
@@ -245,57 +223,65 @@
 	.activity-selection {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem; /* More compact overall spacing */
+		gap: 1rem;
 	}
 
-	/* Table Container */
+	/* Consistent table styling */
 	.table-container {
-		background: var(--white, #ffffff);
-		border: 1px solid var(--gray-200, #e2e8f0);
-		border-radius: 12px;
+		background: white;
+		border: 1px solid #f1f5f9;
+		border-radius: 0.5rem;
 		overflow: hidden;
 		margin: 0;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 	}
 
-	/* Table Styling */
 	:global(.table) {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 0.875rem;
+		table-layout: fixed;
 	}
 
 	:global(.table th),
 	:global(.table td) {
-		padding: 0.875rem 1rem;
+		padding: 12px 16px;
 		text-align: left;
-		border-bottom: 1px solid var(--gray-100, #f3f4f6);
-		font-size: 1rem;
+		border-bottom: 1px solid #f1f5f9;
+		font-size: 14px;
 		vertical-align: top;
 	}
 
 	:global(.table th) {
-		background: var(--gray-50, #f8fafc);
-		font-weight: 500;
-		color: var(--gray-600, #475569);
-		font-size: 0.8rem;
-		letter-spacing: 0.02em;
-		border-bottom: 1px solid var(--gray-200, #e5e7eb);
+		background: #f8fafc;
+		font-size: 12px;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		height: 44px;
 	}
 
 	:global(.table tbody tr.clickable) {
 		cursor: pointer;
+		transition: background 0.2s ease;
+		min-height: 48px;
+	}
+
+	:global(.table tbody tr.clickable:hover) {
+		background: #f8fafc;
 	}
 
 	/* Group Headers */
 	.group-header {
-		background: transparent !important;
+		background: #f1f5f9 !important;
 	}
 	
 	.group-title {
-		padding: 0.75rem 1rem !important;
-		background: var(--gray-50, #f8fafc);
-		border-bottom: 1px solid var(--gray-200, #e5e7eb);
+		padding: 0.5rem 0.75rem !important;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #374151;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 	
 	.group-content {
@@ -305,123 +291,123 @@
 	}
 	
 	.group-dot {
-		width: 8px;
-		height: 8px;
+		width: 6px;
+		height: 6px;
 		border-radius: 50%;
-		background: var(--blue-500, #3b82f6);
+		background: #9ca3af;
 		flex-shrink: 0;
 	}
 	
 	.group-label {
-		font-weight: 500;
-		color: var(--gray-700, #374151);
-		font-size: 1rem;
-		text-transform: capitalize;
+		flex: 1;
 	}
 	
 	.group-count {
-		color: var(--gray-500, #6b7280);
-		font-size: 0.75rem;
-		background: var(--gray-100, #f3f4f6);
-		padding: 0.125rem 0.375rem;
-		border-radius: 10px;
-		font-weight: 500;
-		margin-left: auto;
+		color: #6b7280;
+		font-size: 0.7rem;
 	}
 
 	/* Activity rows */
-	.activity-row {
-		border-left: 3px solid transparent;
-		min-height: 48px;
-	}
-	
-	.activity-row:not(.selected) {
-		background: white;
+	.activity-row.selected {
+		background: #2563eb;
+		color: white;
 	}
 
-	/* Selected rows */
-	:global(.table tbody tr.selected) {
-		background: var(--primary, #2563eb);
+	.activity-row.selected .activity-name,
+	.activity-row.selected .activity-code {
 		color: white;
-		border-left-color: var(--primary, #2563eb);
-		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
-	}
-	
-	:global(.table tbody tr.selected .activity-name) {
-		color: white;
-	}
-	
-	:global(.table tbody tr.selected .activity-code) {
-		color: white;
-		opacity: 0.95;
-	}
-	
-	:global(.table tbody tr.selected .activity-legacy) {
-		color: rgba(255, 255, 255, 0.6);
-	}
-	
-	:global(.table tbody tr.selected .activity-zulu) {
-		color: rgba(255, 255, 255, 0.85);
-	}
-
-	.activity-name-cell {
-		width: 75%;
 	}
 
 	.activity-content {
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
+		gap: 0.5rem;
 	}
 
 	.activity-icon {
-		font-size: 1.4rem;
+		font-size: 16px;
 		flex-shrink: 0;
+		width: 20px;
+		text-align: center;
 	}
 
 	.activity-text {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
+		flex: 1;
 	}
 
 	.activity-name {
 		font-weight: 600;
-		color: var(--gray-900, #111827);
-		font-size: 1.05rem;
-		line-height: 1.2;
+		color: #111827;
+		font-size: 14px;
+		margin-bottom: 2px;
 	}
 
 	.activity-codes {
 		display: flex;
-		align-items: baseline;
 		gap: 0.5rem;
-		white-space: nowrap;
 	}
 
 	.activity-code {
 		font-family: monospace;
-		font-weight: 600;
-		color: var(--gray-700, #374151);
-		font-size: 0.925rem;
+		font-weight: 500;
+		color: #6b7280;
+		font-size: 12px;
 		text-transform: uppercase;
-		white-space: nowrap;
 	}
 
-	.activity-legacy {
-		font-family: monospace;
-		font-size: 0.85rem;
-		color: var(--gray-400, #9ca3af);
-		font-weight: 400;
+	/* Selected summary */
+	.selected-summary {
+		margin-top: 1rem;
+		padding: 1rem;
+		background: #f0fdf4;
+		border: 1px solid #bbf7d0;
+		border-radius: 0.5rem;
 	}
 
-	.activity-zulu {
-		font-style: italic;
-		color: var(--gray-600, #475569);
+	.selected-item {
+		text-align: center;
+	}
+
+	.selected-label {
+		font-size: 0.75rem;
+		color: #059669;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.5rem;
+	}
+
+	.selected-name {
 		font-size: 1rem;
-		font-weight: 400;
-		width: 25%;
-		padding-top: 0.125rem;
+		font-weight: 700;
+		color: #111827;
+		margin-bottom: 0.25rem;
+	}
+
+	.selected-detail {
+		font-size: 0.875rem;
+		color: #6b7280;
+		font-family: monospace;
+	}
+
+	/* Mobile Responsiveness */
+	@media (max-width: 768px) {
+		.table-container {
+			margin: 0;
+		}
+
+		:global(.table th),
+		:global(.table td) {
+			padding: 10px 12px;
+		}
+	}
+
+	@media (max-width: 480px) {
+		:global(.table th),
+		:global(.table td) {
+			padding: 8px 10px;
+			font-size: 13px;
+		}
 	}
 
 	/* Step Header */
@@ -744,7 +730,7 @@
 	/* Mobile Responsiveness */
 	@media (max-width: 768px) {
 		.table-container {
-			margin: 0 -0.5rem;
+			margin: 0;
 			background: white;
 			border-radius: 0.5rem;
 			border: 1px solid var(--gray-200, #e2e8f0);

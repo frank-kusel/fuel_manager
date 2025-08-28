@@ -2,12 +2,18 @@
 	import '../app.css';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 
 	// Svelte 5 children prop
 	let { children }: { children: any } = $props();
 
 	// Safe pathname access
 	const pathname = $derived($page?.url?.pathname || '/');
+
+	// Router-level scroll management - ensures all navigation starts at top
+	afterNavigate(() => {
+		window.scrollTo(0, 0);
+	});
 
 	// Progressive Web App Service Worker Registration
 	onMount(() => {
@@ -97,13 +103,7 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		padding: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		background: var(--gray-50);
-		color: var(--gray-900);
-	}
+	/* Body styles moved to app.css to avoid conflicts */
 
 	.app {
 		display: flex;

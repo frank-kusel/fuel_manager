@@ -182,13 +182,12 @@
 	}
 
 
-	/* Unified ODO Cards - Same size and style */
+	/* Simplified ODO Cards */
 	.odo-card {
 		text-align: center;
-		padding: 1.5rem;
-		border-radius: 0.75rem;
+		padding: 1rem;
+		border-radius: 0.5rem;
 		margin-bottom: 1rem;
-		min-height: 120px;
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
@@ -196,8 +195,7 @@
 
 	.current-odo {
 		background: #f8fafc;
-		border: 2px solid #e2e8f0;
-		position: relative;
+		border: 1px solid #e2e8f0;
 	}
 	
 	.current-odo-header {
@@ -256,7 +254,7 @@
 		background: transparent;
 		color: #6b7280;
 		margin-bottom: 0.5rem;
-		font-family: monospace;
+		font-variant-numeric: tabular-nums;
 		-webkit-appearance: none;
 		appearance: none;
 	}
@@ -278,7 +276,7 @@
 
 	.new-odo {
 		background: white;
-		border: 3px solid #2563eb;
+		border: 2px solid #2563eb;
 	}
 
 	.odo-value {
@@ -286,7 +284,7 @@
 		font-weight: 700;
 		color: #64748b;
 		margin-bottom: 0.5rem;
-		font-family: monospace;
+		font-variant-numeric: tabular-nums;
 	}
 	
 	.odo-value.editable {
@@ -315,7 +313,7 @@
 		background: transparent;
 		color: #1e293b;
 		margin-bottom: 0.5rem;
-		font-family: monospace;
+		font-variant-numeric: tabular-nums;
 		-webkit-appearance: none;
 		appearance: none;
 	}
@@ -329,13 +327,13 @@
 		font-weight: 400;
 	}
 
-	/* Gauge Toggle - moved and styled */
+	/* Gauge Toggle */
 	.gauge-toggle {
-		padding: 1rem;
+		padding: 0.75rem;
 		background: white;
 		border: 1px solid #e2e8f0;
 		border-radius: 0.5rem;
-		margin-top: 1rem;
+		margin-top: 0.5rem;
 	}
 
 	.checkbox {
@@ -354,11 +352,11 @@
 	/* Distance Display */
 	.distance-display {
 		text-align: center;
-		padding: 1rem;
+		padding: 0.75rem;
 		background: #f0f9ff;
 		border: 1px solid #bae6fd;
 		border-radius: 0.5rem;
-		margin-top: 1rem;
+		margin-top: 0.5rem;
 	}
 
 	.distance-value {

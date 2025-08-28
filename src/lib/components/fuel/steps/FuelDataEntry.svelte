@@ -111,14 +111,7 @@
 <div class="fuel-data-entry">
 	
 	{#if selectedVehicle}
-		<!-- Auto-selected bowser info (hidden, Tank A Diesel auto-selected) -->
-		{#if loading}
-			<div class="loading">Loading fuel bowsers...</div>
-		{:else if bowsers.length === 0}
-			<div class="no-bowsers">No fuel bowsers available</div>
-		{/if}
-		
-		<!-- Main Fuel Input -->
+		<!-- Main Fuel Input - Fixed Position -->
 		<div class="fuel-input-container">
 			<input 
 				type="number" 
@@ -130,6 +123,13 @@
 				autocomplete="off"
 			/>
 			<div class="fuel-label">Litres dispensed</div>
+			
+			<!-- Loading state below input to prevent jumping -->
+			{#if loading}
+				<div class="loading-status">Loading fuel bowsers...</div>
+			{:else if bowsers.length === 0}
+				<div class="loading-status error">No fuel bowsers available</div>
+			{/if}
 		</div>
 		
 		<!-- Bowser Readings - Always visible -->
@@ -306,30 +306,46 @@
 		font-weight: 500;
 	}
 
-	/* Calculations Display */
+	/* Loading status - positioned below input */
+	.loading-status {
+		font-size: 0.75rem;
+		color: #6b7280;
+		margin-top: 0.5rem;
+		padding: 0.5rem;
+		text-align: center;
+		font-style: italic;
+	}
+
+	.loading-status.error {
+		color: #dc2626;
+	}
+
+	/* Bowser Readings Card - Minimal Design */
 	.calculations {
 		padding: 1rem;
-		background: #f8fafc;
-		border: 1px solid #e2e8f0;
+		background: white;
+		border: 1px solid #f1f5f9;
 		border-radius: 0.5rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 	}
 
 	.calc-header {
 		text-align: center;
 		margin-bottom: 0.75rem;
-		padding-bottom: 0.75rem;
-		border-bottom: 1px solid #e2e8f0;
+		padding-bottom: 0.5rem;
+		border-bottom: 1px solid #f1f5f9;
 	}
 
 	.calc-header h3 {
-		font-size: 1.125rem;
+		font-size: 1rem;
 		font-weight: 600;
-		color: #374151;
+		color: #6b7280;
 		margin: 0;
+		text-transform: uppercase;
+		font-size: 0.75rem;
+		letter-spacing: 0.05em;
 	}
 
 	.calc-item {
@@ -337,8 +353,8 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 0.75rem 0;
-		min-height: 3rem;
-		border-bottom: 1px solid #f1f5f9;
+		min-height: 2.5rem;
+		border-bottom: 1px solid #f8fafc;
 	}
 	
 	.calc-item-right {

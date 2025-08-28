@@ -100,9 +100,6 @@
 </script>
 
 <div class="vehicle-selection">
-	<div class="step-header">
-		<h2>Vehicle</h2>
-	</div>
 	
 	{#if errors.length > 0}
 		<div class="error-messages">
@@ -175,8 +172,6 @@
 							<tr 
 								class="vehicle-row clickable vehicle-type-{(vehicle.type || 'other').toLowerCase().replace(/\\s+/g, '-').replace(/[()]/g, '')} {selectedVehicle?.id === vehicle.id ? 'selected' : ''}"
 								onclick={() => {
-									console.log('=== VEHICLE ROW CLICK DETECTED ===');
-									console.log('Vehicle clicked:', vehicle.name, vehicle.code);
 									handleVehicleSelect(vehicle);
 								}}
 							>
@@ -192,30 +187,12 @@
 	{/if}
 	
 	{#if selectedVehicle}
-		<div class="selection-summary">
-			<Card class="selected-vehicle-summary">
-				<div class="summary-header">
-					<span class="summary-icon">✓</span>
-					<h3>Selected Vehicle</h3>
-				</div>
-				<div class="summary-content">
-					<div class="summary-vehicle">
-						<div class="summary-name">{selectedVehicle.name || `${selectedVehicle.make || ''} ${selectedVehicle.model || ''}`.trim()}</div>
-						<div class="summary-reg">{selectedVehicle.registration || ''}</div>
-					</div>
-					<div class="summary-details">
-						<div class="summary-detail">
-							<span>Current Odometer:</span>
-							<strong>{formatOdometer(selectedVehicle.current_odometer, selectedVehicle.odometer_unit)}</strong>
-						</div>
-					</div>
-				</div>
-				<div class="summary-actions">
-					<Button variant="outline" size="sm" onclick={() => onVehicleSelect(null)}>
-						Change Vehicle
-					</Button>
-				</div>
-			</Card>
+		<div class="selected-summary">
+			<div class="selected-item">
+				<div class="selected-label">Selected Vehicle</div>
+				<div class="selected-name">{selectedVehicle.name || `${selectedVehicle.make || ''} ${selectedVehicle.model || ''}`.trim()}</div>
+				<div class="selected-detail">{selectedVehicle.registration || ''}</div>
+			</div>
 		</div>
 	{/if}
 </div>
@@ -264,53 +241,62 @@
 		flex-shrink: 0;
 	}
 
-	/* Table Container */
+	/* Consistent table styling */
 	.table-container {
-		background: rgba(255, 255, 255, 0.95);
-		border: 1px solid rgba(255, 255, 255, 0.3);
-		border-radius: 12px;
+		background: white;
+		border: 1px solid #f1f5f9;
+		border-radius: 0.5rem;
 		overflow: hidden;
 		margin: 0;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 	}
 
-	/* Table Styling - Original Design */
 	:global(.table) {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 0.875rem;
+		table-layout: fixed;
 	}
 
 	:global(.table th),
 	:global(.table td) {
-		padding: 0.75rem 1rem;
+		padding: 12px 16px;
 		text-align: left;
-		border-bottom: 1px solid var(--gray-100, #f3f4f6);
-		font-size: 0.95rem; /* Increased for mobile readability */
+		border-bottom: 1px solid #f1f5f9;
+		font-size: 14px;
+		vertical-align: top;
 	}
 
 	:global(.table th) {
-		background: var(--gray-50, #f8fafc);
-		font-weight: 500;
-		color: var(--gray-600, #475569);
-		font-size: 0.8rem;
-		letter-spacing: 0.02em;
-		border-bottom: 1px solid var(--gray-200, #e5e7eb);
+		background: #f8fafc;
+		font-size: 12px;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		height: 44px;
 	}
 
 	:global(.table tbody tr.clickable) {
 		cursor: pointer;
+		transition: background 0.2s ease;
+		min-height: 48px;
+	}
+
+	:global(.table tbody tr.clickable:hover) {
+		background: #f8fafc;
 	}
 
 	/* Group Headers */
 	.group-header {
-		background: transparent !important;
+		background: #f1f5f9 !important;
 	}
 	
 	.group-title {
-		padding: 0.75rem 1rem !important;
-		background: var(--gray-50, #f8fafc);
-		border-bottom: 1px solid var(--gray-200, #e5e7eb);
+		padding: 0.5rem 0.75rem !important;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #374151;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 	
 	.group-content {
@@ -320,110 +306,51 @@
 	}
 	
 	.group-dot {
-		width: 8px;
-		height: 8px;
+		width: 6px;
+		height: 6px;
 		border-radius: 50%;
-		background: var(--type-color, var(--gray-400, #9ca3af));
+		background: #9ca3af;
 		flex-shrink: 0;
 	}
 	
 	.group-label {
-		font-weight: 500;
-		color: var(--gray-700, #374151);
-		font-size: 0.95rem; /* Increased for better visibility */
-		text-transform: capitalize;
+		flex: 1;
 	}
 	
 	.group-count {
-		color: var(--gray-500, #6b7280);
-		font-size: 0.75rem;
-		background: var(--gray-100, #f3f4f6);
-		padding: 0.125rem 0.375rem;
-		border-radius: 10px;
-		font-weight: 500;
-		margin-left: auto;
+		color: #6b7280;
+		font-size: 0.7rem;
 	}
 
 	/* Vehicle rows */
-	.vehicle-row {
-		border-left: 3px solid transparent;
-		min-height: 48px; /* Touch-friendly height */
-	}
-	
-	.vehicle-row:not(.selected) {
-		background: white;
+	.vehicle-row.selected {
+		background: #2563eb;
+		color: white;
 	}
 
-	/* Selected rows */
-	:global(.table tbody tr.selected) {
-		background: var(--primary, #2563eb);
-		color: var(--gray-900, #0f172a);
-		border-left-color: var(--primary, #2563eb);
-		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+	.vehicle-row.selected .vehicle-code,
+	.vehicle-row.selected .vehicle-name,
+	.vehicle-row.selected .vehicle-reg {
+		color: white;
 	}
 
-	/* Vehicle Types - Updated color scheme */
-	.vehicle-type-loader {
-		--type-color: #eab308; /* Yellow */
-		--type-bg: #fefce8;
-		--type-hover: #fef3c7;
-	}
-	.vehicle-type-tractor {
-		--type-color: #dc2626; /* Red */
-		--type-bg: #fef2f2;
-		--type-hover: #fecaca;
-	}
-	.vehicle-type-truck {
-		--type-color: #2563eb; /* Blue */
-		--type-bg: #eff6ff;
-		--type-hover: #dbeafe;
-	}
-	.vehicle-type-utility {
-		--type-color: #64748b; /* Grey */
-		--type-bg: #f8fafc;
-		--type-hover: #f1f5f9;
-	}
-	.vehicle-type-excavator {
-		--type-color: #ea580c; /* Orange */
-		--type-bg: #fff7ed;
-		--type-hover: #fed7aa;
-	}
-	.vehicle-type-bakkie,
-	.vehicle-type-harvester,
-	.vehicle-type-sprayer,
-	.vehicle-type-other {
-		--type-color: #16a34a; /* Green for misc */
-		--type-bg: #f0fdf4;
-		--type-hover: #dcfce7;
-	}
-
-	.vehicle-type-indicator {
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
-		background: var(--type-color);
-		display: inline-block;
-		margin-right: 0.5rem;
-	}
-
-	/* Vehicle code styling */
+	/* Vehicle styling */
 	.vehicle-code {
 		font-weight: 600;
-		color: var(--type-color, var(--gray-700, #374151));
-		font-size: 0.95rem; /* Increased */
+		color: #2563eb;
+		font-size: 14px;
 	}
 	
 	.vehicle-name {
 		font-weight: 500;
-		color: var(--gray-900, #111827);
-		font-size: 0.95rem; /* Increased */
+		color: #111827;
+		font-size: 14px;
 	}
 	
 	.vehicle-reg {
-		font-family: ui-monospace, 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Liberation Mono', Menlo, monospace;
-		font-size: 0.8rem; /* More subtle */
-		color: var(--gray-500, #6b7280); /* More subtle color */
-		font-weight: 400; /* Lighter weight */
+		font-size: 12px;
+		color: #6b7280;
+		font-family: monospace;
 	}
 
 	/* Selection Summary */
@@ -470,32 +397,39 @@
 		margin-bottom: 1rem;
 	}
 
-	.summary-name {
+	/* Selected summary */
+	.selected-summary {
+		margin-top: 1rem;
+		padding: 1rem;
+		background: #f0fdf4;
+		border: 1px solid #bbf7d0;
+		border-radius: 0.5rem;
+	}
+
+	.selected-item {
+		text-align: center;
+	}
+
+	.selected-label {
+		font-size: 0.75rem;
+		color: #059669;
 		font-weight: 600;
-		color: var(--gray-900, #0f172a);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.5rem;
 	}
 
-	.summary-reg {
+	.selected-name {
+		font-size: 1rem;
+		font-weight: 700;
+		color: #111827;
+		margin-bottom: 0.25rem;
+	}
+
+	.selected-detail {
 		font-size: 0.875rem;
-		color: var(--gray-600, #475569);
+		color: #6b7280;
 		font-family: monospace;
-	}
-
-	.summary-detail {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 0.25rem;
-		font-size: 0.875rem;
-	}
-
-	.summary-detail span {
-		color: var(--gray-600, #475569);
-	}
-
-	.summary-actions {
-		display: flex;
-		justify-content: flex-end;
 	}
 
 	/* Loading State */
@@ -599,59 +533,30 @@
 
 	/* Mobile Responsiveness */
 	@media (max-width: 768px) {
-		.vehicle-selection {
-			gap: 0.5rem;
-			padding: 0;
-		}
-
-		.step-header {
-			margin-bottom: 0.5rem;
-		}
-
-		.step-header h2 {
-			font-size: 1.125rem;
-			margin: 0;
-		}
-
 		.table-container {
-			margin: 0 -0.5rem;
-			background: white;
+			margin: 0;
 			border-radius: 0.5rem;
-			border: 1px solid var(--gray-200, #e2e8f0);
-			overflow: hidden;
-		}
-
-		:global(.table) {
-			width: 100%;
-			font-size: 14px;
-			border-collapse: collapse;
-			table-layout: fixed;
 		}
 
 		:global(.table th),
 		:global(.table td) {
-			padding: 0.75rem 1rem !important;
-			border-bottom: 1px solid var(--gray-100, #f1f5f9);
+			padding: 10px 12px;
+			font-size: 14px;
 		}
 
 		:global(.table th) {
-			background-color: var(--gray-50, #f8fafc);
-			font-weight: 600;
-			color: var(--gray-700, #334155);
-			text-transform: uppercase;
-			font-size: 0.75rem;
+			font-size: 11px;
 			height: 40px;
 		}
 
-		:global(.table .clickable) {
-			cursor: pointer;
-			min-height: 56px; /* More touch-friendly */
+		:global(.table tbody tr) {
+			min-height: 52px;
 		}
 
-		:global(.table .selected) {
-			background: var(--primary, #2563eb);
-			color: var(--gray-900, #0f172a);
-			font-weight: 600;
+		.vehicle-code,
+		.vehicle-name,
+		.vehicle-reg {
+			font-size: 14px;
 		}
 
 		/* Mobile table column widths */
@@ -688,7 +593,7 @@
 	@media (max-width: 480px) {
 		:global(.table th),
 		:global(.table td) {
-			padding: 0.5rem 0.375rem !important;
+			padding: 8px 10px;
 			font-size: 13px;
 		}
 	}

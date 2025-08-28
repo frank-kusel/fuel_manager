@@ -252,12 +252,7 @@
 </div>
 
 <style>
-	:global(body) {
-		font-family: 'Inter', sans-serif;
-		-webkit-font-smoothing: antialiased;
-		-moz-osx-font-smoothing: grayscale;
-		background-color: #ffffff;
-	}
+	/* Body styles now handled globally in app.css */
 
 	.container {
 		width: 100%;

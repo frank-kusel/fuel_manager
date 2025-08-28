@@ -30,35 +30,6 @@
 		// Reset workflow on mount
 		fuelEntryWorkflowStore.reset();
 		
-		// Ensure page loads at the top - very aggressive approach
-		document.documentElement.scrollTop = 0;
-		document.body.scrollTop = 0;
-		window.scrollTo(0, 0);
-		
-		// Multiple fallback attempts
-		requestAnimationFrame(() => {
-			window.scrollTo(0, 0);
-			document.documentElement.scrollTop = 0;
-		});
-		
-		setTimeout(() => {
-			window.scrollTo(0, 0);
-			document.documentElement.scrollTop = 0;
-			document.body.scrollTop = 0;
-		}, 1);
-		
-		setTimeout(() => {
-			window.scrollTo({ top: 0, behavior: 'instant' });
-		}, 10);
-		
-		setTimeout(() => {
-			window.scrollTo({ top: 0, behavior: 'instant' });
-		}, 50);
-		
-		setTimeout(() => {
-			window.scrollTo({ top: 0, behavior: 'instant' });
-		}, 100);
-		
 		// Add keyboard shortcuts
 		function handleKeydown(event: KeyboardEvent) {
 			// Only handle shortcuts if not typing in an input field
@@ -117,17 +88,14 @@
 	}
 	
 	function scrollToTop() {
-		if (workflowContainer) {
-			workflowContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-		}
+		// Router-level scroll management now handles this
+		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 	
 	async function handleSubmit() {
 		
 		const result = await fuelEntryWorkflowStore.submitFuelEntry();
 		submitResult = result;
-		
-		console.log('Submit result:', result);
 		
 		if (result.success) {
 			showSuccessModal = true;
@@ -136,10 +104,45 @@
 				showSuccessModal = false;
 				fuelEntryWorkflowStore.reset();
 			}, 1500);
-		} else {
-			console.error('Submit failed:', result.error);
 		}
 	}
+
+	function getStepTitle(step: number): string {
+		const titles = [
+			'Vehicle',
+			'Driver', 
+			'Activity',
+			'Location',
+			'Odometer',
+			'Fuel Data',
+			'Review & Submit'
+		];
+		return titles[step] || '';
+	}
+	
+	// Progress summary items using $state + $effect (more reliable)
+	let progressItems = $state([]);
+	
+	$effect(() => {
+		const items = [];
+		const data = $state.snapshot($workflowData);
+		
+		if (data?.vehicle) {
+			const vehicleName = data.vehicle.name || `${data.vehicle.make || ''} ${data.vehicle.model || ''}`.trim() || 'Vehicle';
+			items.push(vehicleName);
+		}
+		if (data?.driver) {
+			items.push(data.driver.name);
+		}
+		if (data?.activity) {
+			items.push(data.activity.code);
+		}
+		if (data?.field) {
+			items.push(data.field.name);
+		}
+		
+		progressItems = items;
+	});
 	
 	function getCurrentStepErrors() {
 		const currentStepId = $currentStepData?.id || '';
@@ -152,319 +155,276 @@
 </script>
 
 <div class="fuel-entry-workflow" bind:this={workflowContainer}>
-	<!-- Dashboard Header -->
-	<div class="dashboard-header">
+	<!-- Mobile App Header - Complete Header Card -->
+	<div class="app-header-card">
 		<div class="header-content">
-			<h1>Fuel Entry</h1>
+			<!-- Step Header with Navigation -->
+			<div class="step-nav-header">
+				{#if $canGoBackToPrevious}
+					<button class="nav-back" onclick={handlePrevious}>
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+							<path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+						</svg>
+					</button>
+				{:else}
+					<div class="nav-spacer"></div>
+				{/if}
+				
+				<div class="step-info">
+					<h1 class="step-title">{getStepTitle($currentStep)}</h1>
+					<div class="step-counter">{$currentStep + 1} of 7</div>
+				</div>
+				
+				{#if $currentStep === 4 || $currentStep === 5}
+					<button 
+						class="nav-continue {$canProceedToNext ? 'enabled' : 'disabled'}"
+						onclick={() => {
+							if ($canProceedToNext) {
+								handleNext();
+							}
+						}}
+						disabled={!$canProceedToNext}
+					>
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+							<path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
+						</svg>
+					</button>
+				{:else}
+					<div class="nav-spacer"></div>
+				{/if}
+			</div>
+			
+			<!-- Progress Summary -->
+			{#if progressItems.length > 0}
+				<div class="progress-summary">
+					{#each progressItems as item, i}
+						{#if i > 0}<span class="progress-separator">•</span>{/if}
+						<span class="progress-item">{item}</span>
+					{/each}
+				</div>
+			{/if}
+			
+			<!-- Minimal Progress Bar -->
+			<div class="progress-track">
+				<div 
+					class="progress-indicator" 
+					style="width: {Math.round(((($currentStep + 1) / 7) * 100))}%"
+				></div>
+			</div>
 		</div>
-	</div>
-	
-	<!-- Step Info -->
-	<div class="step-info">
-		<span class="step-badge">Step {$currentStep + 1} of 7</span>
-		<span class="step-title">{$currentStepData?.title || ''}</span>
 	</div>
 	
 	<!-- Step Content -->
 	<div class="step-content">
 		{#if $currentStep === 0}
 			<!-- Vehicle Selection -->
-			<div class="step-container">
-				
-					<VehicleSelection
-						selectedVehicle={$workflowData.vehicle}
-						onVehicleSelect={(vehicle) => {
-							console.log('Vehicle selected:', vehicle);
-							fuelEntryWorkflowStore.setVehicle(vehicle);
-						}}
-						onAutoAdvance={handleAutoAdvance}
-						errors={getCurrentStepErrors()}
-					/>
+			<VehicleSelection
+				selectedVehicle={$workflowData.vehicle}
+				onVehicleSelect={(vehicle) => {
+					fuelEntryWorkflowStore.setVehicle(vehicle);
+				}}
+				onAutoAdvance={handleAutoAdvance}
+				errors={getCurrentStepErrors()}
+			/>
+			
+			<!-- Continue Button -->
+			<div class="step-actions">
+				<button
+					class="continue-button"
+					onclick={() => {
+						if ($canProceedToNext) {
+							handleNext();
+						}
+					}}
+					disabled={!$canProceedToNext}
+				>
+					Continue →
+				</button>
 			</div>
 		{:else if $currentStep === 1}
 			<!-- Driver Selection -->
-			<div class="step-container">
-				<!-- Navigation Controls -->
-				<div class="step-nav">
-					{#if $canGoBackToPrevious}
-						<Button 
-							variant="outline" 
-							onclick={handlePrevious}
-							class="nav-button"
-						>
-							← Back
-						</Button>
-					{/if}
-				</div>
-				
-				
-					<DriverSelection
-						selectedDriver={$workflowData.driver}
-						onDriverSelect={(driver) => {
-							console.log('Driver selected:', driver);
-							fuelEntryWorkflowStore.setDriver(driver);
-							
-							// Auto-select driver's default vehicle if available and no vehicle selected yet
-							if (driver?.default_vehicle && !$workflowData.vehicle) {
-								console.log('Auto-selecting default vehicle:', driver.default_vehicle);
-								fuelEntryWorkflowStore.setVehicle(driver.default_vehicle);
-							}
-						}}
-						onAutoAdvance={handleAutoAdvance}
-						errors={getCurrentStepErrors()}
-					/>
+			<DriverSelection
+				selectedDriver={$workflowData.driver}
+				onDriverSelect={(driver) => {
+					fuelEntryWorkflowStore.setDriver(driver);
+					
+					// Auto-select driver's default vehicle if available and no vehicle selected yet
+					if (driver?.default_vehicle && !$workflowData.vehicle) {
+						fuelEntryWorkflowStore.setVehicle(driver.default_vehicle);
+					}
+				}}
+				onAutoAdvance={handleAutoAdvance}
+				errors={getCurrentStepErrors()}
+			/>
+			
+			<!-- Continue Button -->
+			<div class="step-actions">
+				<button
+					class="continue-button"
+					onclick={() => {
+						if ($canProceedToNext) {
+							handleNext();
+						}
+					}}
+					disabled={!$canProceedToNext}
+				>
+					Continue →
+				</button>
 			</div>
 		{:else if $currentStep === 2}
 			<!-- Activity Selection -->
-			<div class="step-container">
-				<!-- Navigation Controls -->
-				<div class="step-nav">
-					{#if $canGoBackToPrevious}
-						<Button 
-							variant="outline" 
-							onclick={handlePrevious}
-							class="nav-button"
-						>
-							← Back
-						</Button>
-					{/if}
-				</div>
-				
-				
-					<ActivitySelection
-						selectedActivity={$workflowData.activity}
-						onActivitySelect={(activity) => {
-							console.log('Activity selected:', activity);
-							fuelEntryWorkflowStore.setActivity(activity);
-						}}
-						onAutoAdvance={handleAutoAdvance}
-						errors={getCurrentStepErrors()}
-					/>
+			<ActivitySelection
+				selectedActivity={$workflowData.activity}
+				onActivitySelect={(activity) => {
+					fuelEntryWorkflowStore.setActivity(activity);
+				}}
+				onAutoAdvance={handleAutoAdvance}
+				errors={getCurrentStepErrors()}
+			/>
+			
+			<!-- Continue Button -->
+			<div class="step-actions">
+				<button
+					class="continue-button"
+					onclick={() => {
+						if ($canProceedToNext) {
+							handleNext();
+						}
+					}}
+					disabled={!$canProceedToNext}
+				>
+					Continue →
+				</button>
 			</div>
 		{:else if $currentStep === 3}
 			<!-- Location Selection (Field or Zone - Optional) -->
-			<div class="step-container">
-				<!-- Navigation Controls -->
-				<div class="step-nav">
-					{#if $canGoBackToPrevious}
-						<Button 
-							variant="outline" 
-							onclick={handlePrevious}
-							class="nav-button"
-						>
-							← Back
-						</Button>
-					{/if}
-				</div>
-				
-				
-					<LocationSelection
-						selectedField={$workflowData.field}
-						selectedZone={$workflowData.zone}
-						onLocationSelect={(field, zone) => {
-							console.log('Location selected:', { field, zone });
-							fuelEntryWorkflowStore.setLocation(field, zone);
-						}}
-						onAutoAdvance={handleAutoAdvance}
-						errors={getCurrentStepErrors()}
-					/>
+			<LocationSelection
+				selectedField={$workflowData.field}
+				selectedZone={$workflowData.zone}
+				onLocationSelect={(field, zone) => {
+					fuelEntryWorkflowStore.setLocation(field, zone);
+				}}
+				onAutoAdvance={handleAutoAdvance}
+				errors={getCurrentStepErrors()}
+			/>
+			
+			<!-- Continue Button -->
+			<div class="step-actions">
+				<button
+					class="continue-button"
+					onclick={() => {
+						if ($canProceedToNext) {
+							handleNext();
+						}
+					}}
+					disabled={!$canProceedToNext}
+				>
+					Continue →
+				</button>
 			</div>
 		{:else if $currentStep === 4}
 			<!-- Odometer Reading -->
-			<div class="step-container">
-				<!-- Navigation Controls -->
-				<div class="step-nav">
-					{#if $canGoBackToPrevious}
-						<Button 
-							variant="outline" 
-							onclick={handlePrevious}
-							class="nav-button"
-						>
-							← Back
-						</Button>
-					{/if}
-					
-					<button
-						class="continue-button"
-						onclick={() => {
-							if ($canProceedToNext) {
-								handleNext();
-							}
-						}}
-						disabled={!$canProceedToNext}
-					>
-						Continue →
-					</button>
-				</div>
-				
-				
-					<OdometerReading
-						selectedVehicle={$workflowData.vehicle}
-						odometerStart={$workflowData.odometerStart}
-						odometerEnd={$workflowData.odometerEnd}
-						gaugeWorking={$workflowData.gaugeWorking}
-						onOdometerUpdate={(start, end, gaugeWorking) => {
-							console.log('Odometer updated:', { start, end, gaugeWorking });
-							fuelEntryWorkflowStore.setOdometerData(start, end, gaugeWorking);
-						}}
-						errors={getCurrentStepErrors()}
-					/>
-			</div>
+			<OdometerReading
+				selectedVehicle={$workflowData.vehicle}
+				odometerStart={$workflowData.odometerStart}
+				odometerEnd={$workflowData.odometerEnd}
+				gaugeWorking={$workflowData.gaugeWorking}
+				onOdometerUpdate={(start, end, gaugeWorking) => {
+					fuelEntryWorkflowStore.setOdometerData(start, end, gaugeWorking);
+				}}
+				errors={getCurrentStepErrors()}
+			/>
 		{:else if $currentStep === 5}
 			<!-- Fuel Data Entry -->
-			<div class="step-container">
-				<!-- Navigation Controls -->
-				<div class="step-nav">
-					{#if $canGoBackToPrevious}
-						<Button 
-							variant="outline" 
-							onclick={handlePrevious}
-							class="nav-button"
-						>
-							← Back
-						</Button>
-					{/if}
-					
-					<button
-						class="continue-button"
-						onclick={() => {
-							if ($canProceedToNext) {
-								handleNext();
-							}
-						}}
-						disabled={!$canProceedToNext}
-					>
-						Continue →
-					</button>
-				</div>
-				
-				
-					<FuelDataEntry
-						selectedVehicle={$workflowData.vehicle}
-						selectedBowser={$workflowData.bowser}
-						bowserReadingStart={$workflowData.bowserReadingStart}
-						bowserReadingEnd={$workflowData.bowserReadingEnd}
-						litresDispensed={$workflowData.litresDispensed}
-						onFuelDataUpdate={(bowser, startReading, endReading, litres) => {
-							console.log('Fuel data updated:', { bowser, startReading, endReading, litres });
-							fuelEntryWorkflowStore.setFuelData(bowser, startReading, endReading, litres);
-						}}
-						errors={getCurrentStepErrors()}
-					/>
-			</div>
+			<FuelDataEntry
+				selectedVehicle={$workflowData.vehicle}
+				selectedBowser={$workflowData.bowser}
+				bowserReadingStart={$workflowData.bowserReadingStart}
+				bowserReadingEnd={$workflowData.bowserReadingEnd}
+				litresDispensed={$workflowData.litresDispensed}
+				onFuelDataUpdate={(bowser, startReading, endReading, litres) => {
+					fuelEntryWorkflowStore.setFuelData(bowser, startReading, endReading, litres);
+				}}
+				errors={getCurrentStepErrors()}
+			/>
 		{:else if $currentStep === 6}
 			<!-- Review & Submit -->
 			<div class="step-container">
-				<!-- Navigation Controls -->
-				<div class="step-nav">
-					{#if $canGoBackToPrevious}
-						<Button 
-							variant="outline" 
-							onclick={handlePrevious}
-							class="nav-button"
-						>
-							← Back
-						</Button>
+				<!-- Simplified Review -->
+				<div class="review-summary">
+					<!-- Vehicle Info -->
+					{#if $workflowData.vehicle}
+						<div class="review-row">
+							<span class="review-label">Vehicle</span>
+							<span class="review-value">{$workflowData.vehicle.name || `${$workflowData.vehicle.make || ''} ${$workflowData.vehicle.model || ''}`.trim() || 'Unnamed'}</span>
+						</div>
+					{/if}
+					
+					<!-- Driver Info -->
+					{#if $workflowData.driver}
+						<div class="review-row">
+							<span class="review-label">Driver</span>
+							<span class="review-value">{$workflowData.driver.name}</span>
+						</div>
+					{/if}
+					
+					<!-- Activity Info -->
+					{#if $workflowData.activity}
+						<div class="review-row">
+							<span class="review-label">Activity</span>
+							<span class="review-value">{$workflowData.activity.name}</span>
+						</div>
+					{/if}
+					
+					<!-- Field Info -->
+					{#if $workflowData.field}
+						<div class="review-row">
+							<span class="review-label">Field</span>
+							<span class="review-value">{$workflowData.field.name}</span>
+						</div>
+					{/if}
+					
+					<!-- Odometer Info -->
+					{#if $workflowData.gaugeWorking && $workflowData.odometerStart !== null && $workflowData.odometerEnd !== null}
+						<div class="review-row">
+							<span class="review-label">Distance</span>
+							<span class="review-value">{new Intl.NumberFormat().format($workflowData.odometerEnd - $workflowData.odometerStart)} km</span>
+						</div>
+					{/if}
+					
+					<!-- Fuel Info - Highlighted -->
+					{#if $workflowData.bowser && $workflowData.litresDispensed}
+						<div class="fuel-total">
+							<span class="fuel-amount">{new Intl.NumberFormat().format($workflowData.litresDispensed)}</span>
+							<span class="fuel-unit">L</span>
+						</div>
 					{/if}
 				</div>
 				
-				<!-- Review Summary Card -->
-				<div class="review-card">
-					<div class="review-header">
-						<h3>Review Entry</h3>
-						<p>Please verify all information before submitting</p>
-					</div>
-					
-					<div class="review-grid">
-						<!-- Vehicle Info -->
-						{#if $workflowData.vehicle}
-							<div class="review-item">
-								<span class="item-label">Vehicle</span>
-								<span class="item-value">{$workflowData.vehicle.name || `${$workflowData.vehicle.make || ''} ${$workflowData.vehicle.model || ''}`.trim() || 'Unnamed'}</span>
-							</div>
-						{/if}
-						
-						<!-- Driver Info -->
-						{#if $workflowData.driver}
-							<div class="review-item">
-								<span class="item-label">Driver</span>
-								<span class="item-value">{$workflowData.driver.name}</span>
-							</div>
-						{/if}
-						
-						<!-- Activity Info -->
-						{#if $workflowData.activity}
-							<div class="review-item">
-								<span class="item-label">Activity</span>
-								<span class="item-value">{$workflowData.activity.name}</span>
-							</div>
-						{/if}
-						
-						<!-- Field Info -->
-						{#if $workflowData.field}
-							<div class="review-item">
-								<span class="item-label">Field</span>
-								<span class="item-value">{$workflowData.field.name}</span>
-							</div>
-						{/if}
-						
-						<!-- Odometer Info -->
-						{#if $workflowData.gaugeWorking && $workflowData.odometerStart !== null && $workflowData.odometerEnd !== null}
-							<div class="review-item odometer-group">
-								<span class="item-label">Odometer</span>
-								<div class="odometer-values">
-									<span class="odo-start">{new Intl.NumberFormat().format($workflowData.odometerStart)}</span>
-									<span class="odo-arrow">→</span>
-									<span class="odo-end">{new Intl.NumberFormat().format($workflowData.odometerEnd)}</span>
-								</div>
-							</div>
-						{/if}
-						
-						<!-- Fuel Info -->
-						{#if $workflowData.bowser && $workflowData.litresDispensed}
-							<div class="review-item fuel-highlight">
-								<span class="item-label">Fuel Dispensed</span>
-								<span class="item-value fuel-value">{new Intl.NumberFormat().format($workflowData.litresDispensed)}L</span>
-							</div>
-						{/if}
-					</div>
-				</div>
-				
 				{#if getCurrentStepErrors().length > 0}
-					<div class="validation-errors">
-						<div class="error-card">
-							<div class="error-header">
-								<span class="error-icon">⚠️</span>
-								<h3>Please complete all required steps</h3>
-							</div>
-							<div class="error-list">
-								{#each getCurrentStepErrors() as error}
-									<div class="error-item">{error}</div>
-								{/each}
-							</div>
-						</div>
+					<div class="error-message">
+						{#each getCurrentStepErrors() as error}
+							<p>{error}</p>
+						{/each}
 					</div>
 				{/if}
 
 				<!-- Submit Button -->
-				<div class="submit-container">
-					<button
-						class="submit-button"
-						onclick={() => {
-							if ($canProceedToNext && !$isSubmittingEntry) {
-								handleSubmit();
-							}
-						}}
-						disabled={!$canProceedToNext || $isSubmittingEntry}
-					>
-						{#if $isSubmittingEntry}
-							<span class="submit-loader"></span>
-							Submitting...
-						{:else}
-							Submit Entry
-						{/if}
-					</button>
-				</div>
+				<button
+					class="submit-btn"
+					onclick={() => {
+						if ($canProceedToNext && !$isSubmittingEntry) {
+							handleSubmit();
+						}
+					}}
+					disabled={!$canProceedToNext || $isSubmittingEntry}
+				>
+					{#if $isSubmittingEntry}
+						Submitting...
+					{:else}
+						Submit
+					{/if}
+				</button>
 			</div>
 		{/if}
 	</div>
@@ -488,6 +448,12 @@
 	</div>
 {/if}
 
+<svelte:head>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</svelte:head>
+
 <style>
 	.fuel-entry-workflow {
 		width: 100%;
@@ -496,66 +462,151 @@
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
 		min-height: 100vh;
+		background: #ffffff;
 	}
 	
-	/* Header - matching Dashboard style */
-	.dashboard-header {
+	/* Mobile App Header Card - Complete sticky header */
+	.app-header-card {
+		position: sticky;
+		top: 0;
+		z-index: 100;
+		background: #ffffff;
+		border-bottom: 1px solid #f1f5f9;
+	}
+	
+	.header-content {
+		padding: 0;
+		background: #ffffff;
+	}
+	
+	.step-nav-header {
 		display: flex;
+		align-items: center;
 		justify-content: space-between;
-		align-items: flex-start;
-		gap: 1rem;
-		margin-bottom: 0.5rem;
+		padding: 0.75rem 1rem;
+		min-height: 56px; /* Standard mobile header height */
 	}
 	
-	.header-content h1 {
-		font-size: 2.25rem;
-		font-weight: 700;
-		color: var(--color-text-primary);
-		margin: 0 0 0.5rem 0;
-		line-height: 1.2;
+	/* Navigation Buttons */
+	.nav-back,
+	.nav-continue {
+		width: 44px;
+		height: 44px;
+		border-radius: 22px;
+		border: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		flex-shrink: 0;
 	}
 	
-	.step-info {
-		background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+	.nav-back {
+		background: #f8fafc;
+		color: #475569;
+	}
+	
+	.nav-back:hover {
+		background: #f1f5f9;
+		color: #334155;
+	}
+	
+	.nav-continue.disabled {
+		background: #f8fafc;
+		color: #cbd5e1;
+		cursor: not-allowed;
+	}
+	
+	.nav-continue.enabled {
+		background: #10b981;
 		color: white;
-		padding: 1rem 1.5rem;
-		border-radius: 16px;
-		box-shadow: 0 8px 32px rgba(249, 115, 22, 0.2);
+	}
+	
+	.nav-continue.enabled:hover {
+		background: #059669;
+		transform: scale(1.05);
+	}
+	
+	.nav-spacer {
+		width: 44px;
+		height: 44px;
+		flex-shrink: 0;
+	}
+	
+	/* Step Info */
+	.step-info {
+		flex: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.25rem;
-		margin-bottom: 1.5rem;
-	}
-	
-	.step-badge {
-		background: rgba(255, 255, 255, 0.2);
-		padding: 0.25rem 0.75rem;
-		border-radius: 20px;
-		font-size: 0.75rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		justify-content: center;
+		padding: 0 1rem;
 	}
 	
 	.step-title {
-		font-size: 1rem;
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: #1f2937;
+		margin: 0;
+		line-height: 1.3;
+	}
+	
+	.step-counter {
+		font-size: 0.75rem;
+		color: #64748b;
 		font-weight: 500;
-		opacity: 0.9;
+		margin-top: 2px;
+		letter-spacing: 0.025em;
+	}
+	
+	/* Progress Track */
+	.progress-track {
+		height: 2px;
+		background: #f1f5f9;
+		position: relative;
+		overflow: hidden;
+	}
+	
+	.progress-indicator {
+		height: 100%;
+		background: linear-gradient(90deg, #10b981, #059669);
+		transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+	}
+	
+	/* Progress Summary */
+	.progress-summary {
+		padding: 0.75rem 1rem;
+		text-align: center;
+		font-size: 0.875rem;
+		color: #6b7280;
+		line-height: 1.4;
+	}
+	
+	.progress-item {
+		font-weight: 500;
+		color: #374151;
+	}
+	
+	.progress-separator {
+		margin: 0 8px;
+		color: #d1d5db;
+		font-weight: 400;
 	}
 	
 	
-	/* Step Container */
-	.step-container {
-		padding: 1.5rem;
+	/* Step Actions */
+	.step-actions {
+		padding: 1.5rem 0;
 		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-		max-width: 900px;
-		margin: 0 auto;
+		justify-content: center;
+		align-items: center;
+		gap: 1rem;
 	}
+	
+	/* Step Container - removed since step-content handles this */
 	
 	
 	/* Navigation */
@@ -568,239 +619,135 @@
 	
 	:global(.nav-button) {
 		padding: 0.75rem 1.5rem !important;
-		border-radius: 12px !important;
+		border-radius: 8px !important;
 		font-weight: 500 !important;
 		border: 1px solid #e5e7eb !important;
 		background: white !important;
-		color: #374151 !important;
+		color: #6b7280 !important;
 		transition: all 0.2s ease !important;
 	}
 	
 	:global(.nav-button:hover) {
-		border-color: #f97316 !important;
-		color: #f97316 !important;
-		box-shadow: 0 2px 8px rgba(249, 115, 22, 0.1) !important;
+		border-color: #d1d5db !important;
+		color: #374151 !important;
+		background: #f9fafb !important;
 	}
 	
 	.continue-button {
-		background: linear-gradient(135deg, #f97316, #ea580c);
+		background: #1f2937;
 		color: white;
 		border: none;
 		padding: 0.75rem 1.5rem;
-		border-radius: 12px;
+		border-radius: 8px;
 		font-weight: 600;
 		font-size: 0.875rem;
 		cursor: pointer;
 		transition: all 0.2s ease;
-		box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
 	}
 	
 	.continue-button:hover:not(:disabled) {
-		transform: translateY(-1px);
-		box-shadow: 0 6px 16px rgba(249, 115, 22, 0.4);
+		background: #374151;
 	}
 	
 	.continue-button:disabled {
 		background: #9ca3af;
 		cursor: not-allowed;
-		box-shadow: none;
-		transform: none;
 	}
 
 	/* Step Content */
 	.step-content {
 		flex: 1;
-		padding-bottom: 2rem;
+		padding: 1.5rem 1rem 6rem 1rem;
+		max-width: 900px;
+		margin: 0 auto;
+		width: 100%;
+		box-sizing: border-box;
+		background: #ffffff;
 	}
 	
-	/* Review Card */
-	.review-card {
-		background: white;
-		border-radius: 16px;
-		padding: 2rem;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-		border: 1px solid #f1f5f9;
-	}
-	
-	.review-header {
-		text-align: center;
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid #f1f5f9;
-	}
-	
-	.review-header h3 {
-		font-size: 1.5rem;
-		font-weight: 700;
-		color: #111827;
-		margin: 0 0 0.5rem 0;
-	}
-	
-	.review-header p {
-		color: #6b7280;
-		font-size: 0.875rem;
-		margin: 0;
-	}
-	
-	.review-grid {
+	/* Simplified Review */
+	.review-summary {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1rem;
+		margin-bottom: 2rem;
 	}
 	
-	.review-item {
+	.review-row {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 1rem;
-		background: #f8fafc;
-		border-radius: 12px;
-		border: 1px solid #e2e8f0;
+		padding: 0.75rem 0;
+		border-bottom: 1px solid #f1f5f9;
 	}
 	
-	.review-item.fuel-highlight {
-		background: linear-gradient(135deg, #fef3e2, #fed7aa);
-		border-color: #f97316;
-		box-shadow: 0 2px 8px rgba(249, 115, 22, 0.1);
-	}
-	
-	.review-item.odometer-group {
-		align-items: flex-start;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-	
-	.item-label {
+	.review-label {
 		font-size: 0.875rem;
-		font-weight: 600;
 		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		font-weight: 500;
 	}
 	
-	.item-value {
-		font-size: 1rem;
-		font-weight: 600;
+	.review-value {
+		font-size: 0.875rem;
 		color: #111827;
+		font-weight: 600;
 		text-align: right;
 	}
 	
-	.fuel-value {
-		font-size: 1.25rem;
-		font-weight: 700;
-		color: #f97316;
+	.fuel-total {
+		text-align: center;
+		margin: 2rem 0;
 	}
 	
-	.odometer-values {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		font-size: 1rem;
-		font-weight: 600;
+	.fuel-amount {
+		font-size: 3rem;
+		font-weight: 800;
 		color: #111827;
 	}
 	
-	.odo-arrow {
-		color: #f97316;
+	.fuel-unit {
+		font-size: 1.25rem;
 		font-weight: 700;
-	}
-	
-	.odo-end {
-		color: #f97316;
+		color: #9ca3af;
+		margin-left: 0.25rem;
 	}
 
 
-	/* Submit Container */
-	.submit-container {
-		padding: 2rem 0 0;
-	}
-	
-	.submit-button {
+	/* Submit Button */
+	.submit-btn {
 		width: 100%;
-		background: linear-gradient(135deg, #f97316, #ea580c);
+		background: #1f2937;
 		color: white;
 		border: none;
-		padding: 1.25rem 2rem;
-		border-radius: 16px;
-		font-size: 1.125rem;
-		font-weight: 700;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		box-shadow: 0 8px 24px rgba(249, 115, 22, 0.3);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-	}
-	
-	.submit-button:hover:not(:disabled) {
-		transform: translateY(-2px);
-		box-shadow: 0 12px 32px rgba(249, 115, 22, 0.4);
-	}
-	
-	.submit-button:disabled {
-		background: #9ca3af;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-		cursor: not-allowed;
-		transform: none;
-	}
-	
-	.submit-loader {
-		width: 20px;
-		height: 20px;
-		border: 2px solid rgba(255, 255, 255, 0.3);
-		border-top: 2px solid white;
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-	}
-	
-	@keyframes spin {
-		0% { transform: rotate(0deg); }
-		100% { transform: rotate(360deg); }
-	}
-	/* Validation Errors */
-	.validation-errors {
-		margin-top: 1.5rem;
-	}
-	
-	.error-card {
-		background: #fef2f2;
-		border: 1px solid #fecaca;
-		border-left: 4px solid #ef4444;
-		border-radius: 12px;
-		padding: 1.5rem;
-	}
-	
-	.error-header {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-bottom: 1rem;
-		padding-bottom: 0.75rem;
-		border-bottom: 1px solid #fecaca;
-	}
-	
-	.error-icon {
-		font-size: 1.25rem;
-	}
-	
-	.error-header h3 {
-		color: #dc2626;
+		padding: 1rem;
+		border-radius: 0.5rem;
 		font-size: 1rem;
 		font-weight: 600;
-		margin: 0;
+		cursor: pointer;
+		transition: background 0.2s ease;
+		margin-top: 1rem;
 	}
 	
-	.error-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
+	.submit-btn:hover:not(:disabled) {
+		background: #374151;
 	}
 	
-	.error-item {
+	.submit-btn:disabled {
+		background: #9ca3af;
+		cursor: not-allowed;
+	}
+	/* Error Message */
+	.error-message {
+		background: #fef2f2;
+		padding: 1rem;
+		border-radius: 0.5rem;
+		margin: 1rem 0;
+	}
+	
+	.error-message p {
 		color: #dc2626;
 		font-size: 0.875rem;
-		padding: 0.25rem 0;
+		margin: 0;
 	}
 
 
@@ -876,39 +823,113 @@
 	@media (max-width: 768px) {
 		.fuel-entry-workflow {
 			padding: 0;
-			gap: 1rem;
-		}
-		
-		.dashboard-header {
+			gap: 0;
+			min-height: 100vh;
+			display: flex;
 			flex-direction: column;
-			gap: 0.75rem;
-			padding: 0.5rem;
-		}
-
-		.header-content h1 {
-			font-size: 1.75rem;
 		}
 		
-		
-		.step-container {
-			padding: 1rem;
-			gap: 1rem;
-			max-width: 100%;
+		/* Mobile app header optimizations */
+		.app-header {
+			height: 56px;
+			padding: 0 16px;
+			border-bottom: 1px solid #f1f5f9;
+			background: #ffffff;
+			box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 		}
 		
-		
-		.step-nav {
-			gap: 0.75rem;
+		.step-nav-header {
+			height: 44px;
+			align-items: center;
+			gap: 12px;
 		}
 		
-		:global(.nav-button) {
-			padding: 0.625rem 1.25rem !important;
-			font-size: 0.875rem !important;
+		.nav-back, .nav-continue {
+			width: 44px;
+			height: 44px;
+			border-radius: 50%;
+			border: none;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			transition: all 0.2s ease;
+			flex-shrink: 0;
 		}
 		
-		.continue-button {
-			padding: 0.625rem 1.25rem;
-			font-size: 0.875rem;
+		.nav-back {
+			background: #f8fafc;
+			color: #64748b;
+		}
+		
+		.nav-back:active {
+			background: #e2e8f0;
+			transform: scale(0.95);
+		}
+		
+		.nav-continue {
+			background: #e5e7eb;
+			color: #9ca3af;
+		}
+		
+		.nav-continue.enabled {
+			background: #10b981;
+			color: white;
+			box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+		}
+		
+		.nav-continue.enabled:active {
+			background: #059669;
+			transform: scale(0.95);
+		}
+		
+		.step-info {
+			flex: 1;
+			min-width: 0;
+		}
+		
+		.step-title {
+			font-size: 18px;
+			font-weight: 600;
+			color: #1f2937;
+			margin: 0;
+			line-height: 1.2;
+			truncate: true;
+		}
+		
+		.step-counter {
+			font-size: 12px;
+			color: #6b7280;
+			margin-top: 2px;
+		}
+		
+		.progress-track {
+			height: 3px;
+			background: #f1f5f9;
+			border-radius: 0;
+			overflow: hidden;
+		}
+		
+		.progress-indicator {
+			height: 100%;
+			background: linear-gradient(90deg, #10b981, #059669);
+			transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+			box-shadow: none;
+		}
+		
+		/* Content area */
+		.step-content {
+			padding: 1.25rem 0 6rem 0;
+		}
+		
+		/* Progress summary mobile */
+		.progress-summary {
+			padding: 0.625rem 0.75rem;
+			font-size: 0.8125rem;
+			line-height: 1.3;
+		}
+		
+		.progress-separator {
+			margin: 0 6px;
 		}
 		
 		.review-card {
@@ -948,8 +969,8 @@
 		}
 		
 		.submit-button {
-			padding: 1rem 1.5rem;
-			font-size: 1rem;
+			padding: 0.875rem 1.5rem;
+			font-size: 0.875rem;
 		}
 		
 		.error-card {
@@ -985,22 +1006,26 @@
 
 	/* Extra small mobile devices */
 	@media (max-width: 480px) {
-		.workflow-header {
-			padding: 1.25rem 0 0.75rem;
+		.app-header {
+			padding: 0 12px;
 		}
 		
-		.workflow-header h1 {
-			font-size: 1.25rem;
+		.step-title {
+			font-size: 16px;
 		}
 		
-		.step-container {
-			padding: 0.75rem;
+		.step-content {
+			padding: 1rem 0 6rem 0;
 		}
 		
-		.keyboard-hints {
-			margin: 1rem 0.75rem 0;
+		.progress-summary {
+			padding: 0.5rem;
+			font-size: 0.75rem;
 		}
 		
+		.progress-separator {
+			margin: 0 4px;
+		}
 		
 		.review-card {
 			padding: 1rem;
@@ -1010,7 +1035,6 @@
 			margin: 0.5rem;
 			padding: 1rem;
 		}
-		
 	}
 	
 	/* Keyboard Shortcuts Hint */

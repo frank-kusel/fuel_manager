@@ -28,7 +28,6 @@
 	let drivers: Driver[] = $state([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let searchTerm = $state('');
 	
 	onMount(async () => {
 		try {
@@ -45,15 +44,7 @@
 		}
 	});
 	
-	let filteredDrivers = $derived(drivers.filter(driver => {
-		if (!searchTerm) return true;
-		const search = searchTerm.toLowerCase();
-		return (
-			driver.name.toLowerCase().includes(search) ||
-			driver.employee_code?.toLowerCase().includes(search) ||
-			driver.license_number?.toLowerCase().includes(search)
-		);
-	}).sort((a, b) => {
+	let filteredDrivers = $derived([...drivers].sort((a, b) => {
 		const codeA = a.employee_code || 'ZZZ';
 		const codeB = b.employee_code || 'ZZZ';
 		return codeA.localeCompare(codeB);
@@ -62,21 +53,6 @@
 
 <div class="driver-selection">
 	
-	{#if !loading && drivers.length > 0}
-		<div class="search-container">
-			<div class="search-input">
-				<span class="search-icon">🔍</span>
-				<input 
-					type="text" 
-					placeholder="Search by name, employee code, or license number..."
-					bind:value={searchTerm}
-				/>
-				{#if searchTerm}
-					<button class="clear-search" onclick={() => searchTerm = ''}>×</button>
-				{/if}
-			</div>
-		</div>
-	{/if}
 	
 	{#if loading}
 		<div class="loading-state">
@@ -135,39 +111,14 @@
 	{/if}
 	
 	{#if selectedDriver}
-		<div class="selection-summary">
-			<Card class="selected-driver-summary">
-				<div class="summary-header">
-					<span class="summary-icon">✓</span>
-					<h3>Selected Driver</h3>
-				</div>
-				<div class="summary-content">
-					<div class="summary-driver">
-						<div class="summary-avatar">
-							{selectedDriver.name.charAt(0).toUpperCase()}
-						</div>
-						<div class="summary-info">
-							<div class="summary-name">{selectedDriver.name}</div>
-							{#if selectedDriver.employee_code}
-								<div class="summary-code">#{selectedDriver.employee_code}</div>
-							{/if}
-						</div>
-					</div>
-					{#if selectedDriver.license_number}
-						<div class="summary-details">
-							<div class="summary-detail">
-								<span>License:</span>
-								<strong>{selectedDriver.license_number}</strong>
-							</div>
-						</div>
-					{/if}
-				</div>
-				<div class="summary-actions">
-					<Button variant="outline" size="sm" onclick={() => onDriverSelect(null)}>
-						Change Driver
-					</Button>
-				</div>
-			</Card>
+		<div class="selected-summary">
+			<div class="selected-item">
+				<div class="selected-label">Selected Driver</div>
+				<div class="selected-name">{selectedDriver.name}</div>
+				{#if selectedDriver.employee_code}
+					<div class="selected-detail">#{selectedDriver.employee_code}</div>
+				{/if}
+			</div>
 		</div>
 	{/if}
 </div>
@@ -177,7 +128,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-		padding: 0;
 	}
 
 	/* Step Header - Following original design */
@@ -199,186 +149,122 @@
 		flex-shrink: 0;
 	}
 
-	/* Search */
-	.search-container {
-		margin-bottom: 1rem;
-	}
 
-	.search-input {
-		position: relative;
-		display: flex;
-		align-items: center;
-	}
-
-	.search-input input {
-		width: 100%;
-		padding: 0.75rem 1rem 0.75rem 2.5rem;
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		font-size: 0.875rem;
-		background: var(--color-background);
-		color: var(--color-text-primary);
-	}
-
-	.search-input input:focus {
-		outline: none;
-		border-color: var(--color-primary);
-		box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
-	}
-
-	.search-icon {
-		position: absolute;
-		left: 0.75rem;
-		color: var(--color-text-secondary);
-		pointer-events: none;
-		font-size: 1rem;
-	}
-
-	.clear-search {
-		position: absolute;
-		right: 0.75rem;
-		background: none;
-		border: none;
-		color: var(--color-text-secondary);
-		font-size: 1.25rem;
-		cursor: pointer;
-		padding: 0;
-		width: 1.5rem;
-		height: 1.5rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 50%;
-	}
-
-	.clear-search:hover {
-		background: var(--color-background-secondary);
-		color: var(--color-text-primary);
-	}
-
-	/* Table Container - Original Design */
+	/* Consistent table styling */
 	.table-container {
-		background: var(--white, #ffffff);
-		border: 1px solid var(--gray-200, #e2e8f0);
-		border-radius: 0.75rem;
-		overflow-x: auto;
-		margin: 0.5rem 0;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+		background: white;
+		border: 1px solid #f1f5f9;
+		border-radius: 0.5rem;
+		overflow: hidden;
+		margin: 0;
 	}
 
-	/* Table Styling - Original Design */
 	:global(.table) {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 0.875rem;
+		table-layout: fixed;
 	}
 
 	:global(.table th),
 	:global(.table td) {
-		padding: 0.75rem;
+		padding: 12px 16px;
 		text-align: left;
-		border-bottom: 1px solid var(--gray-200, #e2e8f0);
+		border-bottom: 1px solid #f1f5f9;
+		font-size: 14px;
+		vertical-align: top;
 	}
 
 	:global(.table th) {
-		background: var(--gray-50, #f8fafc);
+		background: #f8fafc;
+		font-size: 12px;
 		font-weight: 600;
-		color: var(--gray-700, #334155);
-		font-size: 0.75rem;
+		color: #6b7280;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-	}
-
-	:global(.table tbody tr:hover) {
-		background: var(--gray-50, #f8fafc);
+		height: 44px;
 	}
 
 	:global(.table tbody tr.clickable) {
 		cursor: pointer;
+		transition: background 0.2s ease;
+		min-height: 48px;
 	}
 
 	:global(.table tbody tr.clickable:hover) {
-		background: var(--primary-light, #eff6ff);
+		background: #f8fafc;
 	}
 
 	/* Selected rows */
 	:global(.table tbody tr.selected) {
-		background: var(--primary, #2563eb);
-		color: var(--white, #ffffff);
+		background: #2563eb;
+		color: white;
 	}
 
-	/* Selection Summary */
-	.selection-summary {
+	/* Driver cell styling */
+	.driver-code {
+		font-weight: 600;
+		color: #2563eb;
+		font-size: 14px;
+	}
+
+	.driver-name {
+		font-weight: 500;
+		color: #111827;
+		font-size: 14px;
+	}
+
+	/* Mobile Responsiveness */
+	@media (max-width: 768px) {
+		.table-container {
+			margin: 0;
+		}
+
+		:global(.table th),
+		:global(.table td) {
+			padding: 10px 12px;
+		}
+	}
+
+	@media (max-width: 480px) {
+		:global(.table th),
+		:global(.table td) {
+			padding: 8px 10px;
+			font-size: 13px;
+		}
+	}
+
+	/* Selected summary */
+	.selected-summary {
 		margin-top: 1rem;
+		padding: 1rem;
+		background: #f0fdf4;
+		border: 1px solid #bbf7d0;
+		border-radius: 0.5rem;
 	}
 
-	:global(.selected-driver-summary) {
-		border: 2px solid #a7f3d0;
-		background: #ecfdf5;
+	.selected-item {
+		text-align: center;
 	}
 
-	.summary-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
+	.selected-label {
+		font-size: 0.75rem;
+		color: #059669;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.5rem;
 	}
 
-	.summary-icon {
-		background: #10b981;
-		color: var(--gray-900, #0f172a);
-		width: 1.5rem;
-		height: 1.5rem;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.875rem;
-		font-weight: bold;
-	}
-
-	.summary-header h3 {
-		color: #047857;
+	.selected-name {
 		font-size: 1rem;
-		font-weight: 600;
-		margin: 0;
+		font-weight: 700;
+		color: #111827;
+		margin-bottom: 0.25rem;
 	}
 
-	.summary-content {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		margin-bottom: 1rem;
-	}
-
-	.summary-driver {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.summary-avatar {
-		width: 2rem;
-		height: 2rem;
-		border-radius: 50%;
-		background: #10b981;
-		color: var(--gray-900, #0f172a);
-		display: flex;
-		align-items: center;
-		justify-content: center;
+	.selected-detail {
 		font-size: 0.875rem;
-		font-weight: bold;
-		flex-shrink: 0;
-	}
-
-	.summary-name {
-		font-weight: 600;
-		color: var(--gray-900, #0f172a);
-	}
-
-	.summary-code {
-		font-size: 0.875rem;
-		color: var(--gray-600, #475569);
+		color: #6b7280;
 		font-family: monospace;
 	}
 

@@ -188,43 +188,14 @@
 	{/if}
 	
 	{#if selectedField}
-		<div class="selection-summary">
-			<Card class="selected-field-summary">
-				<div class="summary-header">
-					<span class="summary-icon">✓</span>
-					<h3>Selected Field</h3>
-				</div>
-				<div class="summary-content">
-					<div class="summary-field">
-						<div class="summary-field-icon" style="color: {getFieldColor(selectedField.crop_type)}">
-							{getFieldIcon(selectedField.crop_type)}
-						</div>
-						<div class="summary-info">
-							<div class="summary-name">{selectedField.name}</div>
-							{#if selectedField.location}
-								<div class="summary-location">📍 {selectedField.location}</div>
-							{/if}
-						</div>
-					</div>
-					<div class="summary-details">
-						{#if selectedField.crop_type}
-							<div class="summary-detail">
-								<span>Crop:</span>
-								<strong>{selectedField.crop_type}</strong>
-							</div>
-						{/if}
-						<div class="summary-detail">
-							<span>Area:</span>
-							<strong>{formatArea(selectedField.area_hectares)}</strong>
-						</div>
-					</div>
-				</div>
-				<div class="summary-actions">
-					<Button variant="outline" size="sm" onclick={() => onFieldSelect(null)}>
-						Change Field
-					</Button>
-				</div>
-			</Card>
+		<div class="selected-summary">
+			<div class="selected-item">
+				<div class="selected-label">Selected Field</div>
+				<div class="selected-name">{selectedField.name}</div>
+				{#if selectedField.crop_type}
+					<div class="selected-detail">{selectedField.crop_type}</div>
+				{/if}
+			</div>
 		</div>
 	{/if}
 </div>
@@ -233,7 +204,7 @@
 	.field-selection {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1rem;
 	}
 
 	/* Step Header - Following original design */
@@ -262,28 +233,127 @@
 		letter-spacing: 0.05em;
 	}
 
-	/* Table Container - Original Design */
+	/* Consistent table styling */
 	.table-container {
-		background: var(--white, #ffffff);
-		border: 1px solid var(--gray-200, #e2e8f0);
-		border-radius: 0.75rem;
-		overflow-x: auto;
-		margin: 0.5rem 0;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+		background: white;
+		border: 1px solid #f1f5f9;
+		border-radius: 0.5rem;
+		overflow: hidden;
+		margin: 0;
 	}
 
-	/* Table Styling - Original Design */
 	:global(.field-table) {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 0.875rem;
+		table-layout: fixed;
 	}
 
 	:global(.field-table th),
 	:global(.field-table td) {
-		padding: 0.75rem;
+		padding: 12px 16px;
 		text-align: left;
-		border-bottom: 1px solid var(--gray-200, #e2e8f0);
+		border-bottom: 1px solid #f1f5f9;
+		font-size: 14px;
+		vertical-align: top;
+	}
+
+	:global(.field-table th) {
+		background: #f8fafc;
+		font-size: 12px;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		height: 44px;
+	}
+
+	:global(.field-table tbody tr.clickable) {
+		cursor: pointer;
+		transition: background 0.2s ease;
+		min-height: 48px;
+	}
+
+	:global(.field-table tbody tr.clickable:hover) {
+		background: #f8fafc;
+	}
+
+	.field-row.selected {
+		background: #2563eb;
+		color: white;
+	}
+
+	/* Field cell styling */
+	.field-name {
+		font-weight: 600;
+		color: #2563eb;
+		font-size: 14px;
+	}
+
+	.field-crop,
+	.field-location,
+	.field-area {
+		font-weight: 500;
+		color: #111827;
+		font-size: 14px;
+	}
+
+	.field-area {
+		font-family: monospace;
+		color: #6b7280;
+	}
+
+	/* Mobile Responsiveness */
+	@media (max-width: 768px) {
+		.table-container {
+			margin: 0;
+		}
+
+		:global(.field-table th),
+		:global(.field-table td) {
+			padding: 10px 12px;
+		}
+	}
+
+	@media (max-width: 480px) {
+		:global(.field-table th),
+		:global(.field-table td) {
+			padding: 8px 10px;
+			font-size: 13px;
+		}
+	}
+
+	/* Selected summary */
+	.selected-summary {
+		margin-top: 1rem;
+		padding: 1rem;
+		background: #f0fdf4;
+		border: 1px solid #bbf7d0;
+		border-radius: 0.5rem;
+	}
+
+	.selected-item {
+		text-align: center;
+	}
+
+	.selected-label {
+		font-size: 0.75rem;
+		color: #059669;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.5rem;
+	}
+
+	.selected-name {
+		font-size: 1rem;
+		font-weight: 700;
+		color: #111827;
+		margin-bottom: 0.25rem;
+	}
+
+	.selected-detail {
+		font-size: 0.875rem;
+		color: #6b7280;
 	}
 
 	:global(.field-table th) {
