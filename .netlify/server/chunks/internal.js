@@ -466,7 +466,7 @@ const options = {
   root,
   service_worker: false,
   templates: {
-    app: ({ head, body, assets, nonce, env }) => '<!DOCTYPE html>\n<html lang="en" data-theme="light">\n	<head>\n		<meta charset="utf-8" />\n		<link rel="icon" href="' + assets + '/favicon.png" />\n		<meta name="viewport" content="width=device-width, initial-scale=1" />\n		<meta name="description" content="FarmTrack - Comprehensive Farm Management Platform" />\n		<meta name="theme-color" content="#16a34a" />\n		\n		<!-- PWA Meta Tags -->\n		<link rel="manifest" href="/manifest.json" />\n		<meta name="mobile-web-app-capable" content="yes" />\n		<meta name="apple-mobile-web-app-capable" content="yes" />\n		<meta name="apple-mobile-web-app-status-bar-style" content="default" />\n		<meta name="apple-mobile-web-app-title" content="FarmTrack" />\n		\n		' + head + '\n	</head>\n	<body data-sveltekit-preload-data="hover">\n		<div style="display: contents">' + body + "</div>\n	</body>\n</html>",
+    app: ({ head, body, assets, nonce, env }) => '<!DOCTYPE html>\n<html lang="en" data-theme="light">\n	<head>\n		<meta charset="utf-8" />\n		<link rel="icon" href="' + assets + '/favicon.png" />\n		<meta name="viewport" content="width=device-width, initial-scale=1" />\n		<meta name="description" content="FarmTrack - Comprehensive Farm Management Platform" />\n		<meta name="theme-color" content="#f8fafc" />\n		<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8fafc" />\n		<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1f2937" />\n		\n		<!-- PWA Meta Tags -->\n		<link rel="manifest" href="/manifest.json" />\n		<meta name="mobile-web-app-capable" content="yes" />\n		<meta name="apple-mobile-web-app-capable" content="yes" />\n		<meta name="apple-mobile-web-app-status-bar-style" content="light-content" />\n		<meta name="apple-mobile-web-app-title" content="FarmTrack" />\n		<meta name="msapplication-TileColor" content="#f97316" />\n		<meta name="msapplication-navbutton-color" content="#f8fafc" />\n		\n		<!-- Splash screens for iOS -->\n		<link rel="apple-touch-startup-image" href="/splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">\n		<link rel="apple-touch-startup-image" href="/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">\n		<link rel="apple-touch-startup-image" href="/splash-1242x2208.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">\n		<link rel="apple-touch-startup-image" href="/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">\n		<link rel="apple-touch-startup-image" href="/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">\n		\n		' + head + '\n	</head>\n	<body data-sveltekit-preload-data="hover">\n		<div style="display: contents">' + body + "</div>\n	</body>\n</html>",
     error: ({ status, message }) => '<!doctype html>\n<html lang="en">\n	<head>\n		<meta charset="utf-8" />\n		<title>' + message + `</title>
 
 		<style>
@@ -538,7 +538,7 @@ const options = {
 		<div class="error">
 			<span class="status">` + status + '</span>\n			<div class="message">\n				<h1>' + message + "</h1>\n			</div>\n		</div>\n	</body>\n</html>\n"
   },
-  version_hash: "gingfk"
+  version_hash: "1130idt"
 };
 async function get_hooks() {
   let handle;

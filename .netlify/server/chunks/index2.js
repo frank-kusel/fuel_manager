@@ -1902,8 +1902,6 @@ export {
   safe_not_equal as W,
   subscribe_to_store as X,
   run_all as Y,
-  get_prototype_of as Z,
-  object_prototype as _,
   set_active_effect as a,
   active_effect as b,
   active_reaction as c,

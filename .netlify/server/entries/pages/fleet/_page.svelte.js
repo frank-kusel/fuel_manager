@@ -1,8 +1,9 @@
-import { E as store_get, J as escape_html, P as ensure_array_like, N as attr_style, G as attr_class, O as stringify, K as attr, I as unsubscribe_stores, B as pop, z as push, Q as clsx, R as bind_props, S as maybe_selected, T as copy_payload, U as assign_payload, F as head } from "../../../chunks/index2.js";
+import { E as store_get, J as escape_html, P as ensure_array_like, G as attr_class, O as stringify, K as attr, I as unsubscribe_stores, B as pop, z as push, Q as clsx, R as bind_props, S as maybe_selected, T as copy_payload, U as assign_payload, F as head } from "../../../chunks/index2.js";
 import { d as derived, w as writable } from "../../../chunks/index.js";
 import { B as Button } from "../../../chunks/Button.js";
 import { C as Card } from "../../../chunks/Card.js";
 import "clsx";
+/* empty css                                                 */
 const initialState$4 = {
   vehicles: [],
   selectedVehicle: null,
@@ -305,30 +306,11 @@ function VehicleList($$payload, $$props) {
   push();
   var $$store_subs;
   let { onselect, oncreate } = $$props;
-  function getVehicleTypeIcon(type) {
-    const icons = {
-      tractor: "🚜",
-      bakkie: "🛻",
-      truck: "🚛",
-      loader: "🚧",
-      harvester: "🌾",
-      sprayer: "🌿",
-      other: "🚗"
-    };
-    return icons[type] || icons.other;
-  }
-  function getVehicleTypeColor(type) {
-    const colors = {
-      tractor: "#16a34a",
-      bakkie: "#2563eb",
-      truck: "#dc2626",
-      loader: "#ea580c",
-      harvester: "#65a30d",
-      sprayer: "#059669",
-      other: "#6b7280"
-    };
-    return colors[type] || colors.other;
-  }
+  let sortedVehicles = store_get($$store_subs ??= {}, "$vehicles", vehicles).sort((a, b) => {
+    if (a.type < b.type) return -1;
+    if (a.type > b.type) return 1;
+    return 0;
+  });
   function formatOdometer(vehicle) {
     const odometer = vehicle.current_odometer;
     const unit = vehicle.odometer_unit || "km";
@@ -337,14 +319,14 @@ function VehicleList($$payload, $$props) {
     }
     return `${odometer.toLocaleString()} ${unit}`;
   }
-  $$payload.out.push(`<div class="vehicle-list svelte-dydvws"><div class="header svelte-dydvws"><div class="header-content svelte-dydvws"><h2 class="svelte-dydvws">Vehicles</h2> <p class="subtitle svelte-dydvws">Manage your fleet vehicles, registration, and maintenance information</p></div> <div class="header-actions svelte-dydvws">`);
+  $$payload.out.push(`<div class="vehicle-list svelte-1gk5qi2"><div class="header svelte-1gk5qi2"><div class="header-content svelte-1gk5qi2"><h2 class="svelte-1gk5qi2">Vehicles</h2> <p class="subtitle svelte-1gk5qi2">Manage your fleet vehicles, registration, and maintenance information</p></div> <div class="header-actions svelte-1gk5qi2">`);
   if (oncreate) {
     $$payload.out.push("<!--[-->");
     Button($$payload, {
       variant: "primary",
       onclick: oncreate,
       children: ($$payload2) => {
-        $$payload2.out.push(`<span class="icon svelte-dydvws">➕</span> Add Vehicle`);
+        $$payload2.out.push(`<span class="icon svelte-1gk5qi2">➕</span> Add Vehicle`);
       }
     });
   } else {
@@ -353,7 +335,7 @@ function VehicleList($$payload, $$props) {
   $$payload.out.push(`<!--]--></div></div> `);
   if (store_get($$store_subs ??= {}, "$vehicleLoading", vehicleLoading) === "loading") {
     $$payload.out.push("<!--[-->");
-    $$payload.out.push(`<div class="loading-state svelte-dydvws"><div class="spinner svelte-dydvws"></div> <p>Loading vehicles...</p></div>`);
+    $$payload.out.push(`<div class="loading-state svelte-1gk5qi2"><div class="spinner svelte-1gk5qi2"></div> <p>Loading vehicles...</p></div>`);
   } else {
     $$payload.out.push("<!--[!-->");
     if (store_get($$store_subs ??= {}, "$vehicleError", vehicleError)) {
@@ -361,7 +343,7 @@ function VehicleList($$payload, $$props) {
       Card($$payload, {
         class: "error-card",
         children: ($$payload2) => {
-          $$payload2.out.push(`<div class="error-content svelte-dydvws"><span class="error-icon svelte-dydvws">⚠️</span> <div><h3 class="svelte-dydvws">Failed to Load Vehicles</h3> <p class="svelte-dydvws">${escape_html(store_get($$store_subs ??= {}, "$vehicleError", vehicleError))}</p> `);
+          $$payload2.out.push(`<div class="error-content svelte-1gk5qi2"><span class="error-icon svelte-1gk5qi2">⚠️</span> <div><h3 class="svelte-1gk5qi2">Failed to Load Vehicles</h3> <p class="svelte-1gk5qi2">${escape_html(store_get($$store_subs ??= {}, "$vehicleError", vehicleError))}</p> `);
           {
             let children = function($$payload3) {
               $$payload3.out.push(`<!---->Retry`);
@@ -382,7 +364,7 @@ function VehicleList($$payload, $$props) {
         Card($$payload, {
           class: "empty-state",
           children: ($$payload2) => {
-            $$payload2.out.push(`<div class="empty-content svelte-dydvws"><span class="empty-icon svelte-dydvws">🚜</span> <h3 class="svelte-dydvws">No Vehicles Found</h3> <p class="svelte-dydvws">Get started by adding your first vehicle to the fleet.</p> `);
+            $$payload2.out.push(`<div class="empty-content svelte-1gk5qi2"><span class="empty-icon svelte-1gk5qi2">🚜</span> <h3 class="svelte-1gk5qi2">No Vehicles Found</h3> <p class="svelte-1gk5qi2">Get started by adding your first vehicle to the fleet.</p> `);
             if (oncreate) {
               $$payload2.out.push("<!--[-->");
               Button($$payload2, {
@@ -400,32 +382,32 @@ function VehicleList($$payload, $$props) {
         });
       } else {
         $$payload.out.push("<!--[!-->");
-        const each_array = ensure_array_like(store_get($$store_subs ??= {}, "$vehicles", vehicles));
-        $$payload.out.push(`<div class="stats svelte-dydvws">`);
+        const each_array = ensure_array_like(sortedVehicles);
+        $$payload.out.push(`<div class="stats svelte-1gk5qi2">`);
         Card($$payload, {
           padding: "small",
           children: ($$payload2) => {
-            $$payload2.out.push(`<div class="stat svelte-dydvws"><span class="stat-value svelte-dydvws">${escape_html(store_get($$store_subs ??= {}, "$vehicles", vehicles).length)}</span> <span class="stat-label svelte-dydvws">Total Vehicles</span></div>`);
+            $$payload2.out.push(`<div class="stat svelte-1gk5qi2"><span class="stat-value svelte-1gk5qi2">${escape_html(store_get($$store_subs ??= {}, "$vehicles", vehicles).length)}</span> <span class="stat-label svelte-1gk5qi2">Total Vehicles</span></div>`);
           }
         });
         $$payload.out.push(`<!----> `);
         Card($$payload, {
           padding: "small",
           children: ($$payload2) => {
-            $$payload2.out.push(`<div class="stat svelte-dydvws"><span class="stat-value svelte-dydvws">${escape_html(store_get($$store_subs ??= {}, "$vehicles", vehicles).filter((v) => v.active).length)}</span> <span class="stat-label svelte-dydvws">Active</span></div>`);
+            $$payload2.out.push(`<div class="stat svelte-1gk5qi2"><span class="stat-value svelte-1gk5qi2">${escape_html(store_get($$store_subs ??= {}, "$vehicles", vehicles).filter((v) => v.active).length)}</span> <span class="stat-label svelte-1gk5qi2">Active</span></div>`);
           }
         });
         $$payload.out.push(`<!----> `);
         Card($$payload, {
           padding: "small",
           children: ($$payload2) => {
-            $$payload2.out.push(`<div class="stat svelte-dydvws"><span class="stat-value svelte-dydvws">${escape_html(store_get($$store_subs ??= {}, "$vehicles", vehicles).filter((v) => !v.active).length)}</span> <span class="stat-label svelte-dydvws">Inactive</span></div>`);
+            $$payload2.out.push(`<div class="stat svelte-1gk5qi2"><span class="stat-value svelte-1gk5qi2">${escape_html(store_get($$store_subs ??= {}, "$vehicles", vehicles).filter((v) => !v.active).length)}</span> <span class="stat-label svelte-1gk5qi2">Inactive</span></div>`);
           }
         });
-        $$payload.out.push(`<!----></div> <div class="vehicle-table-container svelte-dydvws"><table class="vehicle-table svelte-dydvws"><thead><tr><th class="svelte-dydvws">Type</th><th class="svelte-dydvws">Code</th><th class="svelte-dydvws">Name</th><th class="svelte-dydvws">Registration</th><th class="svelte-dydvws">Make/Model</th><th class="svelte-dydvws">Year</th><th class="svelte-dydvws">Fuel Type</th><th class="svelte-dydvws">Odometer</th><th class="svelte-dydvws">Status</th><th class="svelte-dydvws">Actions</th></tr></thead><tbody><!--[-->`);
+        $$payload.out.push(`<!----></div> <div class="vehicle-table-container svelte-1gk5qi2"><table class="vehicle-table svelte-1gk5qi2"><thead><tr><th class="svelte-1gk5qi2">Type</th><th class="svelte-1gk5qi2">Code</th><th class="svelte-1gk5qi2">Name</th><th class="svelte-1gk5qi2">Registration</th><th class="svelte-1gk5qi2">Make/Model</th><th class="svelte-1gk5qi2">Year</th><th class="svelte-1gk5qi2">Fuel Type</th><th class="svelte-1gk5qi2">Odometer</th><th class="svelte-1gk5qi2">Status</th><th class="svelte-1gk5qi2">Actions</th></tr></thead><tbody><!--[-->`);
         for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
           let vehicle = each_array[$$index];
-          $$payload.out.push(`<tr class="vehicle-row svelte-dydvws"><td class="type-cell svelte-dydvws"><div class="vehicle-type svelte-dydvws"${attr_style(`color: ${stringify(getVehicleTypeColor(vehicle.type))}`)}><span class="type-icon svelte-dydvws">${escape_html(getVehicleTypeIcon(vehicle.type))}</span> <span class="type-label svelte-dydvws">${escape_html(vehicle.type)}</span></div></td><td class="code-cell svelte-dydvws">${escape_html(vehicle.code)}</td><td class="name-cell svelte-dydvws">${escape_html(vehicle.name)}</td><td class="registration-cell svelte-dydvws">${escape_html(vehicle.registration)}</td><td class="make-model-cell svelte-dydvws">${escape_html(vehicle.make && vehicle.model ? `${vehicle.make} ${vehicle.model}` : "-")}</td><td class="year-cell svelte-dydvws">${escape_html(vehicle.year || "-")}</td><td class="fuel-type-cell svelte-dydvws"><span${attr_class(`fuel-badge ${stringify(vehicle.fuel_type || "diesel")}`, "svelte-dydvws")}>${escape_html(vehicle.fuel_type || "diesel")}</span></td><td class="odometer-cell svelte-dydvws">${escape_html(formatOdometer(vehicle))}</td><td class="status-cell svelte-dydvws"><span${attr_class(`status ${stringify(vehicle.active ? "active" : "inactive")}`, "svelte-dydvws")}>${escape_html(vehicle.active ? "Active" : "Inactive")}</span></td><td class="actions-cell svelte-dydvws"><div class="action-buttons svelte-dydvws">`);
+          $$payload.out.push(`<tr class="vehicle-row svelte-1gk5qi2"><td class="type-cell svelte-1gk5qi2"><span class="type-text svelte-1gk5qi2">${escape_html(vehicle.type)}</span></td><td class="code-cell svelte-1gk5qi2">${escape_html(vehicle.code)}</td><td class="name-cell svelte-1gk5qi2">${escape_html(vehicle.name)}</td><td class="registration-cell svelte-1gk5qi2">${escape_html(vehicle.registration)}</td><td class="make-model-cell svelte-1gk5qi2">${escape_html(vehicle.make && vehicle.model ? `${vehicle.make} ${vehicle.model}` : "-")}</td><td class="year-cell svelte-1gk5qi2">${escape_html(vehicle.year || "-")}</td><td class="fuel-type-cell svelte-1gk5qi2"><span${attr_class(`fuel-badge ${stringify(vehicle.fuel_type || "diesel")}`, "svelte-1gk5qi2")}>${escape_html(vehicle.fuel_type || "diesel")}</span></td><td class="odometer-cell svelte-1gk5qi2">${escape_html(formatOdometer(vehicle))}</td><td class="status-cell svelte-1gk5qi2"><span${attr_class(`status ${stringify(vehicle.active ? "active" : "inactive")}`, "svelte-1gk5qi2")}>${escape_html(vehicle.active ? "Active" : "Inactive")}</span></td><td class="actions-cell svelte-1gk5qi2"><div class="action-buttons svelte-1gk5qi2">`);
           Button($$payload, {
             size: "sm",
             variant: "outline",
@@ -437,7 +419,7 @@ function VehicleList($$payload, $$props) {
               $$payload2.out.push(`<!---->View`);
             }
           });
-          $$payload.out.push(`<!----> <a${attr("href", `/fleet/vehicles/${stringify(vehicle.id)}`)} class="svelte-dydvws">`);
+          $$payload.out.push(`<!----> <a${attr("href", `/fleet/vehicles/${stringify(vehicle.id)}`)} class="svelte-1gk5qi2">`);
           Button($$payload, {
             size: "sm",
             variant: "primary",

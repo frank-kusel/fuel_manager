@@ -1,6 +1,7 @@
 import { M as current_component, J as escape_html, G as attr_class, N as attr_style, O as stringify, B as pop, z as push, P as ensure_array_like, F as head, E as store_get, I as unsubscribe_stores } from "../../../chunks/index2.js";
-import { C as Card } from "../../../chunks/Card.js";
+/* empty css                                                 */
 import { B as Button } from "../../../chunks/Button.js";
+import "clsx";
 import { d as derived, w as writable } from "../../../chunks/index.js";
 function onDestroy(fn) {
   var context = (
@@ -23,299 +24,166 @@ function DashboardStats($$payload, $$props) {
     if (percentage > 25) return "medium";
     return "low";
   }
-  $$payload.out.push(`<div class="dashboard-stats svelte-1ptmk1e"><div class="stats-grid svelte-1ptmk1e">`);
-  Card($$payload, {
-    class: "stat-card fuel-daily",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="stat-content svelte-1ptmk1e"><div class="stat-icon svelte-1ptmk1e">⛽</div> <div class="stat-info svelte-1ptmk1e"><h3 class="svelte-1ptmk1e">Today's Fuel</h3> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        $$payload2.out.push(`<div class="loading-skeleton svelte-1ptmk1e"></div>`);
-      } else {
-        $$payload2.out.push("<!--[!-->");
-        $$payload2.out.push(`<div class="stat-value svelte-1ptmk1e">${escape_html(formatDecimal(stats?.dailyFuel || 0))}L</div>`);
-      }
-      $$payload2.out.push(`<!--]--></div></div>`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Card($$payload, {
-    class: "stat-card fuel-weekly",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="stat-content svelte-1ptmk1e"><div class="stat-icon svelte-1ptmk1e">📊</div> <div class="stat-info svelte-1ptmk1e"><h3 class="svelte-1ptmk1e">This Week</h3> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        $$payload2.out.push(`<div class="loading-skeleton svelte-1ptmk1e"></div>`);
-      } else {
-        $$payload2.out.push("<!--[!-->");
-        $$payload2.out.push(`<div class="stat-value svelte-1ptmk1e">${escape_html(formatDecimal(stats?.weeklyFuel || 0))}L</div>`);
-      }
-      $$payload2.out.push(`<!--]--></div></div>`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Card($$payload, {
-    class: "stat-card fuel-monthly",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="stat-content svelte-1ptmk1e"><div class="stat-icon svelte-1ptmk1e">📈</div> <div class="stat-info svelte-1ptmk1e"><h3 class="svelte-1ptmk1e">This Month</h3> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        $$payload2.out.push(`<div class="loading-skeleton svelte-1ptmk1e"></div>`);
-      } else {
-        $$payload2.out.push("<!--[!-->");
-        $$payload2.out.push(`<div class="stat-value svelte-1ptmk1e">${escape_html(formatDecimal(stats?.monthlyFuel || 0))}L</div> <div class="stat-subtitle svelte-1ptmk1e">${escape_html(formatNumber(stats?.monthlyDistance || 0))} km</div>`);
-      }
-      $$payload2.out.push(`<!--]--></div></div>`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Card($$payload, {
-    class: "stat-card tank-level",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="stat-content svelte-1ptmk1e"><div class="stat-icon svelte-1ptmk1e">🪣</div> <div class="stat-info svelte-1ptmk1e"><h3 class="svelte-1ptmk1e">Tank Level</h3> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        $$payload2.out.push(`<div class="loading-skeleton svelte-1ptmk1e"></div>`);
-      } else {
-        $$payload2.out.push("<!--[!-->");
-        $$payload2.out.push(`<div class="stat-value svelte-1ptmk1e">${escape_html(formatDecimal(stats?.tankPercentage || 0))}%</div> <div class="stat-subtitle svelte-1ptmk1e">${escape_html(formatDecimal(stats?.tankLevel || 0))}L / ${escape_html(formatNumber(stats?.tankCapacity || 0))}L</div> <div class="tank-bar svelte-1ptmk1e"><div${attr_class(`tank-fill ${stringify(getTankLevelClass(stats?.tankPercentage || 0))}`, "svelte-1ptmk1e")}${attr_style(`width: ${stringify(Math.min(stats?.tankPercentage || 0, 100))}%`)}></div></div>`);
-      }
-      $$payload2.out.push(`<!--]--></div></div>`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Card($$payload, {
-    class: "stat-card fleet-status",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="stat-content svelte-1ptmk1e"><div class="stat-icon svelte-1ptmk1e">🚜</div> <div class="stat-info svelte-1ptmk1e"><h3 class="svelte-1ptmk1e">Fleet Status</h3> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        $$payload2.out.push(`<div class="loading-skeleton svelte-1ptmk1e"></div>`);
-      } else {
-        $$payload2.out.push("<!--[!-->");
-        $$payload2.out.push(`<div class="stat-value svelte-1ptmk1e">${escape_html(stats?.activeVehicles || 0)}</div> <div class="stat-subtitle svelte-1ptmk1e">Active Vehicles</div> <div class="fleet-detail svelte-1ptmk1e">${escape_html(stats?.vehiclesWithOdometer || 0)} with odometer data</div>`);
-      }
-      $$payload2.out.push(`<!--]--></div></div>`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Card($$payload, {
-    class: "stat-card efficiency",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="stat-content svelte-1ptmk1e"><div class="stat-icon svelte-1ptmk1e">⚡</div> <div class="stat-info svelte-1ptmk1e"><h3 class="svelte-1ptmk1e">Fuel Efficiency</h3> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        $$payload2.out.push(`<div class="loading-skeleton svelte-1ptmk1e"></div>`);
-      } else {
-        $$payload2.out.push("<!--[!-->");
-        $$payload2.out.push(`<div class="stat-value svelte-1ptmk1e">${escape_html(formatDecimal(stats?.averageEfficiency || 0))}</div> <div class="stat-subtitle svelte-1ptmk1e">L/100km fleet average `);
-        if (stats?.consumptionDataQuality) {
-          $$payload2.out.push("<!--[-->");
-          $$payload2.out.push(`<span${attr_class(
-            `data-quality ${stringify(stats.consumptionDataQuality >= 70 ? "good" : stats.consumptionDataQuality >= 40 ? "fair" : "poor")}`,
-            "svelte-1ptmk1e"
-          )}>(${escape_html(stats.consumptionDataQuality)}% reliable)</span>`);
-        } else {
-          $$payload2.out.push("<!--[!-->");
-        }
-        $$payload2.out.push(`<!--]--></div> `);
-        if (stats?.validConsumptionEntries) {
-          $$payload2.out.push("<!--[-->");
-          $$payload2.out.push(`<div class="efficiency-detail svelte-1ptmk1e">${escape_html(stats.validConsumptionEntries)} entries this month</div>`);
-        } else {
-          $$payload2.out.push("<!--[!-->");
-        }
-        $$payload2.out.push(`<!--]-->`);
-      }
-      $$payload2.out.push(`<!--]--></div></div>`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Card($$payload, {
-    class: "stat-card activity-summary",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="stat-content svelte-1ptmk1e"><div class="stat-icon svelte-1ptmk1e">📋</div> <div class="stat-info svelte-1ptmk1e"><h3 class="svelte-1ptmk1e">Activity</h3> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        $$payload2.out.push(`<div class="loading-skeleton svelte-1ptmk1e"></div>`);
-      } else {
-        $$payload2.out.push("<!--[!-->");
-        $$payload2.out.push(`<div class="stat-value svelte-1ptmk1e">${escape_html(stats?.entriesThisWeek || 0)}</div> <div class="stat-subtitle svelte-1ptmk1e">Entries this week</div> <div class="activity-detail svelte-1ptmk1e">${escape_html(stats?.entriesThisMonth || 0)} this month</div>`);
-      }
-      $$payload2.out.push(`<!--]--></div></div>`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Card($$payload, {
-    class: "stat-card daily-average",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="stat-content svelte-1ptmk1e"><div class="stat-icon svelte-1ptmk1e">📊</div> <div class="stat-info svelte-1ptmk1e"><h3 class="svelte-1ptmk1e">Daily Average</h3> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        $$payload2.out.push(`<div class="loading-skeleton svelte-1ptmk1e"></div>`);
-      } else {
-        $$payload2.out.push("<!--[!-->");
-        $$payload2.out.push(`<div class="stat-value svelte-1ptmk1e">${escape_html(formatDecimal(stats?.avgDailyUsage || 0))}L</div> <div class="stat-subtitle svelte-1ptmk1e">Per day this month</div>`);
-      }
-      $$payload2.out.push(`<!--]--></div></div>`);
-    }
-  });
-  $$payload.out.push(`<!----></div></div>`);
+  $$payload.out.push(`<div class="dashboard-overview svelte-10z1854"><div class="primary-metrics svelte-10z1854"><div class="metric-card primary svelte-10z1854"><div class="metric-content svelte-10z1854"><div class="metric-label svelte-10z1854">Today's Fuel</div> `);
+  if (loading) {
+    $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<div class="metric-skeleton svelte-10z1854"></div>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
+    $$payload.out.push(`<div class="metric-value svelte-10z1854">${escape_html(formatDecimal(stats?.dailyFuel || 0))}<span class="unit svelte-10z1854">L</span></div>`);
+  }
+  $$payload.out.push(`<!--]--></div></div> <div class="metric-card tank-status svelte-10z1854"><div class="metric-content svelte-10z1854"><div class="metric-label svelte-10z1854">Fuel Tank</div> `);
+  if (loading) {
+    $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<div class="metric-skeleton svelte-10z1854"></div>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
+    $$payload.out.push(`<div class="metric-value svelte-10z1854">${escape_html(formatNumber(stats?.tankLevel || 0))}<span class="unit svelte-10z1854">L</span></div> <div class="tank-visual svelte-10z1854"><div${attr_class(`tank-indicator ${stringify(getTankLevelClass(stats?.tankPercentage || 0))}`, "svelte-10z1854")}><div class="tank-level svelte-10z1854"${attr_style(`height: ${stringify(Math.min(stats?.tankPercentage || 0, 100))}%`)}></div></div> <div class="tank-info svelte-10z1854">${escape_html(formatDecimal(stats?.tankPercentage || 0))}%</div></div>`);
+  }
+  $$payload.out.push(`<!--]--></div></div></div> <div class="secondary-metrics svelte-10z1854"><div class="metric-card compact svelte-10z1854"><div class="compact-header svelte-10z1854">This Week</div> `);
+  if (loading) {
+    $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<div class="compact-skeleton svelte-10z1854"></div>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
+    $$payload.out.push(`<div class="compact-value svelte-10z1854">${escape_html(formatDecimal(stats?.weeklyFuel || 0))}L</div> <div class="compact-subtitle svelte-10z1854">${escape_html(stats?.entriesThisWeek || 0)} entries</div>`);
+  }
+  $$payload.out.push(`<!--]--></div> <div class="metric-card compact svelte-10z1854"><div class="compact-header svelte-10z1854">This Month</div> `);
+  if (loading) {
+    $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<div class="compact-skeleton svelte-10z1854"></div>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
+    $$payload.out.push(`<div class="compact-value svelte-10z1854">${escape_html(formatDecimal(stats?.monthlyFuel || 0))}L</div> <div class="compact-subtitle svelte-10z1854">${escape_html(formatNumber(stats?.monthlyDistance || 0))} km</div>`);
+  }
+  $$payload.out.push(`<!--]--></div> <div class="metric-card compact svelte-10z1854"><div class="compact-header svelte-10z1854">Fleet Average</div> `);
+  if (loading) {
+    $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<div class="compact-skeleton svelte-10z1854"></div>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
+    $$payload.out.push(`<div class="compact-value svelte-10z1854">${escape_html(formatDecimal(stats?.averageEfficiency || 0))}</div> <div class="compact-subtitle svelte-10z1854">L/100km</div>`);
+  }
+  $$payload.out.push(`<!--]--></div> <div class="metric-card compact svelte-10z1854"><div class="compact-header svelte-10z1854">Bowser Reading</div> `);
+  if (loading) {
+    $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<div class="compact-skeleton svelte-10z1854"></div>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
+    $$payload.out.push(`<div class="compact-value svelte-10z1854">${escape_html(formatDecimal(stats?.bowserReading || 0))}</div> <div class="compact-subtitle svelte-10z1854">litres</div>`);
+  }
+  $$payload.out.push(`<!--]--></div></div></div>`);
   pop();
 }
 function RecentActivity($$payload, $$props) {
   push();
   let { entries, loading = false } = $$props;
-  function formatDate(dateStr) {
-    const date = new Date(dateStr);
+  function groupEntriesByDate(entries2) {
+    const groups = {};
+    entries2.forEach((entry) => {
+      const date = new Date(entry.entry_date);
+      const dateKey = formatDateGroup(date);
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(entry);
+    });
+    return groups;
+  }
+  function formatDateGroup(date) {
     const today = /* @__PURE__ */ new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
+    const diffTime = today.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1e3 * 60 * 60 * 24));
     if (date.toDateString() === today.toDateString()) {
       return "Today";
     } else if (date.toDateString() === yesterday.toDateString()) {
       return "Yesterday";
+    } else if (diffDays < 7) {
+      return date.toLocaleDateString("en-ZA", { weekday: "long" });
+    } else if (diffDays < 14) {
+      return "Last Week";
+    } else if (diffDays < 21) {
+      return "2 Weeks Ago";
+    } else if (diffDays < 28) {
+      return "3 Weeks Ago";
     } else {
       return date.toLocaleDateString("en-ZA", { month: "short", day: "numeric" });
     }
   }
-  function formatTime(timeStr) {
-    return timeStr.substring(0, 5);
-  }
-  Card($$payload, {
-    class: "recent-activity",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="activity-header svelte-gwdetf"><h3 class="svelte-gwdetf">Recent Fuel Entries</h3> `);
-      Button($$payload2, {
-        variant: "outline",
-        size: "sm",
-        children: ($$payload3) => {
-          $$payload3.out.push(`<!---->View All`);
-        }
-      });
-      $$payload2.out.push(`<!----></div> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        const each_array = ensure_array_like(Array(5));
-        $$payload2.out.push(`<div class="loading-state svelte-gwdetf"><!--[-->`);
-        for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
-          each_array[$$index];
-          $$payload2.out.push(`<div class="activity-item-skeleton svelte-gwdetf"><div class="skeleton-icon svelte-gwdetf"></div> <div class="skeleton-content svelte-gwdetf"><div class="skeleton-line svelte-gwdetf"></div> <div class="skeleton-line short svelte-gwdetf"></div></div> <div class="skeleton-value svelte-gwdetf"></div></div>`);
-        }
-        $$payload2.out.push(`<!--]--></div>`);
+  function getUsage(entry) {
+    if (entry.gauge_working === false) {
+      return "-";
+    }
+    if (entry.odometer_start && entry.odometer_end) {
+      const diff = entry.odometer_end - entry.odometer_start;
+      const unit = entry.vehicles?.odometer_unit || "km";
+      if (unit === "hours" || unit === "hr") {
+        return `${Math.round(diff * 10) / 10}hr`;
       } else {
-        $$payload2.out.push("<!--[!-->");
-        if (entries.length === 0) {
-          $$payload2.out.push("<!--[-->");
-          $$payload2.out.push(`<div class="empty-state svelte-gwdetf"><div class="empty-icon svelte-gwdetf">📊</div> <p class="svelte-gwdetf">No recent fuel entries</p> <small class="svelte-gwdetf">Fuel entries will appear here once vehicles start logging fuel usage</small></div>`);
-        } else {
-          $$payload2.out.push("<!--[!-->");
-          const each_array_1 = ensure_array_like(entries);
-          $$payload2.out.push(`<div class="activity-list svelte-gwdetf"><!--[-->`);
-          for (let $$index_1 = 0, $$length = each_array_1.length; $$index_1 < $$length; $$index_1++) {
-            let entry = each_array_1[$$index_1];
-            $$payload2.out.push(`<div class="activity-item svelte-gwdetf"><div class="activity-info svelte-gwdetf"><div class="activity-primary svelte-gwdetf"><span class="vehicle-name svelte-gwdetf">${escape_html(entry.vehicles?.name || "Unknown Vehicle")}</span> <span class="activity-separator svelte-gwdetf">•</span> <span class="activity-name svelte-gwdetf">${escape_html(entry.activities?.name || "Unknown Activity")}</span></div> <div class="activity-secondary svelte-gwdetf"><span class="driver-name svelte-gwdetf">${escape_html(entry.drivers?.name || "Unknown Driver")}</span> <span class="activity-separator svelte-gwdetf">•</span> <span class="entry-time svelte-gwdetf">${escape_html(formatDate(entry.entry_date))} ${escape_html(formatTime(entry.time))}</span> `);
-            if (entry.odometer_start && entry.odometer_end) {
-              $$payload2.out.push("<!--[-->");
-              $$payload2.out.push(`<span class="activity-separator svelte-gwdetf">•</span> <span class="distance svelte-gwdetf">${escape_html(Math.round((entry.odometer_end - entry.odometer_start) * 10) / 10)}km</span>`);
-            } else {
-              $$payload2.out.push("<!--[!-->");
-            }
-            $$payload2.out.push(`<!--]--></div></div> <div class="activity-metrics svelte-gwdetf"><div class="fuel-amount svelte-gwdetf">${escape_html(Math.round((entry.litres_used || 0) * 10) / 10)}L</div> `);
-            if (entry.fuel_consumption_l_per_100km && entry.gauge_working) {
-              $$payload2.out.push("<!--[-->");
-              $$payload2.out.push(`<div class="efficiency svelte-gwdetf">${escape_html(Math.round(entry.fuel_consumption_l_per_100km * 10) / 10)} L/100km</div>`);
-            } else {
-              $$payload2.out.push("<!--[!-->");
-              if (entry.odometer_start && entry.odometer_end && entry.gauge_working !== false) {
-                $$payload2.out.push("<!--[-->");
-                const distance = entry.odometer_end - entry.odometer_start;
-                const efficiency = distance > 0 ? entry.litres_used / distance * 100 : 0;
-                if (efficiency > 0) {
-                  $$payload2.out.push("<!--[-->");
-                  $$payload2.out.push(`<div class="efficiency svelte-gwdetf">${escape_html(Math.round(efficiency * 10) / 10)} L/100km</div>`);
-                } else {
-                  $$payload2.out.push("<!--[!-->");
-                }
-                $$payload2.out.push(`<!--]-->`);
-              } else {
-                $$payload2.out.push("<!--[!-->");
-                if (entry.odometer_start && entry.odometer_end && entry.gauge_working === false) {
-                  $$payload2.out.push("<!--[-->");
-                  $$payload2.out.push(`<div class="efficiency broken-gauge svelte-gwdetf" title="Calculated from broken gauge - not reliable">~${escape_html(Math.round(entry.litres_used / (entry.odometer_end - entry.odometer_start) * 100 * 10) / 10)} L/100km</div>`);
-                } else {
-                  $$payload2.out.push("<!--[!-->");
-                  if (entry.gauge_working === false) {
-                    $$payload2.out.push("<!--[-->");
-                    $$payload2.out.push(`<div class="efficiency broken-gauge svelte-gwdetf">Gauge broken</div>`);
-                  } else {
-                    $$payload2.out.push("<!--[!-->");
-                  }
-                  $$payload2.out.push(`<!--]-->`);
-                }
-                $$payload2.out.push(`<!--]-->`);
-              }
-              $$payload2.out.push(`<!--]-->`);
-            }
-            $$payload2.out.push(`<!--]--></div></div>`);
-          }
-          $$payload2.out.push(`<!--]--></div>`);
-        }
-        $$payload2.out.push(`<!--]-->`);
+        return `${Math.round(diff * 10) / 10}km`;
       }
-      $$payload2.out.push(`<!--]-->`);
+    }
+    return "-";
+  }
+  const groupedEntries = groupEntriesByDate(entries);
+  const dateGroups = Object.keys(groupedEntries);
+  $$payload.out.push(`<div class="fuel-activity svelte-rf411x"><div class="activity-header svelte-rf411x"><h3 class="svelte-rf411x">Recent Fuel Activity</h3> `);
+  Button($$payload, {
+    variant: "outline",
+    size: "sm",
+    href: "/fuel/summary",
+    children: ($$payload2) => {
+      $$payload2.out.push(`<!---->View All`);
     }
   });
+  $$payload.out.push(`<!----></div> `);
+  if (loading) {
+    $$payload.out.push("<!--[-->");
+    const each_array = ensure_array_like(Array(6));
+    $$payload.out.push(`<div class="loading-grid svelte-rf411x"><!--[-->`);
+    for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
+      each_array[$$index];
+      $$payload.out.push(`<div class="entry-skeleton svelte-rf411x"><div class="skeleton-header svelte-rf411x"></div> <div class="skeleton-content svelte-rf411x"><div class="skeleton-bar svelte-rf411x"></div> <div class="skeleton-text svelte-rf411x"></div></div></div>`);
+    }
+    $$payload.out.push(`<!--]--></div>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
+    if (entries.length === 0) {
+      $$payload.out.push("<!--[-->");
+      $$payload.out.push(`<div class="empty-state svelte-rf411x"><div class="empty-visual svelte-rf411x"><div class="fuel-drop svelte-rf411x"></div></div> <h4 class="svelte-rf411x">No recent activity</h4> <p class="svelte-rf411x">Fuel entries will appear here once vehicles start logging usage</p></div>`);
+    } else {
+      $$payload.out.push("<!--[!-->");
+      const each_array_1 = ensure_array_like(dateGroups);
+      $$payload.out.push(`<div class="entries-container svelte-rf411x"><!--[-->`);
+      for (let $$index_2 = 0, $$length = each_array_1.length; $$index_2 < $$length; $$index_2++) {
+        let dateGroup = each_array_1[$$index_2];
+        const each_array_2 = ensure_array_like(groupedEntries[dateGroup]);
+        $$payload.out.push(`<div class="date-section svelte-rf411x"><div class="date-header svelte-rf411x"><span class="date-badge svelte-rf411x">${escape_html(dateGroup)}</span></div> <div class="entries-grid svelte-rf411x"><!--[-->`);
+        for (let $$index_1 = 0, $$length2 = each_array_2.length; $$index_1 < $$length2; $$index_1++) {
+          let entry = each_array_2[$$index_1];
+          $$payload.out.push(`<div class="entry-card svelte-rf411x"><div class="entry-header svelte-rf411x"><div class="vehicle-badge svelte-rf411x">${escape_html(entry.vehicles?.code || "N/A")}</div> <div class="fuel-amount svelte-rf411x">${escape_html(Math.round((entry.litres_dispensed || 0) * 10) / 10)}<span class="fuel-unit svelte-rf411x">L</span></div></div> <div class="entry-details svelte-rf411x"><div class="detail-row svelte-rf411x"><span class="detail-label svelte-rf411x">Vehicle</span> <span class="detail-value svelte-rf411x">${escape_html(entry.vehicles?.name || "-")}</span></div> <div class="detail-row svelte-rf411x"><span class="detail-label svelte-rf411x">Field</span> <span class="detail-value svelte-rf411x">${escape_html(entry.fields?.code || "-")}</span></div> <div class="detail-row svelte-rf411x"><span class="detail-label svelte-rf411x">Usage</span> <span class="detail-value usage-highlight svelte-rf411x">${escape_html(getUsage(entry))}</span></div></div></div>`);
+        }
+        $$payload.out.push(`<!--]--></div></div>`);
+      }
+      $$payload.out.push(`<!--]--></div>`);
+    }
+    $$payload.out.push(`<!--]-->`);
+  }
+  $$payload.out.push(`<!--]--></div>`);
   pop();
 }
-function TankMonitoring($$payload, $$props) {
+function TankManagement($$payload, $$props) {
   push();
-  let { bowsers, loading = false } = $$props;
-  let mainTank = bowsers.find((b) => b.fuel_type === "diesel") || bowsers[0] || null;
-  function getPercentage(current, capacity) {
-    return capacity > 0 ? Math.round(current / capacity * 100 * 10) / 10 : 0;
+  (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+  $$payload.out.push(`<div class="tank-management svelte-1l7f49i"><div class="section-header svelte-1l7f49i"><h2 class="svelte-1l7f49i">Tank Management</h2> <div class="actions svelte-1l7f49i"><button class="action-btn svelte-1l7f49i">📏 Dipstick</button> <button class="action-btn svelte-1l7f49i">🚚 Refill</button></div></div> `);
+  {
+    $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<div class="loading svelte-1l7f49i">Loading tank data...</div>`);
   }
-  function getLevelStatus(percentage) {
-    if (percentage > 75) return "high";
-    if (percentage > 50) return "medium";
-    if (percentage > 25) return "low";
-    return "critical";
-  }
-  function formatLitres(amount) {
-    return new Intl.NumberFormat("en-ZA", { maximumFractionDigits: 0 }).format(amount);
-  }
-  Card($$payload, {
-    class: "tank-monitoring",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<div class="tank-header svelte-w0brre"><h3 class="svelte-w0brre">Fuel Tank</h3> `);
-      Button($$payload2, {
-        variant: "outline",
-        size: "sm",
-        href: "/fleet/bowsers",
-        children: ($$payload3) => {
-          $$payload3.out.push(`<!---->Manage`);
-        }
-      });
-      $$payload2.out.push(`<!----></div> `);
-      if (loading) {
-        $$payload2.out.push("<!--[-->");
-        $$payload2.out.push(`<div class="loading-state svelte-w0brre"><div class="skeleton-tank svelte-w0brre"></div></div>`);
-      } else {
-        $$payload2.out.push("<!--[!-->");
-        if (!mainTank) {
-          $$payload2.out.push("<!--[-->");
-          $$payload2.out.push(`<div class="empty-state svelte-w0brre"><div class="empty-icon svelte-w0brre">🪣</div> <p class="svelte-w0brre">No fuel tank configured</p></div>`);
-        } else {
-          $$payload2.out.push("<!--[!-->");
-          const percentage = getPercentage(mainTank.current_reading, mainTank.capacity);
-          const status = getLevelStatus(percentage);
-          $$payload2.out.push(`<div class="tank-display svelte-w0brre"><div class="bar-chart-container svelte-w0brre"><div class="capacity-label svelte-w0brre">${escape_html(formatLitres(mainTank.capacity))}L</div> <div class="tank-bar svelte-w0brre"><div${attr_class(`tank-fill ${stringify(status)}`, "svelte-w0brre")}${attr_style(`height: ${stringify(Math.min(percentage, 100))}%`)}><div class="percentage-overlay svelte-w0brre">${escape_html(percentage)}%</div></div></div> <div class="current-level-below svelte-w0brre">${escape_html(formatLitres(mainTank.current_reading))}L</div></div></div>`);
-        }
-        $$payload2.out.push(`<!--]-->`);
-      }
-      $$payload2.out.push(`<!--]-->`);
-    }
-  });
+  $$payload.out.push(`<!--]--></div>`);
   pop();
 }
 const initialState = {
@@ -397,7 +265,7 @@ function createDashboardStore() {
             acc[date] = { date, recordCount: 0, totalFuel: 0 };
           }
           acc[date].recordCount++;
-          acc[date].totalFuel += entry.litres_used || 0;
+          acc[date].totalFuel += entry.litres_dispensed || 0;
           return acc;
         }, {});
         activitySummaries2.push(...Object.values(entriesByDate));
@@ -495,19 +363,10 @@ function _page($$payload, $$props) {
     $$payload2.title = `<title>Dashboard - FarmTrack</title>`;
     $$payload2.out.push(`<meta name="description" content="FarmTrack dashboard with fuel consumption analytics, vehicle performance metrics, and tank monitoring"/>`);
   });
-  $$payload.out.push(`<div class="dashboard-page svelte-2un3n7"><div class="dashboard-header svelte-2un3n7"><div class="header-content svelte-2un3n7"><h1 class="svelte-2un3n7">Dashboard</h1> <p class="dashboard-subtitle svelte-2un3n7">Farm operations overview and analytics</p></div> <div class="header-actions svelte-2un3n7">`);
-  Button($$payload, {
-    variant: "outline",
-    onclick: handleRefresh,
-    disabled: store_get($$store_subs ??= {}, "$dashboardLoading", dashboardLoading) === "loading",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<!---->${escape_html(store_get($$store_subs ??= {}, "$dashboardLoading", dashboardLoading) === "loading" ? "Refreshing..." : "Refresh")}`);
-    }
-  });
-  $$payload.out.push(`<!----></div></div> `);
+  $$payload.out.push(`<div class="dashboard-page svelte-17lz8u9"><div class="dashboard-header svelte-17lz8u9"><div class="header-content svelte-17lz8u9"><h1 class="svelte-17lz8u9">Dashboard</h1></div></div> `);
   if (store_get($$store_subs ??= {}, "$dashboardError", dashboardError)) {
     $$payload.out.push("<!--[-->");
-    $$payload.out.push(`<div class="error-banner svelte-2un3n7"><div class="error-content svelte-2un3n7"><span class="error-icon svelte-2un3n7">⚠️</span> <div class="svelte-2un3n7"><p class="svelte-2un3n7">Failed to load dashboard data</p> <small class="svelte-2un3n7">${escape_html(store_get($$store_subs ??= {}, "$dashboardError", dashboardError))}</small></div> `);
+    $$payload.out.push(`<div class="error-banner svelte-17lz8u9"><div class="error-content svelte-17lz8u9"><span class="error-icon svelte-17lz8u9">⚠️</span> <div class="svelte-17lz8u9"><p class="svelte-17lz8u9">Failed to load dashboard data</p> <small class="svelte-17lz8u9">${escape_html(store_get($$store_subs ??= {}, "$dashboardError", dashboardError))}</small></div> `);
     Button($$payload, {
       variant: "outline",
       size: "sm",
@@ -525,53 +384,14 @@ function _page($$payload, $$props) {
     stats: store_get($$store_subs ??= {}, "$dashboardStats", dashboardStats),
     loading: store_get($$store_subs ??= {}, "$dashboardLoading", dashboardLoading) === "loading"
   });
-  $$payload.out.push(`<!----> <div class="dashboard-grid svelte-2un3n7"><div class="dashboard-section activity-section svelte-2un3n7">`);
+  $$payload.out.push(`<!----> <div class="dashboard-content svelte-17lz8u9"><div class="dashboard-section activity-section svelte-17lz8u9">`);
   RecentActivity($$payload, {
     entries: store_get($$store_subs ??= {}, "$dashboardStats", dashboardStats)?.recentEntries || [],
     loading: store_get($$store_subs ??= {}, "$dashboardLoading", dashboardLoading) === "loading"
   });
-  $$payload.out.push(`<!----></div> <div class="dashboard-section tanks-section svelte-2un3n7">`);
-  TankMonitoring($$payload, {
-    bowsers: store_get($$store_subs ??= {}, "$dashboardStats", dashboardStats)?.bowserLevels || [],
-    loading: store_get($$store_subs ??= {}, "$dashboardLoading", dashboardLoading) === "loading"
-  });
-  $$payload.out.push(`<!----></div></div> <div class="quick-actions svelte-2un3n7"><h3 class="svelte-2un3n7">Quick Actions</h3> <div class="actions-grid svelte-2un3n7">`);
-  Button($$payload, {
-    href: "/fuel",
-    variant: "primary",
-    class: "action-button",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<span class="action-icon svelte-2un3n7">⛽</span> Add Fuel Entry`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Button($$payload, {
-    href: "/fleet/vehicles",
-    variant: "outline",
-    class: "action-button",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<span class="action-icon svelte-2un3n7">🚜</span> Manage Vehicles`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Button($$payload, {
-    href: "/fleet/drivers",
-    variant: "outline",
-    class: "action-button",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<span class="action-icon svelte-2un3n7">👤</span> Manage Drivers`);
-    }
-  });
-  $$payload.out.push(`<!----> `);
-  Button($$payload, {
-    href: "/fleet/bowsers",
-    variant: "outline",
-    class: "action-button",
-    children: ($$payload2) => {
-      $$payload2.out.push(`<span class="action-icon svelte-2un3n7">🪣</span> Tank Management`);
-    }
-  });
-  $$payload.out.push(`<!----></div></div></div>`);
+  $$payload.out.push(`<!----></div></div> `);
+  TankManagement($$payload);
+  $$payload.out.push(`<!----></div>`);
   if ($$store_subs) unsubscribe_stores($$store_subs);
   pop();
 }

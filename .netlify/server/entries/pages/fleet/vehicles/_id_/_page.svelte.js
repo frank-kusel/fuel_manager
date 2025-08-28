@@ -1,4 +1,4 @@
-import { J as escape_html, P as ensure_array_like, G as attr_class, K as attr, B as pop, z as push, O as stringify } from "../../../../../chunks/index2.js";
+import { J as escape_html, P as ensure_array_like, G as attr_class, O as stringify, K as attr, B as pop, z as push } from "../../../../../chunks/index2.js";
 import "@sveltejs/kit/internal";
 import "../../../../../chunks/exports.js";
 import "../../../../../chunks/utils.js";
@@ -84,6 +84,37 @@ function _page($$payload, $$props) {
     };
     return colors[category] || "bg-gray-100 text-gray-800";
   }
+  const maintenanceAlerts = () => {
+    const currentOdometer = vehicle.current_odometer || 0;
+    const alerts = [];
+    const intervals = {
+      "Oil Change": { interval: 1e4, urgency: "warning" },
+      "Air Filter": { interval: 15e3, urgency: "info" },
+      "Hydraulic Service": { interval: 25e3, urgency: "warning" },
+      "Major Service": { interval: 5e4, urgency: "critical" }
+    };
+    Object.entries(intervals).forEach(([service, config]) => {
+      const nextService = Math.ceil(currentOdometer / config.interval) * config.interval;
+      const kmRemaining = nextService - currentOdometer;
+      if (kmRemaining <= 2e3) {
+        alerts.push({
+          service,
+          nextService,
+          kmRemaining,
+          urgency: kmRemaining <= 500 ? "critical" : config.urgency
+        });
+      }
+    });
+    return alerts.sort((a, b) => a.kmRemaining - b.kmRemaining);
+  };
+  function getAlertColor(urgency) {
+    const colors = {
+      critical: "bg-red-50 border-red-200 text-red-800",
+      warning: "bg-yellow-50 border-yellow-200 text-yellow-800",
+      info: "bg-blue-50 border-blue-200 text-blue-800"
+    };
+    return colors[urgency] || colors.info;
+  }
   $$payload.out.push(`<div class="container mx-auto px-4 py-8 max-w-7xl"><div class="flex items-center justify-between mb-8"><div><button class="text-gray-500 hover:text-gray-700 mb-2 inline-flex items-center">← Back to Fleet</button> <h1 class="text-3xl font-bold text-gray-900">${escape_html(vehicle.name)} `);
   if (vehicle.registration) {
     $$payload.out.push("<!--[-->");
@@ -106,7 +137,20 @@ function _page($$payload, $$props) {
     $$payload.out.push("<!--[!-->");
     $$payload.out.push(`No data`);
   }
-  $$payload.out.push(`<!--]--></div></div> <div class="bg-white rounded-lg shadow p-6"><div class="text-sm text-gray-600">Monthly Fuel</div> <div class="text-2xl font-bold text-gray-900">${escape_html(formatNumber(metrics.totalFuel))} L</div></div> <div class="bg-white rounded-lg shadow p-6"><div class="text-sm text-gray-600">Monthly Distance</div> <div class="text-2xl font-bold text-gray-900">${escape_html(formatNumber(metrics.totalDistance))} km</div></div> <div class="bg-white rounded-lg shadow p-6"><div class="text-sm text-gray-600">Data Quality</div> <div class="text-2xl font-bold text-gray-900">${escape_html(metrics.dataQuality.toFixed(0))}%</div> <div class="text-xs text-gray-500">Valid readings</div></div></div> <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><div class="bg-white rounded-lg shadow p-6"><h2 class="text-lg font-semibold mb-4">Fuel Consumption Trend</h2> `);
+  $$payload.out.push(`<!--]--></div></div> <div class="bg-white rounded-lg shadow p-6"><div class="text-sm text-gray-600">Monthly Fuel</div> <div class="text-2xl font-bold text-gray-900">${escape_html(formatNumber(metrics.totalFuel))} L</div></div> <div class="bg-white rounded-lg shadow p-6"><div class="text-sm text-gray-600">Monthly Distance</div> <div class="text-2xl font-bold text-gray-900">${escape_html(formatNumber(metrics.totalDistance))} km</div></div> <div class="bg-white rounded-lg shadow p-6"><div class="text-sm text-gray-600">Data Quality</div> <div class="text-2xl font-bold text-gray-900">${escape_html(metrics.dataQuality.toFixed(0))}%</div> <div class="text-xs text-gray-500">Valid readings</div></div></div> `);
+  if (maintenanceAlerts().length > 0) {
+    $$payload.out.push("<!--[-->");
+    const each_array = ensure_array_like(maintenanceAlerts());
+    $$payload.out.push(`<div class="bg-white rounded-lg shadow p-6 mb-8"><h2 class="text-lg font-semibold mb-4 flex items-center"><span class="text-2xl mr-2">🔧</span> Maintenance Alerts</h2> <div class="grid gap-3"><!--[-->`);
+    for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
+      let alert = each_array[$$index];
+      $$payload.out.push(`<div${attr_class(`border rounded-lg p-4 ${stringify(getAlertColor(alert.urgency))}`)}><div class="flex items-center justify-between"><div><div class="font-medium">${escape_html(alert.service)}</div> <div class="text-sm opacity-75">Next service: ${escape_html(formatNumber(alert.nextService))} ${escape_html(vehicle.odometer_unit || "km")}</div></div> <div class="text-right"><div class="font-bold">${escape_html(alert.kmRemaining)} ${escape_html(vehicle.odometer_unit || "km")}</div> <div class="text-xs opacity-75">remaining</div></div></div></div>`);
+    }
+    $$payload.out.push(`<!--]--></div></div>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
+  }
+  $$payload.out.push(`<!--]--> <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><div class="bg-white rounded-lg shadow p-6"><h2 class="text-lg font-semibold mb-4">Fuel Consumption Trend</h2> `);
   if (consumptionChartData().labels.length > 0) {
     $$payload.out.push("<!--[-->");
     Chart($$payload, {
@@ -135,10 +179,10 @@ function _page($$payload, $$props) {
   $$payload.out.push(`<!--]--></div></div> <div class="bg-white rounded-lg shadow p-6 mb-8"><h2 class="text-lg font-semibold mb-4">Activity Breakdown</h2> `);
   if (activityBreakdown().length > 0) {
     $$payload.out.push("<!--[-->");
-    const each_array = ensure_array_like(activityBreakdown().slice(0, 6));
+    const each_array_1 = ensure_array_like(activityBreakdown().slice(0, 6));
     $$payload.out.push(`<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"><!--[-->`);
-    for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
-      let activity = each_array[$$index];
+    for (let $$index_1 = 0, $$length = each_array_1.length; $$index_1 < $$length; $$index_1++) {
+      let activity = each_array_1[$$index_1];
       $$payload.out.push(`<div class="border rounded-lg p-4"><div class="flex items-center justify-between mb-2"><span class="text-2xl">${escape_html(activity.icon || "📋")}</span> <span${attr_class(`px-2 py-1 rounded text-xs font-medium ${getCategoryColor(activity.category)}`)}>${escape_html(activity.category)}</span></div> <div class="font-medium text-gray-900">${escape_html(activity.name)}</div> <div class="text-sm text-gray-600 mt-1">${escape_html(activity.count)} entries • ${escape_html(formatNumber(activity.fuel))} L</div> <div class="text-xs text-gray-500 mt-1">Avg: ${escape_html((activity.fuel / activity.count).toFixed(1))} L/entry</div></div>`);
     }
     $$payload.out.push(`<!--]--></div>`);
@@ -149,10 +193,10 @@ function _page($$payload, $$props) {
   $$payload.out.push(`<!--]--></div> <div class="bg-white rounded-lg shadow"><div class="px-6 py-4 border-b"><h2 class="text-lg font-semibold">Recent Fuel Entries</h2></div> `);
   if (fuelEntries.length > 0) {
     $$payload.out.push("<!--[-->");
-    const each_array_1 = ensure_array_like(paginatedEntries());
+    const each_array_2 = ensure_array_like(paginatedEntries());
     $$payload.out.push(`<div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50 border-b"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Driver</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Activity</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th><th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Distance</th><th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fuel</th><th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">L/100km</th></tr></thead><tbody class="divide-y"><!--[-->`);
-    for (let $$index_1 = 0, $$length = each_array_1.length; $$index_1 < $$length; $$index_1++) {
-      let entry = each_array_1[$$index_1];
+    for (let $$index_2 = 0, $$length = each_array_2.length; $$index_2 < $$length; $$index_2++) {
+      let entry = each_array_2[$$index_2];
       $$payload.out.push(`<tr class="hover:bg-gray-50"><td class="px-4 py-3 text-sm">${escape_html(formatDate(entry.entry_date))} ${escape_html(entry.time)}</td><td class="px-4 py-3 text-sm">${escape_html(entry.driver?.name || "Unknown")}</td><td class="px-4 py-3 text-sm"><span class="inline-flex items-center">${escape_html(entry.activity?.icon || "📋")} <span class="ml-1">${escape_html(entry.activity?.name || "Unknown")}</span></span></td><td class="px-4 py-3 text-sm">${escape_html(entry.field?.name || entry.zone?.name || "-")}</td><td class="px-4 py-3 text-sm text-right">`);
       if (entry.odometer_end && entry.odometer_start) {
         $$payload.out.push("<!--[-->");

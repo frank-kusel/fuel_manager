@@ -144,6 +144,16 @@
       "src/lib/services/supabase.ts"
     ]
   },
+  "src/lib/services/offline-sync.ts": {
+    "file": "chunks/offline-sync.js",
+    "name": "offline-sync",
+    "src": "src/lib/services/offline-sync.ts",
+    "isDynamicEntry": true,
+    "imports": [
+      "_index.js",
+      "src/lib/services/supabase.ts"
+    ]
+  },
   "src/lib/services/offline.ts": {
     "file": "chunks/offline.js",
     "name": "offline",
@@ -172,7 +182,7 @@
       "_state.svelte.js"
     ],
     "css": [
-      "_app/immutable/assets/_layout.CokulyaN.css"
+      "_app/immutable/assets/_layout.8IAU6LRd.css"
     ]
   },
   "src/routes/+page.svelte": {
@@ -220,7 +230,6 @@
     "isEntry": true,
     "imports": [
       "_index2.js",
-      "_Card.js",
       "_Button.js",
       "_index.js"
     ],
@@ -229,7 +238,8 @@
       "src/lib/services/supabase.ts"
     ],
     "css": [
-      "_app/immutable/assets/_page.C4fyRst3.css"
+      "_app/immutable/assets/_page.BfAtx2Rx.css",
+      "_app/immutable/assets/Card.BjmPV3zJ.css"
     ]
   },
   "src/routes/debug/+page.svelte": {
@@ -298,7 +308,8 @@
       "src/lib/services/supabase.ts"
     ],
     "css": [
-      "_app/immutable/assets/_page.DJYJyNLf.css"
+      "_app/immutable/assets/_page.gf5_61HB.css",
+      "_app/immutable/assets/Card.BjmPV3zJ.css"
     ]
   },
   "src/routes/fleet/activities/[id]/+page.server.ts": {
@@ -406,10 +417,12 @@
       "_index.js"
     ],
     "dynamicImports": [
-      "src/lib/services/supabase.ts"
+      "src/lib/services/supabase.ts",
+      "src/lib/services/offline-sync.ts"
     ],
     "css": [
-      "_app/immutable/assets/_page.CYIYY7Zn.css"
+      "_app/immutable/assets/_page.8oRsfE0n.css",
+      "_app/immutable/assets/Card.BjmPV3zJ.css"
     ]
   },
   "src/routes/fuel/summary/+page.svelte": {
@@ -418,12 +431,10 @@
     "src": "src/routes/fuel/summary/+page.svelte",
     "isEntry": true,
     "imports": [
-      "_index2.js",
-      "src/lib/services/supabase.ts",
-      "_Button.js"
+      "_index2.js"
     ],
     "css": [
-      "_app/immutable/assets/_page.BvTGJLMa.css"
+      "_app/immutable/assets/_page.BFP-XQ0B.css"
     ]
   }
 }

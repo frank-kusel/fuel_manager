@@ -17,12 +17,9 @@ class SupabaseService {
   }
   // Load Supabase configuration from environment variables
   async loadConfig() {
-    if (typeof window !== "undefined") {
-      const url = "https://szskplrwmeuahwvicyos.supabase.co";
-      const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MDkzMTEsImV4cCI6MjA2OTI4NTMxMX0.phbhjcVVF-ENJn167Pd0XxlF_VicDcJW7id5K8Vy7Mc";
-      return { url, key };
-    }
-    throw new Error("Server-side Supabase configuration not implemented");
+    const url = "https://szskplrwmeuahwvicyos.supabase.co";
+    const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MDkzMTEsImV4cCI6MjA2OTI4NTMxMX0.phbhjcVVF-ENJn167Pd0XxlF_VicDcJW7id5K8Vy7Mc";
+    return { url, key };
   }
   // Ensure client is initialized
   ensureInitialized() {
@@ -86,6 +83,32 @@ class SupabaseService {
       }).eq("id", id).select().single()
     );
   }
+  async updateBowserReading(id, newReading, fuelEntryId) {
+    const client = this.ensureInitialized();
+    try {
+      const currentBowser = await client.from("bowsers").select("current_reading").eq("id", id).single();
+      const previousReading = currentBowser.data?.current_reading || null;
+      const updateResult = await client.from("bowsers").update({
+        current_reading: newReading,
+        last_updated: (/* @__PURE__ */ new Date()).toISOString(),
+        updated_at: (/* @__PURE__ */ new Date()).toISOString()
+      }).eq("id", id).select().single();
+      try {
+        await client.from("bowser_reading_history").insert({
+          bowser_id: id,
+          fuel_entry_id: fuelEntryId || null,
+          previous_reading: previousReading,
+          new_reading: newReading,
+          created_by: null
+        });
+      } catch (historyError) {
+        console.warn("Could not create bowser reading history:", historyError);
+      }
+      return { data: updateResult.data, error: updateResult.error?.message };
+    } catch (error) {
+      return { data: null, error: error instanceof Error ? error.message : "Failed to update bowser reading" };
+    }
+  }
   async deleteVehicle(id) {
     const client = this.ensureInitialized();
     return this.query(
@@ -125,11 +148,11 @@ class SupabaseService {
     const client = this.ensureInitialized();
     let query = client.from("fuel_entries").select(`
 				*,
-				vehicles (code, name, registration),
-				drivers (employee_code, name),
-				activities (code, name),
-				fields (code, name),
-				bowsers (name)
+				vehicles!left (code, name, registration),
+				drivers!left (employee_code, name),
+				activities!left (code, name),
+				fields!left (code, name),
+				bowsers!left (name)
 			`).order("entry_date", { ascending: false });
     if (startDate) {
       query = query.gte("entry_date", startDate);
@@ -158,13 +181,58 @@ class SupabaseService {
       () => client.from("bowsers").select("*").eq("active", true).order("name")
     );
   }
-  async updateBowserReading(id, reading) {
+  // Tank Management operations
+  async getTankConfig() {
     const client = this.ensureInitialized();
     return this.query(
-      () => client.from("bowsers").update({
-        current_reading: reading,
-        updated_at: (/* @__PURE__ */ new Date()).toISOString()
-      }).eq("id", id).select().single()
+      () => client.from("tank_config").select("*").eq("tank_id", "tank_a").single()
+    );
+  }
+  async getTankReadings(limit = 10) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("tank_readings").select("*").order("reading_date", { ascending: false }).order("reading_time", { ascending: false }).limit(limit)
+    );
+  }
+  async getTankRefills(limit = 10) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("tank_refills").select("*").order("delivery_date", { ascending: false }).limit(limit)
+    );
+  }
+  async addTankReading(reading) {
+    const client = this.ensureInitialized();
+    try {
+      const result = await client.from("tank_readings").insert({
+        tank_id: "tank_a",
+        ...reading,
+        reading_type: "dipstick"
+      }).select().single();
+      if (result.data) {
+        await client.from("tank_config").update({
+          last_dipstick_level: reading.reading_value,
+          last_dipstick_date: reading.reading_date,
+          updated_at: (/* @__PURE__ */ new Date()).toISOString()
+        }).eq("tank_id", "tank_a");
+      }
+      return { data: result.data, error: result.error?.message };
+    } catch (error) {
+      return { data: null, error: error instanceof Error ? error.message : "Failed to add tank reading" };
+    }
+  }
+  async addTankRefill(refill) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("tank_refills").insert({
+        tank_id: "tank_a",
+        ...refill
+      }).select().single()
+    );
+  }
+  async getTankStatus() {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("tank_status").select("*").eq("tank_id", "tank_a").single()
     );
   }
   // Activity operations
@@ -226,29 +294,34 @@ class SupabaseService {
     return this.query(async () => {
       const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
       const monthStart = new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth(), 1).toISOString().split("T")[0];
-      const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
-      const [dailyFuel, weeklyFuel, monthlyFuel, recentEntries, bowsers, vehicles] = await Promise.all([
+      const now = /* @__PURE__ */ new Date();
+      const dayOfWeek = now.getDay();
+      const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const weekStart = new Date(now.getTime() - daysToSubtract * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
+      const [dailyFuel, weeklyFuel, monthlyFuel, recentEntries, bowsers, vehicles, tankStatus] = await Promise.all([
         // Today's fuel usage
         client.from("fuel_entries").select("litres_used, litres_dispensed").gte("entry_date", today),
         // This week's fuel usage
         client.from("fuel_entries").select("litres_used, litres_dispensed, odometer_start, odometer_end").gte("entry_date", weekStart),
         // This month's fuel usage
         client.from("fuel_entries").select("litres_used, litres_dispensed, odometer_start, odometer_end, vehicle_id, fuel_consumption_l_per_100km, gauge_working").gte("entry_date", monthStart),
-        // Recent fuel entries with vehicle info
+        // Recent fuel entries with vehicle info - using LEFT JOINs to include entries with missing relationships
         client.from("fuel_entries").select(`
 						*,
-						vehicles(code, name, type),
-						drivers(employee_code, name),
-						activities(name, category)
+						vehicles!left(code, name, type),
+						drivers!left(employee_code, name),
+						activities!left(name, category)
 					`).order("entry_date", { ascending: false }).order("time", { ascending: false }).limit(10),
         // Bowser levels
         client.from("bowsers").select("name, current_reading, capacity, fuel_type").eq("active", true),
         // Active vehicles count
-        client.from("vehicles").select("id, current_odometer").eq("active", true)
+        client.from("vehicles").select("id, current_odometer").eq("active", true),
+        // Tank status for calculated level
+        client.from("tank_config").select("current_calculated_level, capacity").eq("tank_id", "tank_a").single()
       ]);
-      const dailyUsage = dailyFuel.data?.reduce((sum, entry) => sum + (entry.litres_used || 0), 0) || 0;
-      const weeklyUsage = weeklyFuel.data?.reduce((sum, entry) => sum + (entry.litres_used || 0), 0) || 0;
-      const monthlyUsage = monthlyFuel.data?.reduce((sum, entry) => sum + (entry.litres_used || 0), 0) || 0;
+      const dailyUsage = dailyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+      const weeklyUsage = weeklyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+      const monthlyUsage = monthlyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
       const monthlyDistance = monthlyFuel.data?.reduce((sum, entry) => {
         if (entry.gauge_working && entry.odometer_start && entry.odometer_end) {
           const distance = entry.odometer_end - entry.odometer_start;
@@ -260,9 +333,9 @@ class SupabaseService {
         (entry) => entry.fuel_consumption_l_per_100km && entry.gauge_working
       ) || [];
       const avgEfficiency = consumptionEntries.length > 0 ? consumptionEntries.reduce((sum, entry) => sum + entry.fuel_consumption_l_per_100km, 0) / consumptionEntries.length : monthlyDistance > 0 ? monthlyUsage / monthlyDistance * 100 : 0;
-      const totalTankCapacity = bowsers.data?.reduce((sum, bowser) => sum + (bowser.capacity || 0), 0) || 0;
-      const totalCurrentLevel = bowsers.data?.reduce((sum, bowser) => sum + (bowser.current_reading || 0), 0) || 0;
-      const tankPercentage = totalTankCapacity > 0 ? totalCurrentLevel / totalTankCapacity * 100 : 0;
+      const tankCapacity = tankStatus.data?.capacity || 5e3;
+      const calculatedTankLevel = tankStatus.data?.current_calculated_level || 0;
+      const tankPercentage = tankCapacity > 0 ? calculatedTankLevel / tankCapacity * 100 : 0;
       const activeVehicles = vehicles.data?.length || 0;
       const vehiclesWithOdometer = vehicles.data?.filter((v) => v.current_odometer && v.current_odometer > 0).length || 0;
       const validConsumptionEntries = consumptionEntries.length;
@@ -285,14 +358,16 @@ class SupabaseService {
           consumptionDataQuality: Math.round(consumptionDataQuality),
           bestEfficiencyThisMonth: bestEfficiency ? Math.round(bestEfficiency * 100) / 100 : null,
           worstEfficiencyThisMonth: worstEfficiency ? Math.round(worstEfficiency * 100) / 100 : null,
-          // Tank monitoring
-          tankLevel: Math.round(totalCurrentLevel * 100) / 100,
-          tankCapacity: totalTankCapacity,
+          // Tank monitoring (calculated level)
+          tankLevel: Math.round(calculatedTankLevel * 100) / 100,
+          tankCapacity,
           tankPercentage: Math.round(tankPercentage * 100) / 100,
           // Fleet status
           activeVehicles,
           vehiclesWithOdometer,
           totalBowsers: bowsers.data?.length || 0,
+          // Bowser reading (Tank A - first bowser)
+          bowserReading: bowsers.data?.[0]?.current_reading || 0,
           // Recent activity
           recentEntries: recentEntries.data || [],
           bowserLevels: bowsers.data || [],
@@ -312,8 +387,8 @@ class SupabaseService {
     return this.query(async () => {
       let query = client.from("fuel_entries").select(`
 					*,
-					vehicles(code, name, type, fuel_type),
-					activities(name, category)
+					vehicles!left(code, name, type, fuel_type),
+					activities!left(name, category)
 				`).gte("entry_date", startDate).order("entry_date", { ascending: true });
       if (vehicleId) {
         query = query.eq("vehicle_id", vehicleId);

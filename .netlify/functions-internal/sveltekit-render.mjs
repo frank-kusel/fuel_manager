@@ -9,10 +9,10 @@ function __memo(fn) {
 return {
 	appDir: "_app",
 	appPath: "_app",
-	assets: new Set(["favicon.png","icon-192.png","icon-512.png","manifest.json","sw.js"]),
-	mimeTypes: {".png":"image/png",".json":"application/json",".js":"text/javascript"},
+	assets: new Set(["favicon.png","favicon.svg","icon-192.png","icon-192.svg","icon-512.png","icon-512.svg","icon.svg","manifest.json","simple-icon.svg","sw.js"]),
+	mimeTypes: {".png":"image/png",".svg":"image/svg+xml",".json":"application/json",".js":"text/javascript"},
 	_: {
-		client: {start:"_app/immutable/entry/start.fOHhjW37.js",app:"_app/immutable/entry/app.Bc3j3KlX.js",imports:["_app/immutable/entry/start.fOHhjW37.js","_app/immutable/chunks/nXdQvSCr.js","_app/immutable/chunks/5P4c1mN1.js","_app/immutable/chunks/D6cbYCli.js","_app/immutable/chunks/CSIOR0MX.js","_app/immutable/entry/app.Bc3j3KlX.js","_app/immutable/chunks/D9Z9MdNV.js","_app/immutable/chunks/D6cbYCli.js","_app/immutable/chunks/DsnmJJEf.js","_app/immutable/chunks/5P4c1mN1.js","_app/immutable/chunks/BmneS3Po.js","_app/immutable/chunks/DcOV7W_e.js","_app/immutable/chunks/DQ2vU5C0.js","_app/immutable/chunks/hw9sEPVb.js","_app/immutable/chunks/CSIOR0MX.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
+		client: {start:"_app/immutable/entry/start.C2QotA1O.js",app:"_app/immutable/entry/app.CN-hS7VO.js",imports:["_app/immutable/entry/start.C2QotA1O.js","_app/immutable/chunks/uSTQ6LSa.js","_app/immutable/chunks/CNYTwUFp.js","_app/immutable/chunks/BitNC0P7.js","_app/immutable/chunks/D5dIpzlY.js","_app/immutable/entry/app.CN-hS7VO.js","_app/immutable/chunks/D9Z9MdNV.js","_app/immutable/chunks/BitNC0P7.js","_app/immutable/chunks/DsnmJJEf.js","_app/immutable/chunks/CNYTwUFp.js","_app/immutable/chunks/CLUw0nhx.js","_app/immutable/chunks/C4mhkkN0.js","_app/immutable/chunks/dKzXdLlS.js","_app/immutable/chunks/UqDvfLoM.js","_app/immutable/chunks/D5dIpzlY.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
 		nodes: [
 			__memo(() => import('../server/nodes/0.js')),
 			__memo(() => import('../server/nodes/1.js')),
