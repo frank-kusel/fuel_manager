@@ -172,10 +172,10 @@
 	}
 
 	:global(#driver-table td) {
-		padding: 1rem 0.5rem;
+		padding: 0.75rem 0.5rem;
 		text-align: left;
 		border: none;
-		font-size: 0.875rem;
+		font-size: 1rem;
 		vertical-align: middle;
 	}
 
@@ -216,19 +216,19 @@
 	:global(#driver-table .driver-code) {
 		font-weight: 600;
 		color: #374151;
-		font-size: 0.875rem;
+		font-size: 1rem;
 		font-variant-numeric: tabular-nums;
 		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		width: 4rem;
 		min-width: 4rem;
 		max-width: 4rem;
-		text-align: center;
+		text-align: left;
 	}
 
 	:global(#driver-table .driver-name) {
 		font-weight: 400;
 		color: #111827;
-		font-size: 0.875rem;
+		font-size: 1rem;
 	}
 
 	/* Selected state text colors */

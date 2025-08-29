@@ -542,11 +542,13 @@
 	}
 
 	.field-code {
-		font-size: 0.75rem;
+		font-size: 1rem;
 		font-weight: 600;
 		color: #64748b;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
+		text-align: left;
+		padding: 0.5rem;
 	}
 
 	.field-card.selected .field-code {
@@ -679,7 +681,7 @@
 	}
 	
 	.group-title {
-		padding: 0.5rem;
+		padding: 1rem;
 		font-size: 1rem;
 		font-weight: 600;
 		color: #6b7280;

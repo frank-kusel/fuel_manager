@@ -51,29 +51,13 @@
 		onOdometerUpdate(start, end, !isBrokenGauge);
 	});
 	
-	// Number formatting function
+	// Number formatting function - spaces for thousands, period for decimal
 	function formatNumber(num: number | null): string {
 		if (num === null || num === undefined || isNaN(num)) return 'No reading';
-		return new Intl.NumberFormat('en-US', {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2,
-			useGrouping: true
-		}).format(num).replace(/,/g, ' ');
+		// Format with US locale to ensure period for decimal, then replace commas with spaces
+		return new Intl.NumberFormat('en-US').format(num).replace(/,/g, ' ');
 	}
 	
-	// Format input value for display with thousands separator
-	function formatInputValue(value: string): string {
-		const num = parseFloat(value);
-		if (isNaN(num)) return value;
-		return new Intl.NumberFormat('en-US', {
-			minimumFractionDigits: 0,
-			maximumFractionDigits: 2,
-			useGrouping: true
-		}).format(num).replace(/,/g, ' ');
-	}
-	
-	// Update new odo display when value changes
-	let formattedNewOdo = $derived(newOdo ? formatInputValue(newOdo) : '');
 	
 	// Distance calculation
 	let distance = $state(null);
@@ -115,25 +99,19 @@
 					{/if}
 				</div>
 				
-				{#if isEditingCurrentOdo}
-					<input 
-						type="number" 
-						inputmode="numeric" 
-						pattern="[0-9]*" 
-						bind:value={currentOdo}
-						placeholder="Enter current reading"
-						class="current-odo-input"
-						onfocus={(e) => e.target.select()}
-						autocomplete="off"
-					/>
-				{:else}
-					<div class="odo-value current-odo-value" class:editable={selectedVehicle} onclick={() => selectedVehicle && (isEditingCurrentOdo = true)}>
-						{formatNumber(parseFloat(currentOdo))}
-					</div>
-				{/if}
+				<input 
+					type="number" 
+					inputmode="numeric" 
+					pattern="[0-9]*" 
+					bind:value={currentOdo}
+					placeholder="Old"
+					class="current-odo-input"
+					onfocus={(e) => e.target.select()}
+					autocomplete="off"
+					readonly={!isEditingCurrentOdo}
+					onclick={() => !isEditingCurrentOdo && selectedVehicle && (isEditingCurrentOdo = true)}
+				/>
 			</div>
-			
-			<div class="odo-label">Current</div>
 			
 			{#if isEditingCurrentOdo && parseFloat(currentOdo) !== originalCurrentOdo}
 				<div class="override-notice">Manual override active</div>
@@ -144,37 +122,25 @@
 			<!-- Main ODO Input -->
 			<div class="odo-section">
 				<div class="odo-card new-odo">
-					<div class="odo-value" onclick={(e) => {
-						const input = e.currentTarget.nextElementSibling;
-						if (input) {
-							input.focus();
-							input.select();
-						}
-					}}>
-						{formattedNewOdo || '_'}
-					</div>
 					<input 
 						type="number" 
 						inputmode="numeric" 
 						pattern="[0-9]*" 
 						bind:value={newOdo}
-						placeholder="Enter new reading"
-						class="new-odo-input-hidden"
+						placeholder="New"
+						class="new-odo-input"
 						autocomplete="off"
 						onfocus={(e) => e.target.select()}
 					/>
 				</div>
 				
-				<div class="odo-label">New</div>
+				<!-- Distance Display - below new input -->
+				{#if distance && distance > 0}
+					<div class="distance-stat">
+						+{new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(distance).replace(/,/g, ' ')}
+					</div>
+				{/if}
 			</div>
-			
-			<!-- Distance Display -->
-			{#if distance && distance > 0}
-				<div class="distance-display">
-					<span class="distance-value">{formatNumber(distance)} {selectedVehicle?.odometer_unit || 'km/hr'}</span>
-					<span class="distance-label">Distance or time</span>
-				</div>
-			{/if}
 			
 			<!-- Gauge Status Toggle - moved below new reading -->
 			<div class="gauge-toggle">
@@ -218,7 +184,7 @@
 	.odometer-reading {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0;
 	}
 
 	.step-header {
@@ -258,7 +224,7 @@
 	
 	/* Odo section styling */
 	.odo-section {
-		margin-bottom: 0.75rem;
+		margin-bottom: 0;
 	}
 	
 	.current-odo-controls {
@@ -355,36 +321,8 @@
 		box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 	}
 
-	.odo-value {
-		font-size: 2.5rem;
-		font-weight: 600;
-		color: #1e293b;
-		margin-bottom: 0.5rem;
-		padding: 1.5rem;
-		font-variant-numeric: tabular-nums;
-		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	}
 	
-	.current-odo-value {
-		color: #64748b;
-	}
-	
-	.odo-value.editable {
-		cursor: pointer;
-		transition: background-color 0.2s ease;
-	}
-	
-	.odo-value.editable:hover {
-		background: rgba(156, 163, 175, 0.05);
-	}
 
-	.odo-label {
-		font-size: 0.875rem;
-		color: #64748b;
-		font-weight: 500;
-		text-align: center;
-		margin-top: 0.5rem;
-	}
 	
 	/* Hide the actual input but keep it functional */
 	.new-odo-input-hidden {
@@ -450,27 +388,15 @@
 		height: 18px;
 	}
 
-	/* Distance Display */
-	.distance-display {
+	/* Distance Stat - minimal indicator below new input */
+	.distance-stat {
 		text-align: center;
-		padding: 0.75rem;
-		background: #f0f9ff;
-		border: 1px solid #bae6fd;
-		border-radius: 0.5rem;
-		margin-top: 0.5rem;
-	}
-
-	.distance-value {
+		margin-top: 0.75rem;
 		font-size: 1.25rem;
-		font-weight: 600;
-		color: #0369a1;
-		display: block;
-		margin-bottom: 0.25rem;
-	}
-
-	.distance-label {
-		font-size: 0.875rem;
-		color: #0369a1;
+		font-weight: 700;
+		color: #059669;
+		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		font-variant-numeric: tabular-nums;
 	}
 
 	/* States */

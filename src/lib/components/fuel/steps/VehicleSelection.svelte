@@ -260,10 +260,10 @@
 	}
 
 	:global(#vehicle-table td) {
-		padding: 1rem 0.5rem;
+		padding: 0.75rem 0.5rem;
 		text-align: left;
 		border: none;
-		font-size: 0.875rem;
+		font-size: 1rem;
 		vertical-align: middle;
 	}
 
@@ -294,7 +294,7 @@
 	}
 	
 	.group-title {
-		padding: 1.5rem 0 0.75rem 0;
+		padding: 2rem 0 1rem 0;
 		font-size: 0.8125rem;
 		font-weight: 600;
 		color: #6b7280;
@@ -343,13 +343,14 @@
 	:global(#vehicle-table .vehicle-code) {
 		font-weight: 600;
 		color: #374151;
-		font-size: 0.875rem;
+		font-size: 1rem;
 		font-variant-numeric: tabular-nums;
 		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		width: 4rem;
-		min-width: 4rem;
-		max-width: 4rem;
-		text-align: center;
+		width: 2rem;
+		min-width: 2rem;
+		max-width: 2rem;
+		text-align: left;
+		padding-left: 0.5rem;
 	}
 	
 	:global(#vehicle-table .vehicle-name) {
@@ -577,7 +578,7 @@
 		/* Mobile table column widths */
 		:global(#vehicle-table th:nth-child(1)),
 		:global(#vehicle-table td:nth-child(1)) { /* Code - Narrower */
-			width: 18%;
+			width: 15%;
 		}
 
 		:global(#vehicle-table th:nth-child(2)),

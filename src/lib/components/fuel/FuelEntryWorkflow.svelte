@@ -165,15 +165,18 @@
 		</div>
 		
 		
-		<!-- Progress Summary -->
-		{#if progressItems.length > 0}
-			<div class="progress-summary">
+		<!-- Progress Summary - always present to prevent layout shift -->
+		<div class="progress-summary">
+			{#if progressItems.length > 0}
 				{#each progressItems as item, i}
 					{#if i > 0}<span class="progress-separator">•</span>{/if}
 					<span class="progress-item">{item}</span>
 				{/each}
-			</div>
-		{/if}
+			{:else}
+				<!-- Empty space holder to maintain layout -->
+				<span class="progress-placeholder">&nbsp;</span>
+			{/if}
+		</div>
 		
 		<!-- Minimal Progress Bar -->
 		<div class="progress-track">
@@ -546,7 +549,7 @@
 	.progress-summary {
 		padding: 0 1rem 0.75rem;
 		text-align: left;
-		font-size: 0.8rem;
+		font-size: 0.85rem;
 		color: #6b7280;
 		line-height: 1.4;
 	}
@@ -819,7 +822,7 @@
 		/* Progress summary mobile */
 		.progress-summary {
 			padding: 0.625rem 0.75rem;
-			font-size: 0.8125rem;
+			font-size: 0.85rem;
 			line-height: 1.3;
 		}
 		
@@ -911,7 +914,7 @@
 		
 		.progress-summary {
 			padding: 0.5rem;
-			font-size: 0.75rem;
+			font-size: 0.85rem;
 		}
 		
 		.progress-separator {

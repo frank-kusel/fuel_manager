@@ -286,7 +286,7 @@
 	}
 
 	.group-title {
-		padding: 1.5rem 0 0.75rem 0;
+		padding: 2rem 0 1rem 0;
 		font-size: 0.8125rem;
 		font-weight: 600;
 		color: #6b7280;
