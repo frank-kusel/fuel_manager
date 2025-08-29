@@ -159,14 +159,6 @@
 	{:else}
 		<div class="table-container">
 			<table id="field-table">
-				<thead>
-					<tr>
-						<th>Name</th>
-						<th>Crop</th>
-						<th>Location</th>
-						<th>Area (ha)</th>
-					</tr>
-				</thead>
 				<tbody>
 					{#each filteredFields as field (field.id)}
 						<tr 

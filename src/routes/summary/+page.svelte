@@ -179,8 +179,11 @@
 					<!-- Daily summary stats -->
 					<div class="daily-summary">
 						<div class="total-fuel-value">
-							<span class="total-fuel-amount">{daySummary.totalFuel.toFixed(1)}</span>
-							<span class="total-fuel-unit">L</span>
+							<div class="fuel-amount-container">
+								<span class="entry-count-inline">#{daySummary.entries.length}</span>
+								<span class="total-fuel-amount">{daySummary.totalFuel.toFixed(1)}</span>
+								<span class="total-fuel-unit">L</span>
+							</div>
 						</div>
 						{#if daySummary.openingReading !== null && daySummary.closingReading !== null}
 							<div class="bowser-readings">
@@ -198,12 +201,17 @@
 
 					<!-- Entries for this day -->
 					<div class="entries-list">
-						{#each daySummary.entries as entry (entry.id)}
+						{#each daySummary.entries as entry, index (entry.id)}
 							<div class="entry-card" class:expanded={expandedEntry === entry.id}>
 								<div class="entry-card-header" on:click={() => expandedEntry = expandedEntry === entry.id ? null : entry.id}>
 									<div class="entry-vehicle-info">
-										<p class="entry-vehicle-code">{entry.vehicles?.code || 'N/A'}</p>
-										<p class="entry-vehicle-name">{entry.vehicles?.name || 'Vehicle'}</p>
+										<div class="vehicle-code-container">
+											<span class="entry-number">#{daySummary.entries.length - index}</span>
+											<div class="vehicle-info-main">
+												<p class="entry-vehicle-code">{entry.vehicles?.code || 'N/A'}</p>
+												<p class="entry-vehicle-name">{entry.vehicles?.name || 'Vehicle'}</p>
+											</div>
+										</div>
 									</div>
 									<div class="entry-header-right">
 										<p class="entry-fuel-amount">+ {entry.litres_dispensed.toFixed(1)} L</p>
@@ -239,7 +247,7 @@
 											<span class="context-separator">•</span>
 											<span class="context-value">{entry.fields?.code || entry.zones?.code || 'N/A'}</span>
 										</div>
-										<div class="entry-time">{entry.time}</div>
+										<div class="entry-time-expanded">{entry.time}</div>
 									</div>
 								</div>
 							</div>
@@ -310,9 +318,15 @@
 	}
 
 	.day-header {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		background: rgba(255, 255, 255, 0.95);
+		backdrop-filter: blur(8px);
 		text-align: center;
 		margin-bottom: 1.5rem;
 		padding: 1rem 0;
+		border-bottom: 1px solid rgba(241, 245, 249, 0.8);
 	}
 
 	.day-title {
@@ -339,6 +353,22 @@
 
 	.total-fuel-value {
 		margin: 0.5rem 0;
+	}
+	
+	.fuel-amount-container {
+		display: flex;
+		align-items: baseline;
+		justify-content: center;
+		gap: 0.5rem;
+	}
+	
+	.entry-count-inline {
+		font-size: 1rem;
+		font-weight: 500;
+		color: #9ca3af;
+		opacity: 0.6;
+		align-self: flex-start;
+		margin-top: 0.5rem;
 	}
 
 	.total-fuel-amount {
@@ -388,7 +418,7 @@
 	}
 
 	.entry-card {
-		background-color: #f9fafb;
+		background-color: #f1f5f9;
 		border-radius: 1rem;
 		transition: all 0.3s ease;
 	}
@@ -404,17 +434,49 @@
 	.entry-vehicle-info {
 		flex-grow: 1;
 	}
+	
+	.vehicle-code-container {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+	}
+	
+	.entry-number {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #9ca3af;
+		opacity: 0.8;
+		line-height: 1.2;
+		margin-top: 0.1rem;
+	}
+	
+	.vehicle-info-main {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
 
 	.entry-vehicle-code {
 		font-weight: 700;
 		font-size: 1rem;
 		margin: 0;
+		line-height: 1.2;
+		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		font-variant-numeric: tabular-nums;
 	}
-
+	
 	.entry-vehicle-name {
 		font-size: 0.875rem;
 		color: #6b7280;
 		margin: 0;
+	}
+	
+	.entry-time-expanded {
+		font-size: 0.75rem;
+		color: #9ca3af;
+		font-weight: 500;
+		margin: 0;
+		opacity: 0.8;
 	}
 
 	.entry-header-right {
@@ -513,6 +575,8 @@
 	.context-value {
 		font-weight: 600;
 		color: #374151;
+		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.context-separator {
@@ -554,8 +618,9 @@
 		}
 
 		.day-header {
-			padding: 0.75rem 0;
+			padding: 0.75rem 1rem;
 			margin-bottom: 1rem;
+			border-bottom: 1px solid rgba(241, 245, 249, 0.9);
 		}
 
 		.day-title {

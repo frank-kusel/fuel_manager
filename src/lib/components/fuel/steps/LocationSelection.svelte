@@ -251,13 +251,6 @@
 		{:else}
 			<div class="table-container">
 				<table id="field-table">
-					<thead>
-						<tr>
-							<th>Name</th>
-							<th>Location</th>
-							<th>Area</th>
-						</tr>
-					</thead>
 					<tbody>
 						{#each Object.entries(groupedFields) as [cropType, fieldList]}
 							<!-- Crop Type Group Header -->

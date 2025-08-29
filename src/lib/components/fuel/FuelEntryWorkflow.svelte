@@ -155,62 +155,32 @@
 </script>
 
 <div class="fuel-entry-workflow" bind:this={workflowContainer}>
-	<!-- Mobile App Header - Complete Header Card -->
+	<!-- Header Card - Matching Summary/Dashboard Layout -->
 	<div class="app-header-card">
-		<div class="header-content">
-			<!-- Step Header with Navigation -->
-			<div class="step-nav-header">
-				{#if $canGoBackToPrevious}
-					<button class="nav-back" onclick={handlePrevious}>
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-						</svg>
-					</button>
-				{:else}
-					<div class="nav-spacer"></div>
-				{/if}
-				
-				<div class="step-info">
-					<h1 class="step-title">{getStepTitle($currentStep)}</h1>
-					<div class="step-counter">{$currentStep + 1} of 7</div>
-				</div>
-				
-				{#if $currentStep === 4 || $currentStep === 5}
-					<button 
-						class="nav-continue {$canProceedToNext ? 'enabled' : 'disabled'}"
-						onclick={() => {
-							if ($canProceedToNext) {
-								handleNext();
-							}
-						}}
-						disabled={!$canProceedToNext}
-					>
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
-						</svg>
-					</button>
-				{:else}
-					<div class="nav-spacer"></div>
-				{/if}
+		<!-- Main Dashboard Header Style -->
+		<div class="dashboard-header">
+			<div class="header-content">
+				<h1>{getStepTitle($currentStep)}</h1>
 			</div>
-			
-			<!-- Progress Summary -->
-			{#if progressItems.length > 0}
-				<div class="progress-summary">
-					{#each progressItems as item, i}
-						{#if i > 0}<span class="progress-separator">•</span>{/if}
-						<span class="progress-item">{item}</span>
-					{/each}
-				</div>
-			{/if}
-			
-			<!-- Minimal Progress Bar -->
-			<div class="progress-track">
-				<div 
-					class="progress-indicator" 
-					style="width: {Math.round(((($currentStep + 1) / 7) * 100))}%"
-				></div>
+		</div>
+		
+		
+		<!-- Progress Summary -->
+		{#if progressItems.length > 0}
+			<div class="progress-summary">
+				{#each progressItems as item, i}
+					{#if i > 0}<span class="progress-separator">•</span>{/if}
+					<span class="progress-item">{item}</span>
+				{/each}
 			</div>
+		{/if}
+		
+		<!-- Minimal Progress Bar -->
+		<div class="progress-track">
+			<div 
+				class="progress-indicator" 
+				style="width: {Math.round(((($currentStep + 1) / 7) * 100))}%"
+			></div>
 		</div>
 	</div>
 	
@@ -333,6 +303,8 @@
 					fuelEntryWorkflowStore.setOdometerData(start, end, gaugeWorking);
 				}}
 				errors={getCurrentStepErrors()}
+				canProceedToNext={$canProceedToNext}
+				onNext={handleNext}
 			/>
 		{:else if $currentStep === 5}
 			<!-- Fuel Data Entry -->
@@ -346,6 +318,8 @@
 					fuelEntryWorkflowStore.setFuelData(bowser, startReading, endReading, litres);
 				}}
 				errors={getCurrentStepErrors()}
+				canProceedToNext={$canProceedToNext}
+				onNext={handleNext}
 			/>
 		{:else if $currentStep === 6}
 			<!-- Review & Submit -->
@@ -433,6 +407,17 @@
 	<div class="keyboard-hints">
 		<small>💡 Keyboard shortcuts: <kbd>→</kbd> or <kbd>Enter</kbd> to continue • <kbd>←</kbd> to go back • <kbd>Esc</kbd> to restart</small>
 	</div>
+	
+	<!-- Fixed Position Back Button -->
+	<button 
+		class="back-button-fixed {$canGoBackToPrevious ? 'visible' : 'hidden'}"
+		onclick={handlePrevious}
+		disabled={!$canGoBackToPrevious}
+	>
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+			<path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+		</svg>
+	</button>
 </div>
 
 <!-- Success Modal -->
@@ -475,97 +460,77 @@
 		border-bottom: 1px solid #f1f5f9;
 	}
 	
-	.header-content {
-		padding: 0;
-		background: #ffffff;
-	}
 	
-	.step-nav-header {
+	/* Match Summary/Dashboard Header Layout Exactly */
+	.dashboard-header {
 		display: flex;
-		align-items: center;
 		justify-content: space-between;
-		padding: 0.75rem 1rem;
-		min-height: 56px; /* Standard mobile header height */
+		align-items: flex-start;
+		gap: 1rem;
+		margin-bottom: 0.5rem;
 	}
 	
-	/* Navigation Buttons */
-	.nav-back,
-	.nav-continue {
-		width: 44px;
-		height: 44px;
-		border-radius: 22px;
+	.header-content h1 {
+		font-size: 2.25rem;
+		font-weight: 700;
+		color: var(--color-text-primary);
+		margin: 0 0 0.5rem 0;
+		line-height: 1.2;
+	}
+	
+	/* Fixed Position Back Button - Above Bottom Nav Bar */
+	.back-button-fixed {
+		position: fixed;
+		bottom: 5rem;
+		left: 1rem;
+		z-index: 200;
+		width: 56px;
+		height: 56px;
+		border-radius: 28px;
 		border: none;
+		background: rgba(255, 255, 255, 0.95);
+		color: #64748b;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		transition: all 0.2s ease;
-		flex-shrink: 0;
+		transition: all 0.3s ease;
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+		backdrop-filter: blur(12px);
 	}
 	
-	.nav-back {
-		background: #f8fafc;
+	.back-button-fixed.visible {
+		opacity: 1;
+		transform: translateX(0);
+	}
+	
+	.back-button-fixed.hidden {
+		opacity: 0;
+		transform: translateX(-100%);
+		pointer-events: none;
+	}
+	
+	.back-button-fixed:hover:not(:disabled) {
+		background: rgba(248, 250, 252, 0.98);
 		color: #475569;
-	}
-	
-	.nav-back:hover {
-		background: #f1f5f9;
-		color: #334155;
-	}
-	
-	.nav-continue.disabled {
-		background: #f8fafc;
-		color: #cbd5e1;
-		cursor: not-allowed;
-	}
-	
-	.nav-continue.enabled {
-		background: #10b981;
-		color: white;
-	}
-	
-	.nav-continue.enabled:hover {
-		background: #059669;
 		transform: scale(1.05);
+		box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 	}
 	
-	.nav-spacer {
-		width: 44px;
-		height: 44px;
-		flex-shrink: 0;
+	.back-button-fixed:disabled {
+		opacity: 0;
+		transform: translateX(-100%);
+		pointer-events: none;
 	}
 	
-	/* Step Info */
-	.step-info {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 0 1rem;
-	}
 	
-	.step-title {
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: #1f2937;
-		margin: 0;
-		line-height: 1.3;
-	}
-	
-	.step-counter {
-		font-size: 0.75rem;
-		color: #64748b;
-		font-weight: 500;
-		margin-top: 2px;
-		letter-spacing: 0.025em;
-	}
 	
 	/* Progress Track */
 	.progress-track {
-		height: 2px;
+		height: 4px;
 		background: #f1f5f9;
 		position: relative;
+		border-radius: 2px;
 		overflow: hidden;
 	}
 	
@@ -574,13 +539,14 @@
 		background: linear-gradient(90deg, #10b981, #059669);
 		transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 		box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+		border-radius: 2px;
 	}
 	
 	/* Progress Summary */
 	.progress-summary {
-		padding: 0.75rem 1rem;
-		text-align: center;
-		font-size: 0.875rem;
+		padding: 0 1rem 0.75rem;
+		text-align: left;
+		font-size: 0.8rem;
 		color: #6b7280;
 		line-height: 1.4;
 	}
@@ -829,91 +795,20 @@
 			flex-direction: column;
 		}
 		
-		/* Mobile app header optimizations */
-		.app-header {
-			height: 56px;
-			padding: 0 16px;
-			border-bottom: 1px solid #f1f5f9;
-			background: #ffffff;
-			box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+		/* Match Summary/Dashboard Mobile Header Exactly */
+		.dashboard-header {
+			flex-direction: column;
+			gap: 0.75rem;
+			padding: 0.5rem;
 		}
 		
-		.step-nav-header {
-			height: 44px;
-			align-items: center;
-			gap: 12px;
+		.header-content h1 {
+			font-size: 1.75rem;
 		}
 		
-		.nav-back, .nav-continue {
-			width: 44px;
-			height: 44px;
-			border-radius: 50%;
-			border: none;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			transition: all 0.2s ease;
-			flex-shrink: 0;
-		}
-		
-		.nav-back {
-			background: #f8fafc;
-			color: #64748b;
-		}
-		
-		.nav-back:active {
-			background: #e2e8f0;
-			transform: scale(0.95);
-		}
-		
-		.nav-continue {
-			background: #e5e7eb;
-			color: #9ca3af;
-		}
-		
-		.nav-continue.enabled {
-			background: #10b981;
-			color: white;
-			box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
-		}
-		
-		.nav-continue.enabled:active {
-			background: #059669;
-			transform: scale(0.95);
-		}
-		
-		.step-info {
-			flex: 1;
-			min-width: 0;
-		}
-		
-		.step-title {
-			font-size: 18px;
-			font-weight: 600;
-			color: #1f2937;
-			margin: 0;
-			line-height: 1.2;
-			truncate: true;
-		}
-		
-		.step-counter {
-			font-size: 12px;
-			color: #6b7280;
-			margin-top: 2px;
-		}
 		
 		.progress-track {
-			height: 3px;
-			background: #f1f5f9;
-			border-radius: 0;
-			overflow: hidden;
-		}
-		
-		.progress-indicator {
-			height: 100%;
-			background: linear-gradient(90deg, #10b981, #059669);
-			transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-			box-shadow: none;
+			height: 4px;
 		}
 		
 		/* Content area */
@@ -1006,12 +901,8 @@
 
 	/* Extra small mobile devices */
 	@media (max-width: 480px) {
-		.app-header {
-			padding: 0 12px;
-		}
-		
-		.step-title {
-			font-size: 16px;
+		.header-content h1 {
+			font-size: 1.5rem;
 		}
 		
 		.step-content {

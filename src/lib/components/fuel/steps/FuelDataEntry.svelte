@@ -11,9 +11,11 @@
 		litresDispensed: number | null;
 		onFuelDataUpdate: (bowser: Bowser | null, startReading: number | null, endReading: number | null, litres: number | null) => void;
 		errors: string[];
+		canProceedToNext?: boolean;
+		onNext?: () => void;
 	}
 	
-	let { selectedVehicle, selectedBowser, bowserReadingStart, bowserReadingEnd, litresDispensed, onFuelDataUpdate, errors }: Props = $props();
+	let { selectedVehicle, selectedBowser, bowserReadingStart, bowserReadingEnd, litresDispensed, onFuelDataUpdate, errors, canProceedToNext = false, onNext }: Props = $props();
 	
 	let bowsers: Bowser[] = $state([]);
 	let loading = $state(true);
@@ -93,12 +95,22 @@
 		selectedBowserInfo = bowsers.find(b => b.id === selectedBowserId) || null;
 	});
 	
+	// Number formatting function for bowser readings (1 decimal)
+	function formatNumber(num: number | null): string {
+		if (num === null || num === undefined || isNaN(num)) return '-';
+		return new Intl.NumberFormat('en-US', {
+			minimumFractionDigits: 1,
+			maximumFractionDigits: 1,
+			useGrouping: true
+		}).format(num).replace(/,/g, ' ');
+	}
+	
 	// Check for reading continuity
 	$effect(() => {
 		if (expectedStartReading !== null && startReading !== expectedStartReading) {
 			const diff = Math.abs(startReading - expectedStartReading);
 			if (diff > 0.1) { // Allow small rounding differences
-				readingMismatchWarning = `Warning: Start reading (${startReading}) doesn't match bowser's last reading (${expectedStartReading}). This may indicate a missing entry or manual adjustment.`;
+				readingMismatchWarning = `Warning: Start reading (${formatNumber(startReading)}) doesn't match bowser's last reading (${formatNumber(expectedStartReading)}). This may indicate a missing entry or manual adjustment.`;
 			} else {
 				readingMismatchWarning = null;
 			}
@@ -154,7 +166,7 @@
 					{:else}
 						<span class="calc-value editable" onclick={() => isEditingStartReading = true}>
 							{#if selectedBowserInfo}
-								{new Intl.NumberFormat().format(startReading)}L
+								{formatNumber(startReading)}L
 							{:else}
 								-
 							{/if}
@@ -191,7 +203,7 @@
 					{:else}
 						<span class="calc-value" class:editable={selectedBowserInfo} onclick={() => selectedBowserInfo && (isEditingEndReading = true)}>
 							{#if fuelAmount && parseFloat(fuelAmount) > 0 && selectedBowserInfo}
-								{new Intl.NumberFormat().format(endReading)}L
+								{formatNumber(endReading)}L
 							{:else}
 								-
 							{/if}
@@ -218,6 +230,18 @@
 		
 	{:else}
 		<div class="no-vehicle">Select a vehicle first</div>
+	{/if}
+	
+	<!-- Continue Button - Fixed Position -->
+	{#if canProceedToNext && onNext}
+		<button 
+			class="continue-button-fixed"
+			onclick={onNext}
+		>
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+				<path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
+			</svg>
+		</button>
 	{/if}
 </div>
 
@@ -285,6 +309,7 @@
 		background: white;
 		color: #1e293b;
 		margin-bottom: 0.5rem;
+		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		-webkit-appearance: none;
 		appearance: none;
 	}
@@ -380,6 +405,7 @@
 		color: #1e293b;
 		font-weight: 600;
 		font-size: 1.25rem;
+		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	.calc-value.editable {
@@ -404,6 +430,7 @@
 		width: 150px;
 		text-align: right;
 		transition: all 0.2s ease;
+		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		-webkit-appearance: none;
 		appearance: none;
 	}
@@ -536,5 +563,32 @@
 			min-height: 2.5rem;
 			font-size: 1rem;
 		}
+	}
+	
+	/* Continue Button - Fixed Position (mirroring back button style) */
+	.continue-button-fixed {
+		position: fixed;
+		bottom: 5rem;
+		right: 1rem;
+		z-index: 200;
+		width: 56px;
+		height: 56px;
+		border-radius: 28px;
+		border: none;
+		background: rgba(16, 185, 129, 0.95);
+		color: white;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		box-shadow: 0 6px 20px rgba(16, 185, 129, 0.25);
+		backdrop-filter: blur(12px);
+	}
+	
+	.continue-button-fixed:hover {
+		background: rgba(5, 150, 105, 0.98);
+		transform: scale(1.05);
+		box-shadow: 0 8px 25px rgba(16, 185, 129, 0.35);
 	}
 </style>

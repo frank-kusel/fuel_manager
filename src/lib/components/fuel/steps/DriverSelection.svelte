@@ -87,12 +87,6 @@
 	{:else}
 		<div class="table-container">
 			<table id="driver-table">
-				<thead>
-					<tr>
-						<th>Code</th>
-						<th>Name</th>
-					</tr>
-				</thead>
 				<tbody>
 					{#each filteredDrivers as driver (driver.id)}
 						<tr 
@@ -224,6 +218,11 @@
 		color: #374151;
 		font-size: 0.875rem;
 		font-variant-numeric: tabular-nums;
+		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		width: 4rem;
+		min-width: 4rem;
+		max-width: 4rem;
+		text-align: center;
 	}
 
 	:global(#driver-table .driver-name) {

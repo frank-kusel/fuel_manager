@@ -147,13 +147,6 @@
 	{:else}
 		<div class="table-container">
 			<table id="vehicle-table">
-				<thead>
-					<tr>
-						<th>Code</th>
-						<th>Name</th>
-						<th>Reg</th>
-					</tr>
-				</thead>
 				<tbody>
 					{#each Object.entries(groupedVehicles) as [type, vehicleList]}
 						<!-- Type Group Header -->
@@ -352,6 +345,11 @@
 		color: #374151;
 		font-size: 0.875rem;
 		font-variant-numeric: tabular-nums;
+		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		width: 4rem;
+		min-width: 4rem;
+		max-width: 4rem;
+		text-align: center;
 	}
 	
 	:global(#vehicle-table .vehicle-name) {
