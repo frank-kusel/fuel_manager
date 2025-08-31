@@ -208,8 +208,8 @@
 										<div class="vehicle-code-container">
 											<span class="entry-number">#{daySummary.entries.length - index}</span>
 											<div class="vehicle-info-main">
-												<p class="entry-vehicle-code">{entry.vehicles?.code || 'N/A'}</p>
 												<p class="entry-vehicle-name">{entry.vehicles?.name || 'Vehicle'}</p>
+												<p class="entry-vehicle-code">{entry.vehicles?.code || 'N/A'}</p>
 											</div>
 										</div>
 									</div>
@@ -466,18 +466,19 @@
 	}
 
 	.entry-vehicle-code {
+		font-size: 0.8rem;
+		color: #6b7280;
+		margin: 0;
+	}
+	
+	.entry-vehicle-name {
+
 		font-weight: 700;
 		font-size: 1rem;
 		margin: 0;
 		line-height: 1.2;
 		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		font-variant-numeric: tabular-nums;
-	}
-	
-	.entry-vehicle-name {
-		font-size: 0.8rem;
-		color: #6b7280;
-		margin: 0;
 	}
 	
 	.entry-time-expanded {
