@@ -163,53 +163,61 @@
 	{#if loading}
 		<div class="loading">Loading tank data...</div>
 	{:else}
-		<!-- Tank Status Overview -->
-		<div class="tank-overview">
-			<div class="tank-status-content">
-				<div class="tank-header">
-					<h3>Fuel Tank</h3>
-					<div class="level-value">{formatNumber(tankStatus.current_calculated_level)}<span class="unit">L</span></div>
-				</div>
-				
-				<div class="tank-bar">
-					<div class="tank-fill" style="width: {tankStatus.tank_percentage}%"></div>
-				</div>
-				
-				{#if tankStatus.last_dipstick_level}
-					<div class="variance-compact {getVarianceClass(tankStatus.variance_percentage)}">
-						<div class="variance-info">
-							<span class="dipstick-value">Dipstick: {formatNumber(tankStatus.last_dipstick_level)}L</span>
-							<span class="variance-amount">{tankStatus.variance > 0 ? '+' : ''}{formatNumber(Math.abs(tankStatus.variance))}L</span>
-						</div>
-						{#if tankStatus.last_dipstick_date}
-							<div class="variance-date">{formatDate(tankStatus.last_dipstick_date)}</div>
-						{/if}
-					</div>
-				{:else}
-					<div class="no-dipstick-compact">
-						<span class="no-dipstick-text">No dipstick reading</span>
-						<span class="no-dipstick-prompt">Take reading to verify</span>
-					</div>
-				{/if}
-				
-				<div class="tank-actions">
-					<button class="action-btn" onclick={() => showDipstickForm = !showDipstickForm}>
+		<!-- Recent History - Compact -->
+		<div class="history-section">
+			<div class="history-card">
+				<div class="history-header">
+					<h4>Recent Dipstick Readings</h4>
+					<button class="header-btn" onclick={() => showDipstickForm = !showDipstickForm}>
 						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 							<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
 						</svg>
-						Dipstick Reading
-					</button>
-					<button class="action-btn" onclick={() => showRefillForm = !showRefillForm}>
-						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M14 20h8v-4l-8-8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8l8 8v2z"/>
-							<path d="m7 7 0 0"/>
-						</svg>
-						Tank Refill
+						Reading
 					</button>
 				</div>
+				{#if recentReadings.length > 0}
+					<div class="compact-list">
+						{#each recentReadings.slice(0, 3) as reading}
+							<div class="compact-item">
+								<span class="item-date">{formatDate(reading.reading_date)}</span>
+								<span class="item-value">{formatNumber(reading.reading_value)}L</span>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="empty-state">No readings yet</div>
+				{/if}
+			</div>
+			
+			<div class="history-card">
+				<div class="history-header">
+					<h4>Recent Tank Refills</h4>
+					<button class="header-btn" onclick={() => showRefillForm = !showRefillForm}>
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M3 6h18l-2 13H5L3 6z"/>
+							<path d="m3 6-2-2"/>
+							<path d="M7 10v4"/>
+							<path d="M11 10v4"/>
+							<path d="M15 10v4"/>
+						</svg>
+						Refill
+					</button>
+				</div>
+				{#if recentRefills.length > 0}
+					<div class="compact-list">
+						{#each recentRefills.slice(0, 3) as refill}
+							<div class="compact-item">
+								<span class="item-date">{formatDate(refill.delivery_date)}</span>
+								<span class="item-value refill">+{formatNumber(refill.litres_added)}L</span>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="empty-state">No refills yet</div>
+				{/if}
 			</div>
 		</div>
-		
+
 		<!-- Quick Entry Forms -->
 		{#if showDipstickForm}
 			<Card>
@@ -321,45 +329,6 @@
 				</div>
 			</Card>
 		{/if}
-		
-		<!-- Recent History - Compact -->
-		<div class="history-section">
-			<div class="history-card">
-				<div class="history-header">
-					<h4>Recent Dipstick Readings</h4>
-				</div>
-				{#if recentReadings.length > 0}
-					<div class="compact-list">
-						{#each recentReadings.slice(0, 3) as reading}
-							<div class="compact-item">
-								<span class="item-date">{formatDate(reading.reading_date)}</span>
-								<span class="item-value">{formatNumber(reading.reading_value)}L</span>
-							</div>
-						{/each}
-					</div>
-				{:else}
-					<div class="empty-state">No readings yet</div>
-				{/if}
-			</div>
-			
-			<div class="history-card">
-				<div class="history-header">
-					<h4>Recent Tank Refills</h4>
-				</div>
-				{#if recentRefills.length > 0}
-					<div class="compact-list">
-						{#each recentRefills.slice(0, 3) as refill}
-							<div class="compact-item">
-								<span class="item-date">{formatDate(refill.delivery_date)}</span>
-								<span class="item-value refill">+{formatNumber(refill.litres_added)}L</span>
-							</div>
-						{/each}
-					</div>
-				{:else}
-					<div class="empty-state">No refills yet</div>
-				{/if}
-			</div>
-		</div>
 	{/if}
 </div>
 
@@ -610,12 +579,15 @@
 	}
 
 	.history-card {
-		background: #f8fafc;
+		background: var(--gray-100);
 		border-radius: 8px;
 		padding: 1rem;
 	}
 
 	.history-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
 		margin-bottom: 0.75rem;
 	}
 
@@ -626,6 +598,31 @@
 		margin: 0;
 		text-transform: uppercase;
 		letter-spacing: 0.025em;
+	}
+
+	.header-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		background: #f97316;
+		color: white;
+		border: none;
+		border-radius: 0.5rem;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.header-btn:hover {
+		background: #ea580c;
+		transform: translateY(-1px);
+	}
+
+	.header-btn svg {
+		width: 14px;
+		height: 14px;
 	}
 
 	.compact-list {

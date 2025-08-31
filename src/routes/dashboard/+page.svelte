@@ -3,6 +3,8 @@
 	import DashboardStats from '$lib/components/dashboard/DashboardStats.svelte';
 	import RecentActivity from '$lib/components/dashboard/RecentActivity.svelte';
 	import TankManagement from '$lib/components/dashboard/TankManagement.svelte';
+	import TankStatus from '$lib/components/dashboard/TankStatus.svelte';
+	import FuelChart from '$lib/components/dashboard/FuelChart.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import dashboardStore, { 
 		dashboardStats, 
@@ -53,6 +55,12 @@
 		loading={$dashboardLoading === 'loading'} 
 	/>
 
+	<!-- Tank Status -->
+	<TankStatus />
+
+	<!-- Fuel Usage Chart -->
+	<FuelChart />
+
 	<!-- Main Dashboard Content -->
 	<div class="dashboard-content">
 		<!-- Recent Activity Feed -->
@@ -64,7 +72,7 @@
 		</div>
 	</div>
 
-	<!-- Tank Status Overview -->
+	<!-- Tank Management -->
 	<TankManagement />
 
 </div>
@@ -77,7 +85,7 @@
 		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1rem;
 	}
 
 	.dashboard-header {
@@ -143,6 +151,7 @@
 
 	/* Dashboard Content */
 	.dashboard-content {
+		margin-top: 0.5rem;
 		margin-bottom: 0.5rem;
 	}
 
@@ -156,7 +165,7 @@
 	@media (max-width: 768px) {
 		.dashboard-page {
 			padding: 0;
-			gap: 1rem;
+			gap: 0.5rem;
 		}
 
 		.dashboard-header {
@@ -186,7 +195,7 @@
 		.error-content {
 			flex-direction: column;
 			align-items: flex-start;
-			gap: 0.75rem;
+			gap: 0.5rem;
 		}
 	}
 

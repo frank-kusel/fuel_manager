@@ -277,7 +277,7 @@
 
 	/* Group headers */
 	.vehicle-table tbody tr.group-header td {
-		background: var(--background-200, #f9fafb);
+		background: var(--gray-100, #f9fafb);
 	}
 	
 	.group-title {

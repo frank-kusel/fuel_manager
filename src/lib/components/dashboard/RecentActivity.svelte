@@ -364,8 +364,10 @@
 		flex-direction: column;
 		padding: 0.5rem;
 		border-radius: 1.5rem;
-		background: var(--gray-100);
+		background: var(--gray-200);
 		margin: -0.5rem;
+		margin-top: 0.5rem;
+		margin-bottom: 0.5rem;
 	}
 
 	.activity-header {
@@ -376,7 +378,7 @@
 		padding: 1rem 0.5rem;
 		position: sticky;
 		top: 0;
-		background: var(--gray-100);
+		background: var(--gray-200);
 		z-index: 20;
 		border-bottom: 1px solid #e5e7eb;
 	}
@@ -511,9 +513,8 @@
 		font-size: 1rem;
 		font-weight: 700;
 		color: #111827;
-		line-height: 1.2;
 		display: flex;
-		align-items: center;
+		align-items: bottom;
 		gap: 0.5rem;
 	}
 
@@ -523,13 +524,13 @@
 
 	.vehicle-code {
 		color: #9ca3af;
-		font-weight: 500;
+		font-weight: 400;
 	}
 
 	.vehicle-avg {
-		color: #9ca3af;
-		font-weight: 500;
+		color: var(--gray-900);
 		font-size: 0.875rem;
+		font-weight: 400;
 	}
 
 	.avg-unit {

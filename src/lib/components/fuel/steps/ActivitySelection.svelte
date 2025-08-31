@@ -239,7 +239,7 @@
 		margin: 0;
 		padding: 1rem;
 		text-align: center;
-		background: var(--background-200, #f9fafb);
+		background: var(--gray-100, #f9fafb);
 		border-radius: 8px;
 	}
 
