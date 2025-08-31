@@ -178,9 +178,9 @@
 
 					<!-- Daily summary stats -->
 					<div class="daily-summary">
+						<div class="entry-count-circle">{daySummary.entries.length}</div>
 						<div class="total-fuel-value">
 							<div class="fuel-amount-container">
-								<span class="entry-count-inline">#{daySummary.entries.length}</span>
 								<span class="total-fuel-amount">{daySummary.totalFuel.toFixed(1)}</span>
 								<span class="total-fuel-unit">L</span>
 							</div>
@@ -343,11 +343,28 @@
 	}
 
 	.daily-summary {
+		position: relative;
 		text-align: center;
 		margin-bottom: 1.5rem;
 		padding: 1.5rem;
 		background: #f9fafb;
 		border-radius: 1rem;
+	}
+
+	.entry-count-circle {
+		position: absolute;
+		top: 1rem;
+		left: 1rem;
+		width: 2rem;
+		height: 2rem;
+		background: #3b82f6;
+		color: white;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.875rem;
+		font-weight: 600;
 	}
 
 
@@ -362,14 +379,6 @@
 		gap: 0.5rem;
 	}
 	
-	.entry-count-inline {
-		font-size: 1rem;
-		font-weight: 500;
-		color: #9ca3af;
-		opacity: 0.6;
-		align-self: flex-start;
-		margin-top: 0.5rem;
-	}
 
 	.total-fuel-amount {
 		font-size: 3.75rem;
@@ -466,16 +475,15 @@
 	}
 	
 	.entry-vehicle-name {
-		font-size: 0.875rem;
+		font-size: 0.8rem;
 		color: #6b7280;
 		margin: 0;
 	}
 	
 	.entry-time-expanded {
-		font-size: 0.75rem;
+		font-size: 0.8rem;
 		color: #9ca3af;
 		font-weight: 500;
-		margin: 0;
 		opacity: 0.8;
 	}
 
@@ -513,7 +521,7 @@
 
 	.entry-card.expanded .entry-card-details {
 		max-height: 400px;
-		padding: 1rem 1rem 0.5rem;
+		padding: 1rem;
 		border-top: 1px solid #e5e7eb;
 	}
 
@@ -561,15 +569,17 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 0.25rem 0;
 		margin-top: 0.25rem;
 	}
 
 	.context-info {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 1rem;
 		font-size: 0.875rem;
+		border-radius: 0.5rem;
+		background-color: var(--gray-50);
+		padding: 0.5rem;
 	}
 
 	.context-value {
