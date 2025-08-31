@@ -145,26 +145,27 @@
 			<small>Add vehicles to your fleet to begin fuel entries</small>
 		</div>
 	{:else}
-		<div class="table-container">
-			<table id="vehicle-table">
+		<div class="vehicle-table-container">
+			<table class="vehicle-table">
+				<colgroup>
+					<col class="col-code">
+					<col class="col-name">
+					<col class="col-reg">
+				</colgroup>
 				<tbody>
 					{#each Object.entries(groupedVehicles) as [type, vehicleList]}
 						<!-- Type Group Header -->
 						<tr class="group-header">
-							<td colspan="3" class="group-title vehicle-type-{type.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')}">
-								<div class="group-content">
-									<span class="group-label">{type}</span>
-								</div>
+							<td colspan="3" class="group-title">
+								<span class="group-label">{type}</span>
 							</td>
 						</tr>
 						
 						<!-- Vehicles in this type group -->
 						{#each vehicleList as vehicle (vehicle.id)}
 							<tr 
-								class="vehicle-row clickable vehicle-type-{(vehicle.type || 'other').toLowerCase().replace(/\\s+/g, '-').replace(/[()]/g, '')} {selectedVehicle?.id === vehicle.id ? 'selected' : ''}"
-								onclick={() => {
-									handleVehicleSelect(vehicle);
-								}}
+								class="vehicle-row {selectedVehicle?.id === vehicle.id ? 'selected' : ''}"
+								onclick={() => handleVehicleSelect(vehicle)}
 							>
 								<td class="vehicle-code">{vehicle.code || 'VEH'}</td>
 								<td class="vehicle-name">{vehicle.name || `${vehicle.make || ''} ${vehicle.model || ''}`.trim()}</td>
@@ -232,69 +233,55 @@
 		flex-shrink: 0;
 	}
 
-	/* Ultra-clean table container */
-	.table-container {
+	/* Clean table container */
+	.vehicle-table-container {
 		background: transparent;
 		margin: 0;
 	}
 
-	/* Ultra-clean table design with subtle row borders */
-	:global(#vehicle-table) {
+	/* Clean table design */
+	.vehicle-table {
 		width: 100%;
 		border-collapse: separate;
 		border-spacing: 0;
 		table-layout: fixed;
 	}
 
-	:global(#vehicle-table th) {
-		padding: 0.75rem 0;
-		text-align: left;
-		border: none;
-		background: transparent;
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: #9ca3af;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		line-height: 1;
-	}
+	/* Column widths using colgroup - Desktop */
+	.col-code { width: 15%; }
+	.col-name { width: 60%; }
+	.col-reg { width: 25%; }
 
-	:global(#vehicle-table td) {
+	.vehicle-table td {
 		padding: 0.75rem 0.5rem;
 		text-align: left;
 		border: none;
 		font-size: 1rem;
 		vertical-align: middle;
-	}
-
-	/* Subtle row lines for all rows */
-	:global(#vehicle-table tbody tr) {
 		border-bottom: 1px solid rgba(248, 250, 252, 0.8);
 	}
 
-	:global(#vehicle-table tbody tr.clickable) {
+	.vehicle-table tbody tr.vehicle-row {
 		cursor: pointer;
 		transition: all 0.15s ease;
-		border-bottom-color: rgba(241, 245, 249, 0.6);
 	}
 
-	:global(#vehicle-table tbody tr.clickable:hover) {
+	.vehicle-table tbody tr.vehicle-row:hover {
 		background: rgba(0, 0, 0, 0.02);
 		border-bottom-color: rgba(203, 213, 225, 0.4);
 	}
 
-	:global(#vehicle-table tbody tr:last-child) {
+	.vehicle-table tbody tr:last-child td {
 		border-bottom: none;
 	}
 
-	/* Clean group headers */
-	:global(#vehicle-table tbody tr.group-header) {
-		background: transparent;
-		border: none;
+	/* Group headers */
+	.vehicle-table tbody tr.group-header td {
+		background: var(--background-200, #f9fafb);
 	}
 	
 	.group-title {
-		padding: 2rem 0 1rem 0;
+		padding: 1rem;
 		font-size: 0.8125rem;
 		font-weight: 600;
 		color: #6b7280;
@@ -318,48 +305,44 @@
 		letter-spacing: 0.1em;
 	}
 
-	/* Clean vehicle rows - selected state */
-	:global(#vehicle-table tbody tr.vehicle-row.selected) {
+	/* Selected vehicle row */
+	.vehicle-table tbody tr.vehicle-row.selected {
 		background: rgba(37, 99, 235, 0.08);
 		border-radius: 0.5rem;
-		border-bottom-color: rgba(37, 99, 235, 0.2);
 	}
 
-	:global(#vehicle-table tbody tr.vehicle-row.selected .vehicle-code) {
+	.vehicle-table tbody tr.vehicle-row.selected .vehicle-code {
 		color: #2563eb;
 		font-weight: 600;
 	}
 
-	:global(#vehicle-table tbody tr.vehicle-row.selected .vehicle-name) {
+	.vehicle-table tbody tr.vehicle-row.selected .vehicle-name {
 		color: #1e293b;
 		font-weight: 500;
 	}
 
-	:global(#vehicle-table tbody tr.vehicle-row.selected .vehicle-reg) {
+	.vehicle-table tbody tr.vehicle-row.selected .vehicle-reg {
 		color: #475569;
 	}
 
-	/* Clean vehicle cell styling */
-	:global(#vehicle-table .vehicle-code) {
+	/* Cell styling */
+	.vehicle-code {
 		font-weight: 600;
 		color: #374151;
 		font-size: 1rem;
 		font-variant-numeric: tabular-nums;
 		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		width: 2rem;
-		min-width: 2rem;
-		max-width: 2rem;
 		text-align: left;
 		padding-left: 0.5rem;
 	}
 	
-	:global(#vehicle-table .vehicle-name) {
+	.vehicle-name {
 		font-weight: 400;
 		color: #111827;
 		font-size: 0.875rem;
 	}
 	
-	:global(#vehicle-table .vehicle-reg) {
+	.vehicle-reg {
 		font-size: 0.75rem;
 		color: #6b7280;
 		font-variant-numeric: tabular-nums;
@@ -575,25 +558,10 @@
 			font-size: 14px;
 		}
 
-		/* Mobile table column widths */
-		:global(#vehicle-table th:nth-child(1)),
-		:global(#vehicle-table td:nth-child(1)) { /* Code - Narrower */
-			width: 15%;
-		}
-
-		:global(#vehicle-table th:nth-child(2)),
-		:global(#vehicle-table td:nth-child(2)) { /* Name */
-			width: 45%;
-		}
-
-		:global(#vehicle-table th:nth-child(3)),
-		:global(#vehicle-table td:nth-child(3)) { /* Registration - Wider */
-			width: 37%;
-		}
-
-		:global(#vehicle-table .selected td:nth-child(1)) {
-			color: var(--gray-900, #0f172a);
-		}
+		/* Mobile column widths */
+		.col-code { width: 20%; }
+		.col-name { width: 45%; }
+		.col-reg { width: 35%; }
 
 		.summary-content {
 			flex-direction: column;
