@@ -289,6 +289,7 @@
 		letter-spacing: 0.1em;
 		border: none;
 		text-align: center;
+		border-radius: 1rem;
 	}
 	
 	.group-label {

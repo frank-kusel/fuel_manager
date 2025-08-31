@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 	import DashboardStats from '$lib/components/dashboard/DashboardStats.svelte';
 	import RecentActivity from '$lib/components/dashboard/RecentActivity.svelte';
 	import TankManagement from '$lib/components/dashboard/TankManagement.svelte';
@@ -10,23 +10,9 @@
 		dashboardError 
 	} from '$lib/stores/dashboard';
 
-	let refreshInterval: number | null = null;
-
 	// Load dashboard data on mount
 	onMount(async () => {
 		await dashboardStore.loadDashboardData();
-		
-		// Set up auto-refresh every 5 minutes
-		refreshInterval = window.setInterval(async () => {
-			await dashboardStore.loadDashboardData();
-		}, 5 * 60 * 1000);
-	});
-
-	// Cleanup on destroy
-	onDestroy(() => {
-		if (refreshInterval) {
-			clearInterval(refreshInterval);
-		}
 	});
 
 	async function handleRefresh() {
@@ -78,7 +64,7 @@
 		</div>
 	</div>
 
-	<!-- Tank Management Section -->
+	<!-- Tank Status Overview -->
 	<TankManagement />
 
 </div>
@@ -99,14 +85,12 @@
 		justify-content: space-between;
 		align-items: flex-start;
 		gap: 1rem;
-		margin-bottom: 0.5rem;
 	}
 
 	.header-content h1 {
 		font-size: 2.25rem;
 		font-weight: 700;
 		color: var(--color-text-primary);
-		margin: 0 0 0.5rem 0;
 		line-height: 1.2;
 	}
 
@@ -159,7 +143,7 @@
 
 	/* Dashboard Content */
 	.dashboard-content {
-		margin-bottom: 1rem;
+		margin-bottom: 0.5rem;
 	}
 
 	.dashboard-section {

@@ -8,11 +8,11 @@
 :root {
 	/* Color System - Preserving from original fuel manager */
 	--primary: #16a34a;
-	--primary-light: #dcfce7;
+	--primary-light: #c7e6cc94;
 	--primary-dark: #15803d;
 	--secondary: #64748b;
 	--success: #16a34a;
-	--warning: #f59e0b;
+	--warning: #f59f0b;
 	--error: #dc2626;
 	--validation-error: #dc2626;
 	--validation-warning: #f59e0b;

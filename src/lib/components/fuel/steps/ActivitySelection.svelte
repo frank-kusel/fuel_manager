@@ -256,8 +256,8 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 0.75rem;
-		background: transparent;
-		border: 1px solid #f1f5f9;
+		background: var(--gray-50);
+		border: 1px solid var(--gray-200);
 		border-radius: 8px;
 		cursor: pointer;
 		transition: all 0.15s ease;

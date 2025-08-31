@@ -159,52 +159,55 @@
 </script>
 
 <div class="tank-management">
-	<div class="section-header">
-		<h2>Tank Management</h2>
-		<div class="actions">
-			<button class="action-btn" onclick={() => showDipstickForm = !showDipstickForm}>
-				📏 Dipstick
-			</button>
-			<button class="action-btn" onclick={() => showRefillForm = !showRefillForm}>
-				🚚 Refill
-			</button>
-		</div>
-	</div>
 	
 	{#if loading}
 		<div class="loading">Loading tank data...</div>
 	{:else}
 		<!-- Tank Status Overview -->
 		<div class="tank-overview">
-			<Card>
-				<h3>Tank Status</h3>
-				<div class="status-grid">
-					<div class="status-item">
-						<span class="label">Calculated Level</span>
-						<span class="value primary">{formatNumber(tankStatus.current_calculated_level)} L</span>
-						<div class="tank-bar">
-							<div class="tank-fill" style="width: {tankStatus.tank_percentage}%"></div>
+			<div class="tank-status-content">
+				<div class="tank-header">
+					<h3>Fuel Tank</h3>
+					<div class="level-value">{formatNumber(tankStatus.current_calculated_level)}<span class="unit">L</span></div>
+				</div>
+				
+				<div class="tank-bar">
+					<div class="tank-fill" style="width: {tankStatus.tank_percentage}%"></div>
+				</div>
+				
+				{#if tankStatus.last_dipstick_level}
+					<div class="variance-compact {getVarianceClass(tankStatus.variance_percentage)}">
+						<div class="variance-info">
+							<span class="dipstick-value">Dipstick: {formatNumber(tankStatus.last_dipstick_level)}L</span>
+							<span class="variance-amount">{tankStatus.variance > 0 ? '+' : ''}{formatNumber(Math.abs(tankStatus.variance))}L</span>
 						</div>
-						<span class="percentage">{tankStatus.tank_percentage?.toFixed(1)}% of capacity</span>
-					</div>
-					
-					<div class="status-item">
-						<span class="label">Last Dipstick Reading</span>
-						<span class="value">{tankStatus.last_dipstick_level ? formatNumber(tankStatus.last_dipstick_level) + ' L' : 'No reading'}</span>
 						{#if tankStatus.last_dipstick_date}
-							<span class="date">{formatDate(tankStatus.last_dipstick_date)}</span>
+							<div class="variance-date">{formatDate(tankStatus.last_dipstick_date)}</div>
 						{/if}
 					</div>
-					
-					<div class="status-item">
-						<span class="label">Variance</span>
-						<span class="value variance {getVarianceClass(tankStatus.variance_percentage)}">
-							{tankStatus.variance > 0 ? '+' : ''}{formatNumber(tankStatus.variance)} L
-						</span>
-						<span class="percentage">{tankStatus.variance_percentage?.toFixed(1)}%</span>
+				{:else}
+					<div class="no-dipstick-compact">
+						<span class="no-dipstick-text">No dipstick reading</span>
+						<span class="no-dipstick-prompt">Take reading to verify</span>
 					</div>
+				{/if}
+				
+				<div class="tank-actions">
+					<button class="action-btn" onclick={() => showDipstickForm = !showDipstickForm}>
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+						</svg>
+						Dipstick Reading
+					</button>
+					<button class="action-btn" onclick={() => showRefillForm = !showRefillForm}>
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M14 20h8v-4l-8-8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8l8 8v2z"/>
+							<path d="m7 7 0 0"/>
+						</svg>
+						Tank Refill
+					</button>
 				</div>
-			</Card>
+			</div>
 		</div>
 		
 		<!-- Quick Entry Forms -->
@@ -319,48 +322,42 @@
 			</Card>
 		{/if}
 		
-		<!-- Recent History -->
+		<!-- Recent History - Compact -->
 		<div class="history-section">
-			<div class="history-column">
-				<Card>
+			<div class="history-card">
+				<div class="history-header">
 					<h4>Recent Dipstick Readings</h4>
-					{#if recentReadings.length > 0}
-						<div class="history-list">
-							{#each recentReadings as reading}
-								<div class="history-item">
-									<span class="date">{formatDate(reading.reading_date)}</span>
-									<span class="value">{formatNumber(reading.reading_value)} L</span>
-									{#if reading.notes}
-										<span class="notes">{reading.notes}</span>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					{:else}
-						<p class="no-data">No readings yet</p>
-					{/if}
-				</Card>
+				</div>
+				{#if recentReadings.length > 0}
+					<div class="compact-list">
+						{#each recentReadings.slice(0, 3) as reading}
+							<div class="compact-item">
+								<span class="item-date">{formatDate(reading.reading_date)}</span>
+								<span class="item-value">{formatNumber(reading.reading_value)}L</span>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="empty-state">No readings yet</div>
+				{/if}
 			</div>
 			
-			<div class="history-column">
-				<Card>
+			<div class="history-card">
+				<div class="history-header">
 					<h4>Recent Tank Refills</h4>
-					{#if recentRefills.length > 0}
-						<div class="history-list">
-							{#each recentRefills as refill}
-								<div class="history-item">
-									<span class="date">{formatDate(refill.delivery_date)}</span>
-									<span class="value">+{formatNumber(refill.litres_added)} L</span>
-									{#if refill.supplier}
-										<span class="supplier">{refill.supplier}</span>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					{:else}
-						<p class="no-data">No refills yet</p>
-					{/if}
-				</Card>
+				</div>
+				{#if recentRefills.length > 0}
+					<div class="compact-list">
+						{#each recentRefills.slice(0, 3) as refill}
+							<div class="compact-item">
+								<span class="item-date">{formatDate(refill.delivery_date)}</span>
+								<span class="item-value refill">+{formatNumber(refill.litres_added)}L</span>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="empty-state">No refills yet</div>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -368,9 +365,145 @@
 
 <style>
 	.tank-management {
-		margin-top: 2rem;
-		padding-top: 2rem;
-		border-top: 1px solid #e5e7eb;
+		margin-bottom: 2rem;
+	}
+
+	.tank-status-content {
+		background: var(--primary-light);
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.tank-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin-bottom: 0.75rem;
+	}
+
+	.tank-header h3 {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #374151;
+		margin: 0;
+		text-transform: uppercase;
+		letter-spacing: 0.025em;
+	}
+
+	.level-value {
+		font-size: 1.75rem;
+		font-weight: 700;
+		color: #111827;
+		line-height: 1;
+		font-family: inherit; /* Use same font as rest of card */
+	}
+
+	.unit {
+		font-size: 1rem;
+		font-weight: 500;
+		color: #6b7280;
+		margin-left: 0.25rem;
+	}
+
+
+	.tank-bar {
+		width: 100%;
+		height: 8px;
+		background: #e2e8f0;
+		border-radius: 4px;
+		overflow: hidden;
+		margin-bottom: 0.75rem;
+	}
+
+	.tank-fill {
+		height: 100%;
+		background: linear-gradient(90deg, #10b981, #059669);
+		transition: width 0.5s ease;
+	}
+
+	/* Variance Compact */
+	.variance-compact {
+		padding: 0.5rem 0.75rem;
+		border-radius: 6px;
+		border-left: 3px solid;
+		margin-bottom: 0.75rem;
+	}
+
+	.variance-compact.good {
+		border-left-color: #10b981;
+		background: #f0fdf4;
+	}
+
+	.variance-compact.warning {
+		border-left-color: #f59e0b;
+		background: #fffbeb;
+	}
+
+	.variance-compact.alert {
+		border-left-color: #ef4444;
+		background: #fef2f2;
+	}
+
+	.variance-info {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.25rem;
+	}
+
+	.dipstick-value {
+		font-size: 0.75rem;
+		color: #374151;
+		font-weight: 500;
+	}
+
+	.variance-amount {
+		font-size: 0.75rem;
+		font-weight: 600;
+		font-family: inherit; /* Use same font as rest of card */
+	}
+
+	.variance-compact.good .variance-amount {
+		color: #059669;
+	}
+
+	.variance-compact.warning .variance-amount {
+		color: #d97706;
+	}
+
+	.variance-compact.alert .variance-amount {
+		color: #dc2626;
+	}
+
+	.variance-date {
+		font-size: 0.625rem;
+		color: #9ca3af;
+	}
+
+	/* No Dipstick Compact */
+	.no-dipstick-compact {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		background: #f1f5f9;
+		border-radius: 6px;
+		padding: 0.5rem 0.75rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.no-dipstick-text {
+		font-size: 0.75rem;
+		color: #64748b;
+		font-weight: 500;
+	}
+
+	.no-dipstick-prompt {
+		font-size: 0.625rem;
+		color: #94a3b8;
+	}
+
+	.tank-actions {
+		display: flex;
 	}
 	
 	.section-header {
@@ -406,6 +539,9 @@
 		transition: all 0.2s ease;
 		font-weight: 500;
 		white-space: nowrap;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 	}
 	
 	.action-btn:hover {
@@ -420,76 +556,6 @@
 	
 	.tank-overview {
 		margin-bottom: 1.5rem;
-	}
-	
-	.status-grid {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 2rem;
-		padding: 1rem 0;
-	}
-	
-	.status-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-	
-	.status-item .label {
-		font-size: 0.875rem;
-		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-	
-	.status-item .value {
-		font-size: 1.5rem;
-		font-weight: 600;
-		color: #111827;
-	}
-	
-	.status-item .value.primary {
-		color: #f97316;
-	}
-	
-	.status-item .value.variance {
-		color: #111827;
-	}
-	
-	.status-item .value.variance.good {
-		color: #10b981;
-	}
-	
-	.status-item .value.variance.warning {
-		color: #f59e0b;
-	}
-	
-	.status-item .value.variance.alert {
-		color: #ef4444;
-	}
-	
-	.tank-bar {
-		width: 100%;
-		height: 8px;
-		background: #e5e7eb;
-		border-radius: 4px;
-		overflow: hidden;
-	}
-	
-	.tank-fill {
-		height: 100%;
-		background: linear-gradient(90deg, #f97316, #ea580c);
-		transition: width 0.3s ease;
-	}
-	
-	.percentage {
-		font-size: 0.75rem;
-		color: #6b7280;
-	}
-	
-	.date {
-		font-size: 0.75rem;
-		color: #9ca3af;
 	}
 	
 	/* Forms */
@@ -536,60 +602,74 @@
 		margin-top: 0.5rem;
 	}
 	
-	/* History */
+	/* History - Compact Design */
 	.history-section {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
-		gap: 1rem;
-		margin-top: 1.5rem;
+		gap: 0.5rem;
 	}
-	
-	.history-column h4 {
-		font-size: 1rem;
+
+	.history-card {
+		background: #f8fafc;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.history-header {
+		margin-bottom: 0.75rem;
+	}
+
+	.history-header h4 {
+		font-size: 0.875rem;
 		font-weight: 600;
 		color: #374151;
-		margin-bottom: 1rem;
+		margin: 0;
+		text-transform: uppercase;
+		letter-spacing: 0.025em;
 	}
-	
-	.history-list {
+
+	.compact-list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.375rem;
 	}
-	
-	.history-item {
+
+	.compact-item {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid #f3f4f6;
+		padding: 0.375rem 0;
+		border-bottom: 1px solid #e2e8f0;
 	}
-	
-	.history-item:last-child {
+
+	.compact-item:last-child {
 		border-bottom: none;
+		padding-bottom: 0;
 	}
-	
-	.history-item .date {
-		font-size: 0.875rem;
-		color: #6b7280;
-	}
-	
-	.history-item .value {
-		font-weight: 600;
-		color: #111827;
-	}
-	
-	.history-item .notes,
-	.history-item .supplier {
+
+	.item-date {
 		font-size: 0.75rem;
-		color: #9ca3af;
+		color: #64748b;
+		font-weight: 500;
 	}
-	
-	.no-data {
-		color: #9ca3af;
-		font-style: italic;
+
+	.item-value {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #374151;
+		font-family: inherit; /* Use same font as rest of card */
+	}
+
+	.item-value.refill {
+		color: #059669;
+	}
+
+	.empty-state {
+		color: #94a3b8;
+		font-size: 0.75rem;
 		text-align: center;
-		padding: 1rem;
+		padding: 1rem 0;
+		font-style: italic;
 	}
 	
 	.loading {
@@ -601,22 +681,26 @@
 	/* Mobile */
 	@media (max-width: 768px) {
 		.tank-management {
-			margin-top: 1.5rem;
-			padding-top: 1.5rem;
+			margin-bottom: 1.5rem;
 		}
 		
-		.section-header {
+		.tank-status-content {
+			padding: 0.75rem;
+		}
+
+		.tank-header {
 			flex-direction: column;
-			align-items: stretch;
-			gap: 1rem;
-			margin-bottom: 1rem;
+			align-items: center;
+			text-align: center;
+			gap: 0.5rem;
+			margin-bottom: 0.75rem;
 		}
 		
-		.section-header h2 {
-			font-size: 1.25rem;
+		.level-value {
+			font-size: 1.5rem;
 		}
 		
-		.actions {
+		.tank-actions {
 			display: grid;
 			grid-template-columns: 1fr 1fr;
 			gap: 0.75rem;
@@ -662,20 +746,21 @@
 			grid-template-columns: 1fr;
 			gap: 1rem;
 		}
-		
-		.history-item {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.25rem;
+
+		.history-card {
+			padding: 0.75rem;
 		}
 		
-		.history-item .date {
-			order: -1;
-			font-size: 0.75rem;
+		.compact-item {
+			padding: 0.25rem 0;
 		}
-		
-		.history-item .value {
-			font-size: 1rem;
+
+		.item-date {
+			font-size: 0.7rem;
+		}
+
+		.item-value {
+			font-size: 0.8rem;
 		}
 	}
 </style>
