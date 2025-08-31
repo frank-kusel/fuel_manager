@@ -76,7 +76,7 @@
 	
 	function formatOdometer(reading: number | null, unit: string | null): string {
 		if (reading === null) return 'Not set';
-		return `${new Intl.NumberFormat().format(reading)} ${unit || 'km'}`;
+		return `${new Intl.NumberFormat('en-US').format(reading)} ${unit || 'km'}`;
 	}
 	
 	function getFuelTypeIcon(fuelType: string): string {
@@ -282,7 +282,7 @@
 	
 	.group-title {
 		padding: 1rem;
-		font-size: 0.8125rem;
+		font-size: 1rem;
 		font-weight: 600;
 		color: #6b7280;
 		text-transform: uppercase;
@@ -291,18 +291,15 @@
 		text-align: center;
 	}
 	
-	.group-content {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-	
 	.group-label {
 		font-weight: 600;
 		color: #6b7280;
 		font-size: 1rem;
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
+		display: block;
+		text-align: center;
+		width: 100%;
 	}
 
 	/* Selected vehicle row */

@@ -169,7 +169,7 @@
 		<div class="progress-summary">
 			{#if progressItems.length > 0}
 				{#each progressItems as item, i}
-					{#if i > 0}<span class="progress-separator">•</span>{/if}
+					{#if i > 0}<span class="progress-separator"> • </span>{/if}
 					<span class="progress-item">{item}</span>
 				{/each}
 			{:else}
@@ -362,17 +362,53 @@
 					{/if}
 					
 					<!-- Odometer Info -->
-					{#if $workflowData.gaugeWorking && $workflowData.odometerStart !== null && $workflowData.odometerEnd !== null}
+					{#if $workflowData.odometerStart !== null}
 						<div class="review-row">
-							<span class="review-label">Distance</span>
-							<span class="review-value">{new Intl.NumberFormat().format($workflowData.odometerEnd - $workflowData.odometerStart)} km</span>
+							<span class="review-label">ODO Start</span>
+							<span class="review-value">{new Intl.NumberFormat('en-US').format($workflowData.odometerStart)} km</span>
 						</div>
+					{/if}
+					
+					{#if $workflowData.gaugeWorking && $workflowData.odometerEnd !== null}
+						<div class="review-row">
+							<span class="review-label">ODO End</span>
+							<span class="review-value">{new Intl.NumberFormat('en-US').format($workflowData.odometerEnd)} km</span>
+						</div>
+						
+						{#if $workflowData.odometerStart !== null}
+							<div class="review-row">
+								<span class="review-label">Distance</span>
+								<span class="review-value">{new Intl.NumberFormat('en-US').format($workflowData.odometerEnd - $workflowData.odometerStart)} km</span>
+							</div>
+						{/if}
+					{:else if !$workflowData.gaugeWorking}
+						<div class="review-row">
+							<span class="review-label">ODO Status</span>
+							<span class="review-value">Gauge broken</span>
+						</div>
+					{/if}
+					
+					<!-- Bowser Reading Info -->
+					{#if $workflowData.bowser}
+						{#if $workflowData.bowserReadingStart !== null}
+							<div class="review-row">
+								<span class="review-label">Bowser Start</span>
+								<span class="review-value">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format($workflowData.bowserReadingStart)} L</span>
+							</div>
+						{/if}
+						
+						{#if $workflowData.bowserReadingEnd !== null}
+							<div class="review-row">
+								<span class="review-label">Bowser End</span>
+								<span class="review-value">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format($workflowData.bowserReadingEnd)} L</span>
+							</div>
+						{/if}
 					{/if}
 					
 					<!-- Fuel Info - Highlighted -->
 					{#if $workflowData.bowser && $workflowData.litresDispensed}
 						<div class="fuel-total">
-							<span class="fuel-amount">{new Intl.NumberFormat().format($workflowData.litresDispensed)}</span>
+							<span class="fuel-amount">{new Intl.NumberFormat('en-US').format($workflowData.litresDispensed)}</span>
 							<span class="fuel-unit">L</span>
 						</div>
 					{/if}
@@ -638,26 +674,23 @@
 	.review-summary {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
-		margin-bottom: 2rem;
 	}
 	
 	.review-row {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 0.75rem 0;
-		border-bottom: 1px solid #f1f5f9;
+		padding: 0.25rem;
 	}
 	
 	.review-label {
-		font-size: 0.875rem;
-		color: #6b7280;
+		font-size: 1.25rem;
+		color: var(--gray-400);
 		font-weight: 500;
 	}
 	
 	.review-value {
-		font-size: 0.875rem;
+		font-size: 1.25rem;
 		color: #111827;
 		font-weight: 600;
 		text-align: right;
@@ -665,7 +698,7 @@
 	
 	.fuel-total {
 		text-align: center;
-		margin: 2rem 0;
+		margin: 1rem 0;
 	}
 	
 	.fuel-amount {

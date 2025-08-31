@@ -160,49 +160,41 @@
 	{:else if filteredActivitiesCount === 0}
 		<div class="empty-state">No activities found</div>
 	{:else}
-		<div class="table-container">
-			<table id="activity-table">
-				<tbody>
-					{#each Object.entries(groupedActivities) as [category, activityList]}
-						<!-- Category Group Header -->
-						<tr class="group-header">
-							<td colspan="2" class="group-title category-{category.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')}">
-								<div class="group-content">
-									<span class="group-label">{category}</span>
-								</div>
-							</td>
-						</tr>
-						
-						<!-- Activities in this category -->
+		<div class="activities-container">
+			{#each Object.entries(groupedActivities) as [category, activityList]}
+				<!-- Category Header -->
+				<div class="category-section">
+					<h3 class="category-title">{category}</h3>
+					
+					<!-- Activities Grid -->
+					<div class="activities-grid">
 						{#each activityList as activity (activity.id)}
-							<tr 
-								class="activity-row clickable category-{(activity.category || 'other').toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')} {selectedActivity?.id === activity.id ? 'selected' : ''}"
-								onclick={() => {
-									handleActivitySelect(activity);
-								}}
+							<button 
+								class="activity-card {selectedActivity?.id === activity.id ? 'selected' : ''}"
+								onclick={() => handleActivitySelect(activity)}
 							>
-								<td class="activity-name-cell">
-									<div class="activity-content">
-										<span class="activity-icon" style="color: {getActivityColor(activity.name)}">
-											{getActivityIcon(activity)}
-										</span>
-										<div class="activity-text">
-											<div class="activity-name">{activity.name}</div>
-											<div class="activity-codes">
-												<span class="activity-code">{activity.code}</span>
-												{#if activity.legacy}
-													<span class="activity-legacy">{activity.legacy}</span>
-												{/if}
-											</div>
+								<div class="activity-main">
+									<span class="activity-icon" style="color: {getActivityColor(activity.name)}">
+										{getActivityIcon(activity)}
+									</span>
+									<div class="activity-info">
+										<div class="activity-name">{activity.name}</div>
+										<div class="activity-meta">
+											<span class="activity-code">{activity.code}</span>
+											{#if activity.name_zulu}
+												<span class="activity-zulu">{activity.name_zulu}</span>
+											{/if}
 										</div>
 									</div>
-								</td>
-								<td class="activity-zulu">{activity.name_zulu || ''}</td>
-							</tr>
+								</div>
+								{#if selectedActivity?.id === activity.id}
+									<div class="selection-indicator">✓</div>
+								{/if}
+							</button>
 						{/each}
-					{/each}
-				</tbody>
-			</table>
+					</div>
+				</div>
+			{/each}
 		</div>
 	{/if}
 	
@@ -224,149 +216,135 @@
 		gap: 1rem;
 	}
 
-	/* Ultra-clean table container - matches vehicle table */
-	.table-container {
-		background: transparent;
-		margin: 0;
+	/* Activities container */
+	.activities-container {
+		display: flex;
+		flex-direction: column;
+		gap: 2rem;
 	}
 
-	/* Ultra-clean table design - matches vehicle table */
-	:global(#activity-table) {
-		width: 100%;
-		border-collapse: separate;
-		border-spacing: 0;
-		table-layout: fixed;
+	/* Category sections */
+	.category-section {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
 	}
 
-	:global(#activity-table th) {
-		padding: 0.75rem 0;
-		text-align: left;
-		border: none;
-		background: transparent;
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: #9ca3af;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		line-height: 1;
-	}
-
-	:global(#activity-table td) {
-		padding: 1rem 0.5rem;
-		text-align: left;
-		border: none;
-		font-size: 0.875rem;
-		vertical-align: middle;
-	}
-
-	/* Subtle row lines for all rows */
-	:global(#activity-table tbody tr) {
-		border-bottom: 1px solid rgba(248, 250, 252, 0.8);
-	}
-
-	:global(#activity-table tbody tr.clickable) {
-		cursor: pointer;
-		transition: all 0.15s ease;
-		border-bottom-color: rgba(241, 245, 249, 0.6);
-	}
-
-	:global(#activity-table tbody tr.clickable:hover) {
-		background: rgba(0, 0, 0, 0.02);
-		border-bottom-color: rgba(203, 213, 225, 0.4);
-	}
-
-	:global(#activity-table tbody tr:last-child) {
-		border-bottom: none;
-	}
-
-	/* Clean group headers */
-	:global(#activity-table tbody tr.group-header) {
-		background: transparent;
-		border: none;
-	}
-
-	.group-title {
-		padding: 2rem 0 1rem 0;
-		font-size: 0.8125rem;
+	.category-title {
+		font-size: 1rem;
 		font-weight: 600;
 		color: #6b7280;
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
-		border: none;
+		margin: 0;
+		padding: 1rem;
 		text-align: center;
+		background: var(--background-200, #f9fafb);
+		border-radius: 8px;
 	}
-	
-	.group-content {
+
+	/* Activities grid - two columns */
+	.activities-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.5rem;
+	}
+
+	/* Activity cards */
+	.activity-card {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-	}
-	
-	.group-label {
-		font-weight: 600;
-		color: #6b7280;
-		font-size: 1rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-	}
-	
-	.group-count {
-		color: #6b7280;
-		font-size: 0.7rem;
+		justify-content: space-between;
+		padding: 0.75rem;
+		background: transparent;
+		border: 1px solid #f1f5f9;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		text-align: left;
+		width: 100%;
 	}
 
-	/* Clean selected state - matches vehicle table */
-	:global(#activity-table tbody tr.activity-row.selected) {
-		background: rgba(37, 99, 235, 0.08);
-		border-radius: 0.5rem;
-		border-bottom-color: rgba(37, 99, 235, 0.2);
+	.activity-card:hover {
+		background: rgba(0, 0, 0, 0.02);
+		border-color: #e2e8f0;
 	}
 
-	:global(#activity-table tbody tr.activity-row.selected .activity-name) {
+	.activity-card.selected {
+		background: rgba(37, 99, 235, 0.06);
+		border-color: rgba(37, 99, 235, 0.2);
+	}
+
+	.activity-main {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.activity-icon {
+		font-size: 1.125rem;
+		flex-shrink: 0;
+		width: 1.5rem;
+		text-align: center;
+	}
+
+	.activity-info {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.activity-name {
+		font-weight: 500;
+		color: #374151;
+		font-size: 0.875rem;
+		line-height: 1.3;
+		margin-bottom: 0.25rem;
+	}
+
+	.activity-card.selected .activity-name {
 		color: #2563eb;
 		font-weight: 600;
 	}
 
-	:global(#activity-table tbody tr.activity-row.selected .activity-code) {
-		color: #1e293b;
-		font-weight: 500;
-	}
-
-	.activity-content {
+	.activity-meta {
 		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.activity-icon {
-		font-size: 16px;
-		flex-shrink: 0;
-		width: 20px;
-		text-align: center;
-	}
-
-	.activity-text {
-		flex: 1;
-	}
-
-	.activity-name {
-		font-weight: 600;
-		color: #374151;
-		font-size: 0.875rem;
-		margin-bottom: 2px;
-	}
-
-	.activity-codes {
-		display: flex;
-		gap: 0.5rem;
+		flex-direction: column;
+		gap: 0.125rem;
 	}
 
 	.activity-code {
-		font-family: monospace;
+		font-family: 'Inter', monospace;
 		font-weight: 500;
 		color: #6b7280;
-		font-size: 12px;
+		font-size: 0.6875rem;
 		text-transform: uppercase;
+		letter-spacing: 0.025em;
+	}
+
+	.activity-zulu {
+		font-size: 0.75rem;
+		color: #6b7280;
+		font-style: italic;
+		line-height: 1.2;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.selection-indicator {
+		color: #2563eb;
+		font-size: 1rem;
+		font-weight: bold;
+		flex-shrink: 0;
+		width: 1.25rem;
+		height: 1.25rem;
+		background: rgba(37, 99, 235, 0.1);
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	/* Clean selected summary - matches other tables */
@@ -404,35 +382,52 @@
 		font-weight: 400;
 	}
 
-	/* Clean mobile responsiveness - matches other tables */
+	/* Mobile responsiveness */
 	@media (max-width: 768px) {
-		:global(#activity-table th) {
-			padding: 0.625rem 0;
-			font-size: 0.625rem;
+		.activities-grid {
+			grid-template-columns: 1fr 1fr;
+			gap: 0.375rem;
 		}
 
-		:global(#activity-table td) {
-			padding: 0.875rem 0;
+		.activity-card {
+			padding: 0.625rem;
+		}
+
+		.activity-name {
 			font-size: 0.8125rem;
 		}
 
-		/* Mobile Activity Table Column Widths */
-		:global(#activity-table td:nth-child(1)) { /* Activity name */
-			width: 80%;
+		.activity-code {
+			font-size: 0.625rem;
 		}
 
-		:global(#activity-table td:nth-child(2)) { /* Zulu name */
-			width: 20%;
+		.activity-zulu {
+			font-size: 0.6875rem;
 		}
 	}
 
 	@media (max-width: 480px) {
-		:global(#activity-table th) {
-			padding: 0.5rem 0;
+		.activities-container {
+			gap: 1.5rem;
 		}
 
-		:global(#activity-table td) {
-			padding: 0.75rem 0;
+		.category-section {
+			gap: 0.75rem;
+		}
+
+		.activity-card {
+			padding: 0.5rem;
+		}
+
+		.activity-main {
+			gap: 0.5rem;
+		}
+
+		.activity-icon {
+			font-size: 1rem;
+		}
+
+		.activity-name {
 			font-size: 0.75rem;
 		}
 	}

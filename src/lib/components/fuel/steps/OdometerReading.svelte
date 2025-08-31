@@ -101,8 +101,8 @@
 				
 				<input 
 					type="number" 
-					inputmode="numeric" 
-					pattern="[0-9]*" 
+					inputmode="decimal" 
+					step="0.1"
 					bind:value={currentOdo}
 					placeholder="Old"
 					class="current-odo-input"
@@ -124,8 +124,8 @@
 				<div class="odo-card new-odo">
 					<input 
 						type="number" 
-						inputmode="numeric" 
-						pattern="[0-9]*" 
+						inputmode="decimal" 
+						step="0.1"
 						bind:value={newOdo}
 						placeholder="New"
 						class="new-odo-input"
@@ -287,7 +287,7 @@
 		text-align: center;
 		border: none;
 		background: transparent;
-		color: #1e293b;
+		color: var(--gray-500, #0f172a);
 		margin-bottom: 0.5rem;
 		font-variant-numeric: tabular-nums;
 		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -307,7 +307,7 @@
 		padding: 0.25rem 0.5rem;
 		border-radius: 0.25rem;
 		text-align: center;
-		margin-top: 0.5rem;
+		margin: 0.25rem;
 	}
 
 	.new-odo {

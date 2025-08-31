@@ -127,14 +127,14 @@
 		<div class="fuel-input-container">
 			<input 
 				type="number" 
-				inputmode="numeric" 
-				pattern="[0-9]*" 
+				inputmode="decimal" 
+				step="0.1"
 				bind:value={fuelAmount}
 				placeholder="Enter fuel"
 				class="fuel-input"
 				autocomplete="off"
 			/>
-			<div class="fuel-label">Litres dispensed</div>
+			<div class="fuel-label">Litres</div>
 			
 			<!-- Loading state below input to prevent jumping -->
 			{#if loading}
@@ -155,7 +155,8 @@
 					{#if isEditingStartReading}
 						<input 
 							type="number" 
-							inputmode="numeric" 
+							inputmode="decimal" 
+							step="0.1"
 							bind:value={startReading}
 							placeholder="Enter start reading"
 							class="start-reading-input"
@@ -192,7 +193,8 @@
 					{#if isEditingEndReading}
 						<input 
 							type="number" 
-							inputmode="numeric" 
+							inputmode="decimal" 
+							step="0.1"
 							bind:value={endReading}
 							placeholder="Enter end reading"
 							class="end-reading-input"
@@ -348,7 +350,7 @@
 	/* Bowser Readings Card - Minimal Design */
 	.calculations {
 		padding: 1rem;
-		background: white;
+		background: var(--gray-50, #f9fafb);
 		border: 1px solid #f1f5f9;
 		border-radius: 0.5rem;
 		display: flex;
@@ -358,7 +360,6 @@
 
 	.calc-header {
 		text-align: center;
-		margin-bottom: 0.75rem;
 		padding-bottom: 0.5rem;
 		border-bottom: 1px solid #f1f5f9;
 	}
@@ -524,11 +525,6 @@
 			padding: 2rem 1rem;
 			min-height: 100px;
 		}
-
-		.calculations {
-			margin: 0 -0.25rem;
-			padding: 1rem;
-		}
 		
 		.calc-header h3 {
 			font-size: 1.25rem;
@@ -543,11 +539,11 @@
 		}
 		
 		.calc-label {
-			font-size: 1rem;
+			font-size: 1.25rem;
 		}
 		
 		.calc-value {
-			font-size: 1.25rem;
+			font-size: 2rem;
 		}
 		
 		.start-reading-input,

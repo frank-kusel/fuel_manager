@@ -163,7 +163,7 @@
 	
 	function formatArea(area: number | null): string {
 		if (area === null) return 'Not specified';
-		return `${new Intl.NumberFormat().format(area)} ha`;
+		return `${new Intl.NumberFormat('en-US').format(area)} ha`;
 	}
 </script>
 
@@ -249,23 +249,26 @@
 				{searchTerm ? 'No fields found' : 'No fields available'}
 			</div>
 		{:else}
-			<div class="table-container">
-				<table id="field-table">
+			<div class="field-table-container">
+				<table class="field-table">
+					<colgroup>
+						<col class="col-name">
+						<col class="col-location">
+						<col class="col-area">
+					</colgroup>
 					<tbody>
 						{#each Object.entries(groupedFields) as [cropType, fieldList]}
 							<!-- Crop Type Group Header -->
 							<tr class="group-header">
-								<td colspan="3" class="group-title crop-type-{cropType.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')}">
-									<div class="group-content">
-										<span class="group-label">{cropType}</span>
-									</div>
+								<td colspan="3" class="group-title">
+									<span class="group-label">{cropType}</span>
 								</td>
 							</tr>
 							
 							<!-- Fields in this crop group -->
 							{#each fieldList as field (field.id)}
 								<tr 
-									class="field-row clickable crop-type-{(field.crop_type || 'other').toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '')} {selectedField?.id === field.id ? 'selected' : ''}"
+									class="field-row {selectedField?.id === field.id ? 'selected' : ''}"
 									onclick={() => selectField(field)}
 								>
 									<td class="field-name">{field.name}</td>
@@ -613,71 +616,57 @@
 		color: var(--gray-900, #0f172a);
 	}
 
-	/* Ultra-clean table container */
-	.table-container {
+	/* Clean table container */
+	.field-table-container {
 		background: transparent;
 		margin: 0;
 	}
 
-	/* Ultra-clean table design with subtle row lines */
-	:global(#field-table) {
+	/* Clean table design */
+	.field-table {
 		width: 100%;
 		border-collapse: separate;
 		border-spacing: 0;
 		table-layout: fixed;
 	}
 
-	:global(#field-table th) {
-		padding: 0.5rem;
-		text-align: left;
-		border: none;
-		background: transparent;
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: #9ca3af;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		line-height: 1;
-	}
+	/* Column widths using colgroup - Desktop (split in thirds) */
+	.col-name { width: 33.33%; }
+	.col-location { width: 33.33%; }
+	.col-area { width: 33.33%; }
 
-	:global(#field-table td) {
-		padding: 0.55rem;
+	.field-table td {
+		padding: 0.75rem 0.5rem;
 		text-align: left;
 		border: none;
-		font-size: 0.875rem;
+		font-size: 1rem;
 		vertical-align: middle;
-	}
-
-	/* Subtle row lines for all rows */
-	:global(#field-table tbody tr) {
 		border-bottom: 1px solid rgba(248, 250, 252, 0.8);
 	}
 
-	:global(#field-table tbody tr.clickable) {
-		cursor: pointer;
-		transition: all 0.15s ease;
-		border-bottom-color: rgba(241, 245, 249, 0.6);
+	/* Right align the area column specifically */
+	.field-table td.field-area {
+		text-align: right;
 	}
 
-	:global(#field-table tbody tr.clickable:hover) {
+	.field-table tbody tr.field-row {
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.field-table tbody tr.field-row:hover {
 		background: rgba(0, 0, 0, 0.02);
 		border-bottom-color: rgba(203, 213, 225, 0.4);
 	}
 
-	:global(#field-table tbody tr:last-child) {
+	.field-table tbody tr:last-child td {
 		border-bottom: none;
 	}
 
-	/* Clean selected state */
-	:global(#field-table tbody tr.selected) {
-		background: rgba(37, 99, 235, 0.08);
-		border-radius: 0.5rem;
-		border-bottom-color: rgba(37, 99, 235, 0.2);
-	}
-
-	/* Group Headers for Fields - Match vehicle table style */
-	.group-header {
-		background: transparent !important;
+	/* Group headers */
+	.field-table tbody tr.group-header td {
+		background: var(--background-200, #f9fafb);
+		border: none;
 	}
 	
 	.group-title {
@@ -691,36 +680,56 @@
 		text-align: center;
 	}
 	
-	.group-content {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-	
 	.group-label {
 		font-weight: 600;
 		color: #6b7280;
 		font-size: 1rem;
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
+		display: block;
+		text-align: center;
+		width: 100%;
 	}
 
-	/* Field rows */
-	.field-row {
-		min-height: 48px; /* Touch-friendly height */
+	/* Selected field row */
+	.field-table tbody tr.field-row.selected {
+		background: rgba(37, 99, 235, 0.08);
+		border-radius: 0.5rem;
 	}
 
-
-
-	.field-code {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
+	.field-table tbody tr.field-row.selected .field-name {
+		color: #2563eb;
 		font-weight: 600;
 	}
 
-	.field-icon {
-		font-size: 1.25rem;
+	.field-table tbody tr.field-row.selected .field-location {
+		color: #1e293b;
+		font-weight: 500;
+	}
+
+	.field-table tbody tr.field-row.selected .field-area {
+		color: #475569;
+	}
+
+	/* Cell styling */
+	.field-name {
+		font-weight: 500;
+		color: #111827;
+		font-size: 0.875rem;
+	}
+	
+	.field-location {
+		font-weight: 400;
+		color: #6b7280;
+		font-size: 0.875rem;
+	}
+	
+	.field-area {
+		font-size: 0.875rem;
+		color: #6b7280;
+		font-variant-numeric: tabular-nums;
+		font-weight: 400;
+		text-align: right;
 	}
 
 	/* Zones Grid */
@@ -960,9 +969,20 @@
 
 	/* Mobile Responsiveness */
 	@media (max-width: 768px) {
-		.fields-grid {
-			grid-template-columns: 1fr;
+		.field-table-container {
+			margin: 0;
 		}
+
+		.field-name,
+		.field-location,
+		.field-area {
+			font-size: 14px;
+		}
+
+		/* Mobile column widths - equal thirds */
+		.col-name { width: 33.33%; }
+		.col-location { width: 33.33%; }
+		.col-area { width: 33.33%; }
 		
 		.zones-grid {
 			grid-template-columns: repeat(2, 1fr);
