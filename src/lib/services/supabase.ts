@@ -505,31 +505,39 @@ class SupabaseService {
 			const today = new Date().toISOString().split('T')[0];
 			const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 			
-			// Calculate week start (Monday)
-			const now = new Date();
-			const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-			const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days to Monday
-			const weekStart = new Date(now.getTime() - daysToSubtract * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+			// Calculate previous month dates
+			const prevMonthStart = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().split('T')[0];
+			const prevMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0];
+			
+			// Calculate past 7 days start
+			const past7DaysStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 			
 			// Get fuel entries for different periods
-			const [dailyFuel, weeklyFuel, monthlyFuel, recentEntries, bowsers, vehicles, tankStatus] = await Promise.all([
+			const [dailyFuel, weeklyFuel, monthlyFuel, previousMonthFuel, recentEntries, bowsers, vehicles, tankStatus] = await Promise.all([
 				// Today's fuel usage
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed')
 					.gte('entry_date', today),
 				
-				// This week's fuel usage
+				// Past 7 days fuel usage
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed, odometer_start, odometer_end')
-					.gte('entry_date', weekStart),
+					.gte('entry_date', past7DaysStart),
 				
 				// This month's fuel usage
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed, odometer_start, odometer_end, vehicle_id, fuel_consumption_l_per_100km, gauge_working')
 					.gte('entry_date', monthStart),
+				
+				// Previous month's fuel usage
+				client
+					.from('fuel_entries')
+					.select('litres_used, litres_dispensed')
+					.gte('entry_date', prevMonthStart)
+					.lte('entry_date', prevMonthEnd),
 				
 				// Recent fuel entries with vehicle info - using LEFT JOINs to include entries with missing relationships
 				client
@@ -569,6 +577,7 @@ class SupabaseService {
 			const dailyUsage = dailyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
 			const weeklyUsage = weeklyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
 			const monthlyUsage = monthlyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+			const previousMonthUsage = previousMonthFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
 			
 			// Calculate distance traveled this month (only valid entries)
 			const monthlyDistance = monthlyFuel.data?.reduce((sum, entry) => {
@@ -614,6 +623,7 @@ class SupabaseService {
 					dailyFuel: Math.round(dailyUsage * 100) / 100,
 					weeklyFuel: Math.round(weeklyUsage * 100) / 100,
 					monthlyFuel: Math.round(monthlyUsage * 100) / 100,
+					previousMonthFuel: Math.round(previousMonthUsage * 100) / 100,
 					
 					// Distance and efficiency
 					monthlyDistance: Math.round(monthlyDistance),
@@ -860,6 +870,21 @@ class SupabaseService {
 				.eq('active', true)
 				.order('average_consumption_l_per_100km', { ascending: true })
 				.limit(limit)
+		);
+	}
+
+	// Get fuel records for a specific vehicle
+	async getVehicleFuelRecords(vehicleId: string, startDate: string, endDate: string): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('fuel_entries')
+				.select('id, entry_date, litres_dispensed, litres_used, time, vehicle_id')
+				.eq('vehicle_id', vehicleId)
+				.gte('entry_date', startDate)
+				.lte('entry_date', endDate)
+				.order('entry_date', { ascending: false })
+				.order('time', { ascending: false })
 		);
 	}
 

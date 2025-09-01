@@ -25,7 +25,7 @@
 	<div class="secondary-metrics">
 		<!-- Weekly Summary -->
 		<div class="metric-card compact">
-			<div class="compact-header">This Week</div>
+			<div class="compact-header">Past 7 Days</div>
 			{#if loading}
 				<div class="compact-skeleton"></div>
 			{:else}
@@ -45,14 +45,14 @@
 			{/if}
 		</div>
 
-		<!-- Fleet Efficiency -->
+		<!-- Previous Month -->
 		<div class="metric-card compact">
-			<div class="compact-header">Fleet Average</div>
+			<div class="compact-header">Previous Month</div>
 			{#if loading}
 				<div class="compact-skeleton"></div>
 			{:else}
-				<div class="compact-value">{formatDecimal(stats?.averageEfficiency || 0)}</div>
-				<div class="compact-subtitle">L/100km</div>
+				<div class="compact-value">{formatDecimal(stats?.previousMonthFuel || 0)}L</div>
+				<div class="compact-subtitle">fuel used</div>
 			{/if}
 		</div>
 
@@ -89,11 +89,14 @@
 		padding: 1em;
 		text-align: left;
 		background: var(--gray-50);
+		border: 1px solid transparent;
+		transition: all 0.2s ease;
 	}
 
 	.metric-card.compact:hover {
 		border-color: #f97316;
 		transform: translateY(-1px);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 	}
 
 	.compact-header {
@@ -115,16 +118,6 @@
 		font-size: 1rem;
 		color: var(--gray-400);
 		font-weight: 600;
-	}
-
-	/* Loading States */
-	.metric-skeleton {
-		height: 3rem;
-		background: linear-gradient(90deg, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.3) 75%);
-		background-size: 200% 100%;
-		animation: loading 1.5s infinite;
-		border-radius: 8px;
-		margin-bottom: 0.25rem;
 	}
 
 	.compact-skeleton {
@@ -151,16 +144,49 @@
 	@media (max-width: 768px) {
 		.secondary-metrics {
 			grid-template-columns: repeat(2, 1fr);
+			gap: 0.75rem;
+		}
+
+		.metric-card.compact {
+			padding: 0.875rem;
+			background: var(--primary-light);
+			border-radius: 10px;
+		}
+
+		.compact-header {
+			font-size: 0.875rem;
+			margin-bottom: 0.5rem;
+		}
+
+		.compact-value {
+			font-size: 1.75rem;
+			margin-bottom: 0.375rem;
+		}
+
+		.compact-subtitle {
+			font-size: 0.875rem;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.secondary-metrics {
 			gap: 0.5rem;
 		}
 
 		.metric-card.compact {
-			padding: 0.5rem;
-			background: var(--primary-light);
+			padding: 0.75rem;
+		}
+
+		.compact-header {
+			font-size: 0.8rem;
 		}
 
 		.compact-value {
-			font-size: 1.8rem;
+			font-size: 1.5rem;
+		}
+
+		.compact-subtitle {
+			font-size: 0.8rem;
 		}
 	}
 

@@ -167,6 +167,7 @@ export interface DashboardStats {
 	dailyFuel: number;
 	weeklyFuel: number;
 	monthlyFuel: number;
+	previousMonthFuel: number;
 	
 	// Distance and efficiency
 	monthlyDistance: number;

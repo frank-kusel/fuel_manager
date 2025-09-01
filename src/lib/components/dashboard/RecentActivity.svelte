@@ -364,7 +364,7 @@
 		flex-direction: column;
 		padding: 0.5rem;
 		border-radius: 1.5rem;
-		background: var(--gray-200);
+		background: var(--gray-100);
 		margin: -0.5rem;
 		margin-top: 0.5rem;
 		margin-bottom: 0.5rem;
@@ -378,7 +378,7 @@
 		padding: 1rem 0.5rem;
 		position: sticky;
 		top: 0;
-		background: var(--gray-200);
+		background: var(--gray-100);
 		z-index: 20;
 		border-bottom: 1px solid #e5e7eb;
 	}
