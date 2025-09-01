@@ -31,7 +31,8 @@
       "Bash(for file in src/lib/components/fuel/steps/*.svelte)",
       "Bash(do sed -i \"s/color: var(--gray-900, #0f172a);/color: white;/g\" \"$file\")",
       "Bash(done)",
-      "mcp__supabase__apply_migration"
+      "mcp__supabase__apply_migration",
+      "Bash(find:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",

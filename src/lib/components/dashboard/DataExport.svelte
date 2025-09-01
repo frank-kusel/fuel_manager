@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import exportService from '$lib/services/export';
+	import { PDFExportService } from '$lib/services/pdf-export';
 
 	// Initialize date range with current month immediately
 	const now = new Date();
@@ -135,21 +136,20 @@
 		pdfExportSuccess = false;
 
 		try {
-			console.log('Starting monthly PDF export process...');
+			console.log('Starting enhanced PDF export with reconciliation data...');
 			
 			// Import supabase service dynamically
 			const { default: supabaseService } = await import('$lib/services/supabase');
-			console.log('Supabase service imported for PDF export');
 			
-			// Perform export
-			const result = await exportService.exportMonthlySummaryPDF(
+			// Use original export service with enhancements
+			const result = await exportService.exportMonthlySummaryPDFWithReconciliation(
 				selectedYear, 
 				selectedMonth, 
 				supabaseService,
 				'KCT Farming (Pty) Ltd'
 			);
 
-			console.log('Monthly PDF export result:', result);
+			console.log('Enhanced PDF export result:', result);
 
 			if (result.success) {
 				pdfExportSuccess = true;
@@ -161,7 +161,7 @@
 			}
 
 		} catch (error) {
-			console.error('Monthly PDF export error:', error);
+			console.error('Enhanced PDF export error:', error);
 			pdfExportError = error instanceof Error ? error.message : 'PDF export failed';
 		} finally {
 			isExportingPDF = false;

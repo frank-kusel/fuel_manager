@@ -502,11 +502,12 @@ class ExportService {
 			pdf.text(`Total Active Vehicles: ${data.length}`, 15, 60);
 			pdf.text(`Total Fuel Consumption: ${totalFuel.toFixed(2)} Litres`, 15, 66);
 			
-			// Professional table with registration after name
+			// Professional table with separate name and registration columns
 			const tableStartY = 78;
 			const tableData = data.map(vehicle => [
 				vehicle.code,
-				vehicle.name + (vehicle.registration ? ` (${vehicle.registration})` : ''),
+				vehicle.name,
+				vehicle.registration || '—',
 				vehicle.category,
 				vehicle.distance === '' ? '—' : vehicle.distance.toString(),
 				vehicle.fuel.toFixed(2),
@@ -525,35 +526,38 @@ class ExportService {
 				''
 			]);
 
-			// Scientific journal table style with flexible width
+			// Scientific journal table style with compact spacing
 			autoTable(pdf, {
 				startY: tableStartY,
-				head: [['Vehicle ID', 'Vehicle Name (Registration)', 'Classification', 'Distance', 'Fuel (L)', 'Efficiency*', 'Unit']],
+				head: [['Vehicle ID', 'Vehicle Name', 'Registration', 'Classification', 'Distance', 'Fuel (L)', 'Efficiency*', 'Unit']],
 				body: tableData,
 				theme: 'grid',
 				styles: {
-					fontSize: 8,
-					cellPadding: 2,
+					fontSize: 10,
+					cellPadding: 1,
 					lineColor: [200, 200, 200],
 					lineWidth: 0.1,
 					font: 'times',
-					textColor: [0, 0, 0]
+					textColor: [0, 0, 0],
+					minCellHeight: 3
 				},
 				headStyles: {
 					fillColor: [255, 255, 255],
 					textColor: [0, 0, 0],
 					fontStyle: 'bold',
-					fontSize: 8,
-					halign: 'center'
+					fontSize: 10,
+					halign: 'center',
+					minCellHeight: 4
 				},
 				columnStyles: {
-					0: { halign: 'center' }, // Code
-					1: { halign: 'left' }, // Name + Registration (flexible)
-					2: { halign: 'center' }, // Type
-					3: { halign: 'right' }, // Distance
-					4: { halign: 'right' }, // Fuel
-					5: { halign: 'right' }, // Consumption
-					6: { halign: 'center' } // Unit
+					0: { halign: 'center' }, // Vehicle ID
+					1: { halign: 'left' }, // Vehicle Name
+					2: { halign: 'center' }, // Registration
+					3: { halign: 'center' }, // Classification
+					4: { halign: 'right' }, // Distance
+					5: { halign: 'right' }, // Fuel
+					6: { halign: 'right' }, // Efficiency
+					7: { halign: 'center' } // Unit
 				},
 				didParseCell: function (data: any) {
 					// Style the subtotal row (last row)
@@ -650,6 +654,375 @@ class ExportService {
 				error: error instanceof Error ? error.message : 'Monthly summary PDF export failed' 
 			};
 		}
+	}
+
+	// Enhanced monthly summary PDF export with reconciliation data
+	async exportMonthlySummaryPDFWithReconciliation(
+		year: number,
+		month: number,
+		supabaseService: any,
+		companyName?: string
+	): Promise<{ success: boolean; error?: string }> {
+		try {
+			// Fetch vehicle data
+			const vehicleResult = await this.getMonthlySummaryForExport(year, month, supabaseService);
+			
+			if (vehicleResult.error || !vehicleResult.data) {
+				return { success: false, error: vehicleResult.error || 'No vehicle data found' };
+			}
+
+			// Fetch reconciliation data for the month
+			const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+			const monthEnd = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+			
+			let reconciliationData = {
+				fuelDispensed: 0,
+				bowserStart: 0,
+				bowserEnd: 0,
+				tankStartCalculated: 0,
+				tankEndCalculated: 0,
+				lastDipReading: 0,
+				tankActivities: [],
+				reconciled: false
+			};
+
+			try {
+				// Performance optimization: Execute all reconciliation queries in parallel
+				const [fuelReconResult, tankStartReconResult, tankEndReconResult, dipReadingResult, tankActivitiesResult] = await Promise.all([
+					// Fuel reconciliation data
+					supabaseService.getDateRangeReconciliationData(monthStart, monthEnd),
+					
+					// Tank reconciliation data for month start (opening level)
+					supabaseService.query(() =>
+						supabaseService.ensureInitialized()
+							.from('tank_reconciliations')
+							.select('*')
+							.eq('reconciliation_date', monthStart)
+							.maybeSingle()
+					),
+					
+					// Tank reconciliation data for month end (closing level)
+					supabaseService.query(() =>
+						supabaseService.ensureInitialized()
+							.from('tank_reconciliations')
+							.select('*')
+							.eq('reconciliation_date', monthEnd)
+							.maybeSingle()
+					),
+					
+					// Actual dip reading from tank_readings table (last reading of the month)
+					supabaseService.query(() =>
+						supabaseService.ensureInitialized()
+							.from('tank_readings')
+							.select('*')
+							.gte('reading_date', monthStart)
+							.lte('reading_date', monthEnd)
+							.order('reading_date', { ascending: false })
+							.limit(1)
+							.maybeSingle()
+					),
+					
+					// Tank activities (refills and adjustments) for the month
+					supabaseService.query(() =>
+						supabaseService.ensureInitialized()
+							.from('tank_refills')
+							.select('delivery_date, litres_added, invoice_number')
+							.gte('delivery_date', monthStart)
+							.lte('delivery_date', monthEnd)
+							.order('delivery_date', { ascending: true })
+					)
+				]);
+
+				// Process results
+				if (fuelReconResult.data) {
+					reconciliationData.fuelDispensed = fuelReconResult.data.fuelDispensed || 0;
+					reconciliationData.bowserStart = fuelReconResult.data.bowserStart || 0;
+					reconciliationData.bowserEnd = fuelReconResult.data.bowserEnd || 0;
+				}
+
+				if (tankStartReconResult.data) {
+					reconciliationData.tankStartCalculated = tankStartReconResult.data.calculated_level || 0;
+				}
+
+				if (tankEndReconResult.data) {
+					reconciliationData.tankEndCalculated = tankEndReconResult.data.calculated_level || 0;
+				}
+
+				if (dipReadingResult.data) {
+					reconciliationData.lastDipReading = dipReadingResult.data.reading_value || 0;
+				}
+
+				if (tankActivitiesResult.data) {
+					reconciliationData.tankActivities = tankActivitiesResult.data || [];
+				}
+
+			} catch (reconError) {
+				console.warn('Could not fetch reconciliation data:', reconError);
+			}
+
+			// Generate enhanced PDF with reconciliation data
+			await this.generateMonthlySummaryPDFWithReconciliation(
+				vehicleResult.data, 
+				reconciliationData, 
+				year, 
+				month, 
+				companyName
+			);
+			
+			return { success: true };
+			
+		} catch (error) {
+			return { 
+				success: false, 
+				error: error instanceof Error ? error.message : 'Enhanced PDF export failed' 
+			};
+		}
+	}
+
+	// Generate enhanced monthly summary PDF with reconciliation data (journal style)
+	async generateMonthlySummaryPDFWithReconciliation(
+		data: MonthlySummaryData[],
+		reconciliationData: any,
+		year: number,
+		month: number,
+		companyName: string = 'KCT Farming (Pty) Ltd'
+	): Promise<void> {
+		try {
+			// Create new PDF document
+			const pdf = new jsPDF('p', 'mm', 'a4');
+			const pageWidth = pdf.internal.pageSize.width;
+			const pageHeight = pdf.internal.pageSize.height;
+			
+			// Format month name
+			const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+				'July', 'August', 'September', 'October', 'November', 'December'];
+			const monthName = monthNames[month - 1];
+			
+			// Calculate total fuel consumption
+			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
+			const averageFuel = data.length > 0 ? totalFuel / data.length : 0;
+			
+			// Professional journal-style header
+			pdf.setFontSize(18);
+			pdf.setFont('times', 'bold');
+			pdf.text('Monthly Fuel Consumption Report', pageWidth / 2, 18, { align: 'center' });
+			
+			pdf.setFontSize(14);
+			pdf.setFont('times', 'normal');
+			pdf.text(companyName, pageWidth / 2, 26, { align: 'center' });
+			
+			pdf.setFontSize(12);
+			pdf.setFont('times', 'italic');
+			pdf.text(`${monthName} ${year}`, pageWidth / 2, 33, { align: 'center' });
+			
+			// Calculate variables needed for the new reconciliation sections below
+			const bowserDifference = reconciliationData.bowserEnd - reconciliationData.bowserStart;
+			const fuelVariance = bowserDifference - reconciliationData.fuelDispensed;
+			const labelX = 15;
+			const valueX = 75;
+			const detailsX = 130;
+			
+			// Start table directly after header
+			let yPos = 45;
+
+			// Professional table with separate name and registration columns
+			const tableStartY = yPos;
+			const tableData = data.map(vehicle => [
+				vehicle.code,
+				vehicle.name,
+				vehicle.registration || '—',
+				vehicle.category,
+				vehicle.distance === '' ? '—' : vehicle.distance.toString(),
+				vehicle.fuel.toFixed(2),
+				vehicle.consumption === '' ? '—' : vehicle.consumption.toString(),
+				vehicle.unit || '—'
+			]);
+			
+			// Add subtotal row
+			tableData.push([
+				'',
+				'',
+				'',
+				'',
+				'',
+				`${totalFuel.toFixed(2)}`,
+				'',
+				''
+			]);
+
+			// Scientific journal table style with compact spacing
+			autoTable(pdf, {
+				startY: tableStartY,
+				head: [['Vehicle ID', 'Vehicle Name', 'Registration', 'Classification', 'Distance', 'Fuel (L)', 'Efficiency*', 'Unit']],
+				body: tableData,
+				theme: 'grid',
+				styles: {
+					fontSize: 10,
+					cellPadding: 1,
+					lineColor: [200, 200, 200],
+					lineWidth: 0.1,
+					font: 'times',
+					textColor: [0, 0, 0],
+					minCellHeight: 3
+				},
+				headStyles: {
+					fillColor: [255, 255, 255],
+					textColor: [0, 0, 0],
+					fontStyle: 'bold',
+					fontSize: 10,
+					halign: 'center',
+					minCellHeight: 4
+				},
+				columnStyles: {
+					0: { halign: 'center' }, // Vehicle ID
+					1: { halign: 'left' }, // Vehicle Name
+					2: { halign: 'center' }, // Registration
+					3: { halign: 'center' }, // Classification
+					4: { halign: 'right' }, // Distance
+					5: { halign: 'right' }, // Fuel
+					6: { halign: 'right' }, // Efficiency
+					7: { halign: 'center' } // Unit
+				},
+				didParseCell: function (data: any) {
+					// Style the subtotal row (last row)
+					if (data.row.index === tableData.length - 1) {
+						data.cell.styles.fontStyle = 'bold';
+						data.cell.styles.fillColor = [245, 245, 245];
+					}
+				}
+			});
+
+			// Get table end position
+			const tableEndY = (pdf as any).lastAutoTable.finalY || tableStartY + 100;
+			let reconciliationY = tableEndY + 15;
+
+			// Add footnote about efficiency - reduced spacing
+			pdf.setFontSize(8);
+			pdf.setFont('times', 'italic');
+			pdf.text('* Efficiency: l/100km or l/hr', 15, tableEndY + 5);
+
+			// RECONCILIATION SECTIONS MOVED HERE - after table
+			pdf.setFontSize(12);
+			pdf.setFont('times', 'bold');
+			pdf.text('Fuel Reconciliation', 15, reconciliationY);
+			
+			reconciliationY += 6;
+			pdf.setFontSize(10);
+			pdf.setFont('times', 'normal');
+			
+			pdf.text('Fuel Dispensed:', labelX, reconciliationY);
+			pdf.text(`${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			reconciliationY += 4;
+			
+			const bowserOpeningDate = `1 ${monthName} ${year}`;
+			const bowserClosingDate = `${new Date(year, month, 0).getDate()} ${monthName} ${year}`;
+			
+			pdf.text('Bowser Opening:', labelX, reconciliationY);
+			pdf.text(`${reconciliationData.bowserStart.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(`(${bowserOpeningDate})`, detailsX, reconciliationY);
+			reconciliationY += 4;
+			
+			pdf.text('Bowser Closing:', labelX, reconciliationY);
+			pdf.text(`${reconciliationData.bowserEnd.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(`(${bowserClosingDate})`, detailsX, reconciliationY);
+			reconciliationY += 4;
+			
+			pdf.text('Bowser Difference:', labelX, reconciliationY);
+			pdf.text(`${bowserDifference.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			reconciliationY += 4;
+			
+			pdf.text('Fuel Variance:', labelX, reconciliationY);
+			pdf.text(`${fuelVariance.toFixed(1)}L`, valueX, reconciliationY);
+			
+			reconciliationY += 10;
+			
+			// Tank Reconciliation Section
+			pdf.setFontSize(12);
+			pdf.setFont('times', 'bold');
+			pdf.text('Tank Reconciliation', 15, reconciliationY);
+			
+			reconciliationY += 4;
+			pdf.setFontSize(10);
+			pdf.setFont('times', 'normal');
+			
+			// Get current month date for opening level (start of month)
+			const openingDate = `1 ${monthName} ${year}`;
+			
+			pdf.text('Opening Level:', labelX, reconciliationY);
+			pdf.text(`${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(`(${openingDate})`, detailsX, reconciliationY);
+			reconciliationY += 4;
+			
+			// Tank Activities with improved formatting
+			if (reconciliationData.tankActivities.length > 0) {
+				let totalAdditions = 0;
+				reconciliationData.tankActivities.forEach(activity => {
+					const activityDate = new Date(activity.delivery_date).toLocaleDateString('en-ZA', { 
+						day: 'numeric', 
+						month: 'short' 
+					});
+					const amount = activity.litres_added || 0;
+					totalAdditions += amount;
+					const sign = amount >= 0 ? '+' : '';
+					const invoiceText = activity.invoice_number || 'Adjustment';
+					
+					pdf.text(`• ${activityDate}:`, labelX + 5, reconciliationY);
+					pdf.text(`${sign}${amount.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+					pdf.text(`(${invoiceText})`, detailsX, reconciliationY);
+					reconciliationY += 4;
+				});
+				
+				pdf.setFont('times', 'bold');
+				pdf.text('Total Additions:', labelX, reconciliationY);
+				pdf.text(`+${totalAdditions.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+				pdf.setFont('times', 'normal');
+				reconciliationY += 4;
+			}
+			
+			// Expected vs Actual calculation
+			const totalTankAdditions = reconciliationData.tankActivities.reduce((sum, activity) => sum + (activity.litres_added || 0), 0);
+			const expectedLevel = reconciliationData.tankStartCalculated - reconciliationData.fuelDispensed + totalTankAdditions;
+			
+			const calculationFormula = `(${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', {minimumFractionDigits: 1})} - ${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})} + ${totalTankAdditions.toLocaleString('en-ZA', {minimumFractionDigits: 1})})`;
+			pdf.text('Expected Level:', labelX, reconciliationY);
+			pdf.text(`${expectedLevel.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(calculationFormula, detailsX, reconciliationY);
+			reconciliationY += 4;
+			
+			const lastDayOfMonth = new Date(year, month, 0).getDate();
+			const actualReadingDate = `${lastDayOfMonth} ${monthName} ${year}`;
+			pdf.text('Actual Reading:', labelX, reconciliationY);
+			pdf.text(`${reconciliationData.lastDipReading.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(`(${actualReadingDate})`, detailsX, reconciliationY);
+			reconciliationY += 4;
+			
+			// Tank variance - simplified with alignment
+			const tankVariance = expectedLevel - reconciliationData.lastDipReading;
+			pdf.text('Tank Variance:', labelX, reconciliationY);
+			pdf.text(`${tankVariance.toFixed(1)}L`, valueX, reconciliationY);
+			
+			let footerY = reconciliationY + 15;
+
+			// Report generation timestamp
+			pdf.setFontSize(7);
+			pdf.setFont('times', 'italic');
+			pdf.setTextColor(128, 128, 128);
+			pdf.text(`Report generated on ${new Date().toLocaleString()}`, 15, pageHeight - 10);
+
+			// Save the PDF
+			const fileName = `Monthly_Fuel_Report_${monthName}_${year}.pdf`;
+			pdf.save(fileName);
+
+		} catch (error) {
+			console.error('PDF generation error:', error);
+			throw new Error('Failed to generate PDF report');
+		}
+	}
+
+	// Helper method to format date range
+	formatDateRange(monthName: string, year: number): string {
+		const daysInMonth = new Date(year, new Date(`${monthName} 1, ${year}`).getMonth() + 1, 0).getDate();
+		return `${monthName.slice(0, 3)} 1 - ${daysInMonth}, ${year}`;
 	}
 }
 

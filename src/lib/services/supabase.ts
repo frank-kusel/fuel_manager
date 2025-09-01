@@ -888,6 +888,588 @@ class SupabaseService {
 		);
 	}
 
+	// Reconciliation operations
+	async getMonthlyReconciliation(year: number, month: number): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		const monthString = `${year}-${month.toString().padStart(2, '0')}`;
+		return this.query(() => 
+			client
+				.from('monthly_reconciliations')
+				.select('*')
+				.eq('month', monthString)
+				.maybeSingle() // Use maybeSingle to avoid 406 errors when no record exists
+		);
+	}
+
+	async createMonthlyReconciliation(data: {
+		year: number;
+		month: number;
+		fuelDispensed: number;
+		bowserStart: number;
+		bowserEnd: number;
+		tankCalculated: number;
+		tankMeasured: number;
+	}): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		const monthString = `${data.year}-${data.month.toString().padStart(2, '0')}`;
+		
+		// Calculate bowser difference (bowser reading increases, so end - start = fuel added)
+		const bowserDifference = data.bowserEnd - data.bowserStart;
+		const fuelVariance = Math.abs(data.fuelDispensed - bowserDifference);
+		const reconciliationStatus = fuelVariance <= 1 ? 'reconciled' : 'discrepancy';
+		
+		return this.query(() => 
+			client
+				.from('monthly_reconciliations')
+				.insert({
+					month: monthString,
+					fuel_dispensed: data.fuelDispensed,
+					fuel_received: bowserDifference, // Calculated from bowser readings
+					discrepancy_count: fuelVariance > 1 ? 1 : 0,
+					status: reconciliationStatus,
+					reconciled_date: new Date().toISOString(),
+					notes: `Bowser: ${data.bowserStart}L → ${data.bowserEnd}L (${bowserDifference}L added). Tank: ${data.tankCalculated}L vs ${data.tankMeasured}L measured.`
+				})
+				.select()
+				.single()
+		);
+	}
+
+	async createTankReconciliation(data: {
+		reconciliationDate: string;
+		calculatedLevel: number;
+		measuredLevel: number;
+		notes?: string;
+	}): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('tank_reconciliations')
+				.insert({
+					reconciliation_date: data.reconciliationDate,
+					calculated_level: data.calculatedLevel,
+					measured_level: data.measuredLevel,
+					accepted: Math.abs((data.calculatedLevel - data.measuredLevel) / 24000 * 100) <= 5, // 24000L tank capacity
+					notes: data.notes
+				})
+				.select()
+				.single()
+		);
+	}
+
+	async getMonthlyReconciliationData(year: number, month: number): Promise<ApiResponse<{
+		fuelDispensed: number;
+		bowserStart: number;
+		bowserEnd: number;
+		tankCalculated: number;
+		tankMeasured: number;
+		existingReconciliation: any;
+	}>> {
+		const client = this.ensureInitialized();
+		
+		// Calculate date range for the month
+		const startDate = new Date(Date.UTC(year, month - 1, 1)).toISOString().split('T')[0];
+		const endDate = new Date(Date.UTC(year, month, 0)).toISOString().split('T')[0];
+		const previousMonthEnd = new Date(Date.UTC(year, month - 1, 0)).toISOString().split('T')[0];
+		
+		try {
+			// Get total fuel dispensed for the month
+			const fuelResult = await client
+				.from('fuel_entries')
+				.select('litres_dispensed')
+				.gte('entry_date', startDate)
+				.lte('entry_date', endDate);
+				
+			const fuelDispensed = fuelResult.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+			
+			// Try to get bowser readings - use fallback if table doesn't exist or no data
+			let bowserStart = 0;
+			let bowserEnd = 0;
+			
+			try {
+				// Get bowser readings from fuel_entries table instead of bowser_reading_history
+				// Opening reading: Get the first bowser_reading_start from the month
+				const bowserStartResult = await client
+					.from('fuel_entries')
+					.select('bowser_reading_start, entry_date, time')
+					.gte('entry_date', startDate)
+					.lte('entry_date', endDate)
+					.not('bowser_reading_start', 'is', null)
+					.order('entry_date', { ascending: true })
+					.order('time', { ascending: true })
+					.limit(1);
+				
+				// Closing reading: Get the last bowser_reading_end from the month	
+				const bowserEndResult = await client
+					.from('fuel_entries')
+					.select('bowser_reading_end, entry_date, time')
+					.gte('entry_date', startDate)
+					.lte('entry_date', endDate)
+					.not('bowser_reading_end', 'is', null)
+					.order('entry_date', { ascending: false })
+					.order('time', { ascending: false })
+					.limit(1);
+				
+				bowserStart = parseFloat(bowserStartResult.data?.[0]?.bowser_reading_start) || 0;
+				bowserEnd = parseFloat(bowserEndResult.data?.[0]?.bowser_reading_end) || 0;
+				
+				console.log('Bowser readings from fuel_entries:', {
+					year,
+					month,
+					startDate,
+					endDate,
+					bowserStartResult: bowserStartResult.data?.[0],
+					bowserEndResult: bowserEndResult.data?.[0],
+					bowserStart,
+					bowserEnd
+				});
+			} catch (bowserError) {
+				console.warn('Could not fetch bowser readings:', bowserError);
+				// Fall back to current bowser readings if available
+				try {
+					const bowserResult = await client
+						.from('bowsers')
+						.select('current_reading')
+						.limit(1);
+					bowserStart = bowserResult.data?.[0]?.current_reading || 0;
+					bowserEnd = bowserStart; // Same reading if no history
+				} catch {
+					// No bowser data available
+					bowserStart = 0;
+					bowserEnd = 0;
+				}
+			}
+			
+			// Try to get tank status (calculated level) - fallback gracefully
+			let tankCalculated = 0;
+			try {
+				const tankStatusResult = await client
+					.from('tank_status')
+					.select('current_calculated_level')
+					.eq('tank_id', 'tank_a')
+					.single();
+				tankCalculated = tankStatusResult.data?.current_calculated_level || 0;
+			} catch (tankError) {
+				console.warn('Could not fetch tank status:', tankError);
+			}
+				
+			// Try to get latest tank reading (measured level) - fallback gracefully
+			let tankMeasured = 0;
+			try {
+				const tankReadingResult = await client
+					.from('tank_readings')
+					.select('reading_value')
+					.eq('tank_id', 'tank_a')
+					.order('reading_date', { ascending: false })
+					.limit(1);
+				tankMeasured = tankReadingResult.data?.[0]?.reading_value || 0;
+			} catch (readingError) {
+				console.warn('Could not fetch tank readings:', readingError);
+			}
+				
+			// Check if reconciliation already exists - fallback gracefully
+			let existingReconciliation = null;
+			try {
+				const monthString = `${year}-${month.toString().padStart(2, '0')}`;
+				console.log('Checking for existing reconciliation for month:', monthString);
+				const existingResult = await client
+					.from('monthly_reconciliations')
+					.select('*')
+					.eq('month', monthString)
+					.maybeSingle(); // Use maybeSingle instead of single to avoid errors when no record exists
+				existingReconciliation = existingResult.data;
+				console.log('Existing reconciliation result:', existingResult);
+			} catch (existingError) {
+				// Table might not exist yet, or no record found - that's okay
+				console.warn('Could not check existing reconciliation:', existingError);
+			}
+
+			return {
+				data: {
+					fuelDispensed,
+					bowserStart,
+					bowserEnd,
+					tankCalculated,
+					tankMeasured,
+					existingReconciliation
+				},
+				error: null
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to get reconciliation data'
+			};
+		}
+	}
+
+	// Flexible date range reconciliation methods for new Tools section
+	async getDateRangeReconciliationData(startDate: string, endDate: string): Promise<ApiResponse<{
+		fuelDispensed: number;
+		bowserStart: number;
+		bowserEnd: number;
+	}>> {
+		const client = this.ensureInitialized();
+		
+		try {
+			// Get total fuel dispensed for the date range
+			const fuelResult = await client
+				.from('fuel_entries')
+				.select('litres_dispensed')
+				.gte('entry_date', startDate)
+				.lte('entry_date', endDate);
+				
+			const fuelDispensed = fuelResult.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+			
+			// Get bowser readings for the date range
+			let bowserStart = 0;
+			let bowserEnd = 0;
+			
+			try {
+				// Opening reading: Get the first bowser_reading_start from the range
+				const bowserStartResult = await client
+					.from('fuel_entries')
+					.select('bowser_reading_start, entry_date, time')
+					.gte('entry_date', startDate)
+					.lte('entry_date', endDate)
+					.not('bowser_reading_start', 'is', null)
+					.order('entry_date', { ascending: true })
+					.order('time', { ascending: true })
+					.limit(1);
+				
+				// Closing reading: Get the last bowser_reading_end from the range	
+				const bowserEndResult = await client
+					.from('fuel_entries')
+					.select('bowser_reading_end, entry_date, time')
+					.gte('entry_date', startDate)
+					.lte('entry_date', endDate)
+					.not('bowser_reading_end', 'is', null)
+					.order('entry_date', { ascending: false })
+					.order('time', { ascending: false })
+					.limit(1);
+				
+				bowserStart = parseFloat(bowserStartResult.data?.[0]?.bowser_reading_start) || 0;
+				bowserEnd = parseFloat(bowserEndResult.data?.[0]?.bowser_reading_end) || 0;
+				
+			} catch (bowserError) {
+				console.warn('Could not fetch bowser readings:', bowserError);
+				bowserStart = 0;
+				bowserEnd = 0;
+			}
+
+			return {
+				data: {
+					fuelDispensed,
+					bowserStart,
+					bowserEnd
+				},
+				error: null
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to get date range reconciliation data'
+			};
+		}
+	}
+
+	async getTankReconciliationData(date: string): Promise<ApiResponse<{
+		tankCalculated: number;
+		tankMeasured: number;
+	}>> {
+		const client = this.ensureInitialized();
+		
+		try {
+			// Get tank calculated level
+			let tankCalculated = 0;
+			try {
+				const tankStatusResult = await client
+					.from('tank_status')
+					.select('current_calculated_level')
+					.eq('tank_id', 'tank_a')
+					.single();
+				tankCalculated = tankStatusResult.data?.current_calculated_level || 0;
+			} catch (tankError) {
+				console.warn('Could not fetch tank status:', tankError);
+			}
+				
+			// Get latest tank reading (measured level)
+			let tankMeasured = 0;
+			try {
+				const tankReadingResult = await client
+					.from('tank_readings')
+					.select('reading_value')
+					.eq('tank_id', 'tank_a')
+					.lte('reading_date', date) // Get readings up to the specified date
+					.order('reading_date', { ascending: false })
+					.limit(1);
+				tankMeasured = tankReadingResult.data?.[0]?.reading_value || 0;
+			} catch (readingError) {
+				console.warn('Could not fetch tank readings:', readingError);
+			}
+
+			return {
+				data: {
+					tankCalculated,
+					tankMeasured
+				},
+				error: null
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to get tank reconciliation data'
+			};
+		}
+	}
+
+	async createFuelReconciliation(data: {
+		startDate: string;
+		endDate: string;
+		fuelDispensed: number;
+		bowserStart: number;
+		bowserEnd: number;
+	}): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		
+		// Calculate bowser difference (bowser reading increases, so end - start = fuel added)
+		const bowserDifference = data.bowserEnd - data.bowserStart;
+		const fuelVariance = Math.abs(data.fuelDispensed - bowserDifference);
+		const reconciliationStatus = fuelVariance <= 1 ? 'reconciled' : 'discrepancy';
+		
+		return this.query(() => 
+			client
+				.from('fuel_reconciliations')
+				.insert({
+					start_date: data.startDate,
+					end_date: data.endDate,
+					fuel_dispensed: data.fuelDispensed,
+					fuel_received: bowserDifference,
+					discrepancy_count: fuelVariance > 1 ? 1 : 0,
+					status: reconciliationStatus,
+					reconciled_date: new Date().toISOString(),
+					notes: `Bowser: ${data.bowserStart}L → ${data.bowserEnd}L (${bowserDifference}L added).`
+				})
+				.select()
+				.single()
+		);
+	}
+
+	// Database management methods for new Tools section
+	async getTables(): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('information_schema.tables')
+				.select('table_name, table_schema')
+				.eq('table_schema', 'public')
+				.order('table_name')
+		);
+	}
+
+	async getTableData(tableName: string, limit: number = 50): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from(tableName)
+				.select('*')
+				.limit(limit)
+		);
+	}
+
+	async executeQuery(query: string): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const { data, error } = await client.rpc('execute_sql', { query_text: query });
+			return { data, error };
+		});
+	}
+
+	// Reconciliation history method for new Tools section
+	async getReconciliationHistory(limit: number = 50): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		
+		try {
+			// Get fuel reconciliations
+			let fuelRecords = [];
+			try {
+				const fuelResult = await client
+					.from('fuel_reconciliations')
+					.select('*')
+					.order('reconciled_date', { ascending: false })
+					.limit(Math.floor(limit / 2));
+				
+				fuelRecords = (fuelResult.data || []).map(record => ({
+					...record,
+					type: 'fuel',
+					date: record.reconciled_date || record.created_at
+				}));
+			} catch (fuelError) {
+				console.warn('Could not fetch fuel reconciliations:', fuelError);
+			}
+			
+			// Get tank reconciliations
+			let tankRecords = [];
+			try {
+				const tankResult = await client
+					.from('tank_reconciliations')
+					.select('*')
+					.order('reconciliation_date', { ascending: false })
+					.limit(Math.floor(limit / 2));
+				
+				tankRecords = (tankResult.data || []).map(record => ({
+					...record,
+					type: 'tank',
+					date: record.reconciliation_date,
+					status: record.accepted ? 'reconciled' : 'discrepancy'
+				}));
+			} catch (tankError) {
+				console.warn('Could not fetch tank reconciliations:', tankError);
+			}
+			
+			// Combine and sort by date
+			const allRecords = [...fuelRecords, ...tankRecords]
+				.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+				.slice(0, limit);
+			
+			return { data: allRecords, error: null };
+		} catch (error) {
+			return {
+				data: [],
+				error: error instanceof Error ? error.message : 'Failed to get reconciliation history'
+			};
+		}
+	}
+
+	// Fuel entry management methods for inline editing
+	async getFuelEntriesForPeriod(startDate: string, endDate: string): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('fuel_entries')
+				.select(`
+					*,
+					vehicles:vehicle_id(id, code, name),
+					drivers:driver_id(id, employee_code, name),
+					activities:activity_id(id, name),
+					fields:field_id(id, code, name),
+					zones:zone_id(id, code, name)
+				`)
+				.gte('entry_date', startDate)
+				.lte('entry_date', endDate)
+				.order('entry_date', { ascending: false })
+				.order('time', { ascending: false })
+		);
+	}
+
+
+	// Tank level management methods for tank adjustment
+	async getTankDataForDate(date: string): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		
+		try {
+			// Get tank calculated level
+			let calculatedLevel = 0;
+			try {
+				const tankStatusResult = await client
+					.from('tank_status')
+					.select('current_calculated_level')
+					.eq('tank_id', 'tank_a')
+					.single();
+				calculatedLevel = tankStatusResult.data?.current_calculated_level || 0;
+			} catch (tankError) {
+				console.warn('Could not fetch tank status:', tankError);
+			}
+				
+			// Get tank measured level for the date
+			let measuredLevel = 0;
+			try {
+				const tankReadingResult = await client
+					.from('tank_readings')
+					.select('reading_value')
+					.eq('tank_id', 'tank_a')
+					.lte('reading_date', date)
+					.order('reading_date', { ascending: false })
+					.limit(1);
+				measuredLevel = tankReadingResult.data?.[0]?.reading_value || 0;
+			} catch (readingError) {
+				console.warn('Could not fetch tank readings:', readingError);
+			}
+
+			return {
+				data: {
+					calculatedLevel,
+					measuredLevel,
+					date
+				},
+				error: null
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to get tank data'
+			};
+		}
+	}
+
+	async updateTankCalculatedLevel(date: string, newLevel: number, notes: string): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('tank_status')
+				.update({
+					current_calculated_level: newLevel,
+					updated_at: new Date().toISOString(),
+					notes: notes
+				})
+				.eq('tank_id', 'tank_a')
+		);
+	}
+
+	async updateTankMeasuredLevel(date: string, newLevel: number, notes: string): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('tank_readings')
+				.upsert({
+					tank_id: 'tank_a',
+					reading_date: date,
+					reading_value: newLevel,
+					reading_type: 'manual_adjustment',
+					notes: notes,
+					updated_at: new Date().toISOString()
+				})
+				.select()
+		);
+	}
+
+	async createTankAdjustmentLog(data: {
+		date: string;
+		adjustments: string;
+		notes: string;
+		previousCalculated: number;
+		newCalculated: number;
+		previousMeasured: number;
+		newMeasured: number;
+	}): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('tank_adjustment_logs')
+				.insert({
+					adjustment_date: data.date,
+					adjustments_made: data.adjustments,
+					notes: data.notes,
+					previous_calculated_level: data.previousCalculated,
+					new_calculated_level: data.newCalculated,
+					previous_measured_level: data.previousMeasured,
+					new_measured_level: data.newMeasured,
+					created_at: new Date().toISOString()
+				})
+				.select()
+		);
+	}
+
 	// Connection test
 	async testConnection(): Promise<boolean> {
 		try {

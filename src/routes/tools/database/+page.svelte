@@ -59,12 +59,12 @@
 	let isEditingZone = $state(false);
 
 	const sections = [
-		{ id: 'vehicles', label: 'Vehicles', icon: '🚛' },
-		{ id: 'drivers', label: 'Drivers', icon: '👨‍💼' },
-		{ id: 'bowsers', label: 'Bowsers', icon: '⛽' },
-		{ id: 'activities', label: 'Activities', icon: '⚙️' },
-		{ id: 'fields', label: 'Fields', icon: '🌾' },
-		{ id: 'zones', label: 'Zones', icon: '📍' }
+		{ id: 'vehicles', label: 'Vehicles' },
+		{ id: 'drivers', label: 'Drivers' },
+		{ id: 'bowsers', label: 'Bowsers' },
+		{ id: 'activities', label: 'Activities' },
+		{ id: 'fields', label: 'Fields' },
+		{ id: 'zones', label: 'Zones' }
 	];
 
 	// Vehicle handlers
@@ -320,7 +320,6 @@
 					class:active={section.id === selectedSection}
 					onclick={() => changeSection(section.id)}
 				>
-					<span class="tab-icon">{section.icon}</span>
 					<span class="tab-label">{section.label}</span>
 				</button>
 			{/each}
@@ -494,9 +493,8 @@
 
 	.tab-btn {
 		display: flex;
-		flex-direction: column;
 		align-items: center;
-		gap: 0.25rem;
+		justify-content: center;
 		padding: 0.75rem 1rem;
 		border: none;
 		background: transparent;
@@ -504,7 +502,6 @@
 		cursor: pointer;
 		border-bottom: 3px solid transparent;
 		transition: all 0.2s ease;
-		min-width: 80px;
 		font-size: 0.875rem;
 	}
 
@@ -516,10 +513,6 @@
 	.tab-btn.active {
 		color: var(--color-primary);
 		border-bottom-color: var(--color-primary);
-	}
-
-	.tab-icon {
-		font-size: 1.25rem;
 	}
 
 	.tab-label {
@@ -545,12 +538,7 @@
 		}
 
 		.tab-btn {
-			padding: 0.5rem;
-			min-width: 70px;
-		}
-
-		.tab-icon {
-			font-size: 1rem;
+			padding: 0.5rem 0.75rem;
 		}
 
 		.tab-label {

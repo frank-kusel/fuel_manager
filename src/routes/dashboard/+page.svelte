@@ -7,6 +7,7 @@
 	import FuelChart from '$lib/components/dashboard/FuelChart.svelte';
 	import DataExport from '$lib/components/dashboard/DataExport.svelte';
 	import VehicleHistory from '$lib/components/dashboard/VehicleHistory.svelte';
+	import MonthlyReconciliation from '$lib/components/dashboard/MonthlyReconciliation.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import dashboardStore, { 
 		dashboardStats, 
