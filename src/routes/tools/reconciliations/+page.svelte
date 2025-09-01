@@ -523,73 +523,81 @@
 		{#if historyLoading}
 			<div class="loading">Loading reconciliation history...</div>
 		{:else if reconciliationHistory.length > 0}
-			<div class="history-list">
-				{#each reconciliationHistory as record}
-					<div class="history-item">
-						<div class="history-header">
-							<div class="history-info">
-								<h3 class="history-title">
-									{record.type === 'fuel' ? 'Fuel Reconciliation' : 'Tank Reconciliation'}
-								</h3>
-								<p class="history-date">
-									{new Date(record.date).toLocaleDateString('en-ZA')}
-									{#if record.start_date && record.end_date}
-										({record.start_date} to {record.end_date})
-									{/if}
-								</p>
-							</div>
-							<div class="history-status status-{record.status}">
-								{record.status.toUpperCase()}
-							</div>
-						</div>
-						
-						<div class="history-details">
-							{#if record.type === 'fuel'}
-								<div class="detail-item">
-									<span class="detail-label">Fuel Dispensed:</span>
-									<span class="detail-value">{formatNumber(record.fuel_dispensed)}L</span>
-								</div>
-								<div class="detail-item">
-									<span class="detail-label">Fuel Received:</span>
-									<span class="detail-value">{formatNumber(record.fuel_received)}L</span>
-								</div>
-								<div class="detail-item">
-									<span class="detail-label">Variance:</span>
-									<span class="detail-value variance {getVarianceClass(Math.abs(record.fuel_dispensed - record.fuel_received))}">
-										{Math.abs(record.fuel_dispensed - record.fuel_received) < 0.1 ? '0' : 
-										(record.fuel_dispensed - record.fuel_received >= 0 ? '+' : '') + 
-										(record.fuel_dispensed - record.fuel_received).toFixed(1)}L
-									</span>
-								</div>
-							{:else}
-								<div class="detail-item">
-									<span class="detail-label">Calculated Level:</span>
-									<span class="detail-value">{formatNumber(record.calculated_level)}L</span>
-								</div>
-								<div class="detail-item">
-									<span class="detail-label">Measured Level:</span>
-									<span class="detail-value">{formatNumber(record.measured_level)}L</span>
-								</div>
-								<div class="detail-item">
-									<span class="detail-label">Variance:</span>
-									<span class="detail-value variance {getTankVarianceClass(Math.abs((record.calculated_level - record.measured_level) / 24000 * 100))}">
-										{Math.abs((record.calculated_level - record.measured_level) / 24000 * 100) < 0.1 ? '0' : 
-										((record.calculated_level - record.measured_level) >= 0 ? '+' : '') + 
-										((record.calculated_level - record.measured_level) / 24000 * 100).toFixed(1)}%
-									</span>
-								</div>
-							{/if}
-						</div>
-						
-						{#if record.notes}
-							<div class="history-notes">
-								<span class="notes-label">Notes:</span>
-								<span class="notes-text">{record.notes}</span>
-							</div>
-						{/if}
+			{@const fuelRecords = reconciliationHistory.filter(r => r.type === 'fuel')}
+			{@const tankRecords = reconciliationHistory.filter(r => r.type === 'tank')}
+			
+			{#if fuelRecords.length > 0}
+				<div class="table-section">
+					<h3>Fuel Reconciliation</h3>
+					<div class="table-container">
+						<table class="history-table">
+							<thead>
+								<tr>
+									<th>Date</th>
+									<th>Dispensed</th>
+									<th>Open</th>
+									<th>Close</th>
+									<th>Diff</th>
+									<th>Var</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each fuelRecords as record}
+									<tr>
+										<td>
+											{new Date(record.date).toLocaleDateString('en-ZA')}
+											{#if record.start_date && record.end_date}
+												<div class="date-range">({record.start_date} to {record.end_date})</div>
+											{/if}
+										</td>
+										<td>{formatNumber(record.fuel_dispensed)}L</td>
+										<td>{formatNumber(record.bowser_start || 0)}L</td>
+										<td>{formatNumber(record.bowser_end || 0)}L</td>
+										<td>{formatNumber((record.bowser_end || 0) - (record.bowser_start || 0))}L</td>
+										<td class="variance {getVarianceClass(Math.abs(record.fuel_dispensed - record.fuel_received))}">
+											{Math.abs(record.fuel_dispensed - record.fuel_received) < 0.1 ? '0' : 
+											(record.fuel_dispensed - record.fuel_received >= 0 ? '+' : '') + 
+											(record.fuel_dispensed - record.fuel_received).toFixed(1)}L
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
 					</div>
-				{/each}
-			</div>
+				</div>
+			{/if}
+
+			{#if tankRecords.length > 0}
+				<div class="table-section">
+					<h3>Tank Reconciliation</h3>
+					<div class="table-container">
+						<table class="history-table">
+							<thead>
+								<tr>
+									<th>Date</th>
+									<th>Dip Level</th>
+									<th>Level</th>
+									<th>Difference (L)</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each tankRecords as record}
+									<tr>
+										<td>{new Date(record.date).toLocaleDateString('en-ZA')}</td>
+										<td>{formatNumber(record.measured_level)}L</td>
+										<td>{formatNumber(record.calculated_level)}L</td>
+										<td class="variance {getTankVarianceClass(Math.abs((record.calculated_level - record.measured_level) / 24000 * 100))}">
+											{Math.abs(record.calculated_level - record.measured_level) < 0.1 ? '0' : 
+											((record.calculated_level - record.measured_level) >= 0 ? '+' : '') + 
+											(record.calculated_level - record.measured_level).toFixed(1)}L
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			{/if}
 		{:else}
 			<div class="history-placeholder">
 				<p>No reconciliation history found</p>
@@ -636,7 +644,6 @@
 	.reconciliation-container {
 		max-width: 1000px;
 		margin: 0 auto;
-		padding: 1rem;
 	}
 
 	.header {
@@ -934,9 +941,7 @@
 
 	.history-section {
 		background: white;
-		border: 1px solid #e5e7eb;
 		border-radius: 12px;
-		padding: 1.5rem;
 	}
 
 	.history-section .section-header {
@@ -953,108 +958,59 @@
 		color: #111827;
 	}
 
-	.history-list {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
+	.table-section {
+		margin-bottom: 2rem;
 	}
 
-	.history-item {
+	.table-section h3 {
+		margin: 0 0 1rem;
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: #111827;
+	}
+
+	.table-container {
+		overflow-x: auto;
 		border: 1px solid #e5e7eb;
 		border-radius: 8px;
-		padding: 1rem;
+	}
+
+	.history-table {
+		width: 100%;
+		border-collapse: collapse;
+		background: white;
+		font-size: 0.875rem;
+	}
+
+	.history-table th {
+		background: #f9fafb;
+		border-bottom: 1px solid #e5e7eb;
+		padding: 0.75rem;
+		text-align: left;
+		font-weight: 600;
+		color: #374151;
+		white-space: nowrap;
+	}
+
+	.history-table td {
+		border-bottom: 1px solid #f3f4f6;
+		padding: 0.75rem;
+		color: #111827;
+		vertical-align: top;
+	}
+
+	.history-table tbody tr:hover {
 		background: #f9fafb;
 	}
 
-	.history-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		margin-bottom: 0.75rem;
+	.history-table tbody tr:last-child td {
+		border-bottom: none;
 	}
 
-	.history-info {
-		flex: 1;
-	}
-
-	.history-title {
-		margin: 0 0 0.25rem;
-		font-size: 1rem;
-		font-weight: 600;
-		color: #111827;
-	}
-
-	.history-date {
-		margin: 0;
-		font-size: 0.875rem;
-		color: #6b7280;
-	}
-
-	.history-status {
-		padding: 0.25rem 0.5rem;
-		border-radius: 4px;
+	.date-range {
 		font-size: 0.75rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.025em;
-	}
-
-	.history-status.status-reconciled {
-		background: #dcfce7;
-		color: #166534;
-	}
-
-	.history-status.status-discrepancy {
-		background: #fee2e2;
-		color: #991b1b;
-	}
-
-	.history-status.status-pending {
-		background: #fef3c7;
-		color: #92400e;
-	}
-
-	.history-details {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-		gap: 0.5rem;
-		margin-bottom: 0.75rem;
-	}
-
-	.detail-item {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.25rem 0;
-	}
-
-	.detail-label {
-		font-size: 0.875rem;
 		color: #6b7280;
-		font-weight: 500;
-	}
-
-	.detail-value {
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: #111827;
-	}
-
-	.history-notes {
-		margin-top: 0.75rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid #e5e7eb;
-		font-size: 0.875rem;
-	}
-
-	.notes-label {
-		font-weight: 600;
-		color: #111827;
-		margin-right: 0.5rem;
-	}
-
-	.notes-text {
-		color: #6b7280;
+		margin-top: 0.25rem;
 	}
 
 	.history-placeholder {
@@ -1087,18 +1043,10 @@
 			gap: 1rem;
 		}
 		
-		.history-header {
-			flex-direction: column;
-			align-items: stretch;
-			gap: 0.5rem;
-		}
-		
-		.history-status {
-			align-self: flex-start;
-		}
-		
-		.history-details {
-			grid-template-columns: 1fr;
+		.history-table th,
+		.history-table td {
+			padding: 0.5rem;
+			font-size: 0.75rem;
 		}
 		
 		.reconcile-actions {
