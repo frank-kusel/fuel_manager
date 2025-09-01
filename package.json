@@ -44,6 +44,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",
-    "svelte": "^5.38.1"
+    "jspdf": "^3.0.2",
+    "jspdf-autotable": "^5.0.2",
+    "svelte": "^5.38.1",
+    "xlsx": "^0.18.5"
   }
 }

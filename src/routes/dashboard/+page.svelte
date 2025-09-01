@@ -5,6 +5,7 @@
 	import TankManagement from '$lib/components/dashboard/TankManagement.svelte';
 	import TankStatus from '$lib/components/dashboard/TankStatus.svelte';
 	import FuelChart from '$lib/components/dashboard/FuelChart.svelte';
+	import DataExport from '$lib/components/dashboard/DataExport.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import dashboardStore, { 
 		dashboardStats, 
@@ -74,6 +75,9 @@
 
 	<!-- Tank Management -->
 	<TankManagement />
+
+	<!-- Data Export -->
+	<DataExport />
 
 </div>
 
