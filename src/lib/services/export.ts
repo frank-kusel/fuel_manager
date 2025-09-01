@@ -70,34 +70,36 @@ class ExportService {
 				return { data: null, error: result.error.message };
 			}
 
-			// Transform data to match Excel format
-			const exportData: ExportData[] = result.data.map((entry: any) => {
-				// Calculate distance from odometer readings
-				let hrsKm = 0;
-				if (entry.odometer_end && entry.odometer_start && entry.odometer_end > entry.odometer_start) {
-					hrsKm = entry.odometer_end - entry.odometer_start;
-				} else if (entry.hours_worked) {
-					// Fallback to hours worked if no valid odometer readings
-					hrsKm = entry.hours_worked;
-				} else if (entry.distance_km) {
-					// Fallback to distance_km if available
-					hrsKm = entry.distance_km;
-				}
+			// Transform data to match Excel format - filter out entries without valid vehicles
+			const exportData: ExportData[] = result.data
+				.filter((entry: any) => entry.vehicles) // Only include entries with valid vehicle relationships
+				.map((entry: any) => {
+					// Calculate distance from odometer readings
+					let hrsKm = 0;
+					if (entry.odometer_end && entry.odometer_start && entry.odometer_end > entry.odometer_start) {
+						hrsKm = entry.odometer_end - entry.odometer_start;
+					} else if (entry.hours_worked) {
+						// Fallback to hours worked if no valid odometer readings
+						hrsKm = entry.hours_worked;
+					} else if (entry.distance_km) {
+						// Fallback to distance_km if available
+						hrsKm = entry.distance_km;
+					}
 
-				return {
-					date: this.formatDate(entry.entry_date),
-					vehicle: entry.vehicles?.code || 'N/A',
-					field: entry.fields?.code || entry.zones?.code || 'N/A',
-					activity: entry.activities?.code || 'N/A',
-					fuel: entry.litres_dispensed || 0,
-					hrsKm: hrsKm,
-					odoEnd: entry.odometer_end || 0,
-					store: entry.bowsers?.code || 'Tank A',
-					issueNo: 0, // Default value as per your example
-					tons: entry.tons_transported || 0,
-					driver: entry.drivers?.employee_code || 'N/A'
-				};
-			});
+					return {
+						date: this.formatDate(entry.entry_date),
+						vehicle: entry.vehicles.code || 'N/A',
+						field: entry.fields?.code || entry.zones?.code || 'N/A',
+						activity: entry.activities?.code || 'N/A',
+						fuel: entry.litres_dispensed || 0,
+						hrsKm: hrsKm,
+						odoEnd: entry.odometer_end || 0,
+						store: entry.bowsers?.code || 'Tank A',
+						issueNo: 0, // Default value as per your example
+						tons: entry.tons_transported || 0,
+						driver: entry.drivers?.employee_code || 'N/A'
+					};
+				});
 
 			return { data: exportData, error: null };
 			
@@ -209,9 +211,9 @@ class ExportService {
 			await supabaseService.init();
 			const client = supabaseService.getClient();
 			
-			// Get start and end dates for the month
-			const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
-			const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+			// Get start and end dates for the month (using UTC to avoid timezone issues)
+			const startDate = new Date(Date.UTC(year, month - 1, 1)).toISOString().split('T')[0];
+			const endDate = new Date(Date.UTC(year, month, 0)).toISOString().split('T')[0];
 			
 			// Fetch fuel entries with vehicle data for the month
 			const result = await client
