@@ -6,6 +6,9 @@ import type {
 	Vehicle, 
 	Driver, 
 	FuelEntry, 
+	FuelEntryField,
+	FuelEntryWithLocation,
+	FieldSelectionState,
 	Bowser, 
 	Activity, 
 	Field,
@@ -288,6 +291,170 @@ class SupabaseService {
 				.eq('id', id)
 				.select()
 				.single()
+		);
+	}
+
+	// Multi-field fuel entry operations
+	async createFuelEntryWithFields(
+		entry: Omit<FuelEntry, 'id' | 'created_at' | 'updated_at'>, 
+		fieldIds: string[] = []
+	): Promise<ApiResponse<FuelEntry>> {
+		const client = this.ensureInitialized();
+		
+		try {
+			// Start transaction
+			const { data: fuelEntry, error: entryError } = await client
+				.from('fuel_entries')
+				.insert({
+					...entry,
+					field_selection_mode: fieldIds.length > 1 ? 'multiple' : 'single'
+				})
+				.select()
+				.single();
+
+			if (entryError) {
+				return { data: null, error: entryError.message };
+			}
+
+			// If multiple fields, create junction table entries
+			if (fieldIds.length > 0 && entry.field_selection_mode === 'multiple') {
+				const junctionEntries = fieldIds.map(fieldId => ({
+					fuel_entry_id: fuelEntry.id,
+					field_id: fieldId
+				}));
+
+				const { error: junctionError } = await client
+					.from('fuel_entry_fields')
+					.insert(junctionEntries);
+
+				if (junctionError) {
+					// Rollback by deleting the fuel entry
+					await client.from('fuel_entries').delete().eq('id', fuelEntry.id);
+					return { data: null, error: junctionError.message };
+				}
+			}
+
+			return { data: fuelEntry, error: null };
+		} catch (error) {
+			return { 
+				data: null, 
+				error: error instanceof Error ? error.message : 'Failed to create fuel entry with fields' 
+			};
+		}
+	}
+
+	async getFuelEntryFields(entryId: string): Promise<ApiResponse<Field[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('fuel_entry_fields')
+				.select(`
+					field_id,
+					fields (
+						id,
+						code,
+						name,
+						type,
+						area,
+						location,
+						crop_type,
+						active,
+						created_at,
+						updated_at
+					)
+				`)
+				.eq('fuel_entry_id', entryId)
+		);
+	}
+
+	async getFuelEntriesWithLocation(startDate?: string, endDate?: string): Promise<ApiResponse<FuelEntryWithLocation[]>> {
+		const client = this.ensureInitialized();
+		let query = client
+			.from('fuel_entries_with_fields')
+			.select(`
+				*,
+				vehicles (
+					code,
+					name,
+					type
+				),
+				drivers (
+					employee_code,
+					name
+				),
+				activities (
+					code,
+					name,
+					category
+				),
+				bowsers (
+					name,
+					registration
+				)
+			`)
+			.order('entry_date', { ascending: false });
+
+		if (startDate) {
+			query = query.gte('entry_date', startDate);
+		}
+		if (endDate) {
+			query = query.lte('entry_date', endDate);
+		}
+
+		return this.query(() => query);
+	}
+
+	async updateFuelEntryFields(entryId: string, fieldIds: string[]): Promise<ApiResponse<boolean>> {
+		const client = this.ensureInitialized();
+		
+		try {
+			// Delete existing field associations
+			await client
+				.from('fuel_entry_fields')
+				.delete()
+				.eq('fuel_entry_id', entryId);
+
+			// Insert new field associations if provided
+			if (fieldIds.length > 0) {
+				const junctionEntries = fieldIds.map(fieldId => ({
+					fuel_entry_id: entryId,
+					field_id: fieldId
+				}));
+
+				const { error: insertError } = await client
+					.from('fuel_entry_fields')
+					.insert(junctionEntries);
+
+				if (insertError) {
+					return { data: null, error: insertError.message };
+				}
+
+				// Update the field selection mode on the fuel entry
+				await client
+					.from('fuel_entries')
+					.update({ 
+						field_selection_mode: fieldIds.length > 1 ? 'multiple' : 'single',
+						updated_at: new Date().toISOString()
+					})
+					.eq('id', entryId);
+			}
+
+			return { data: true, error: null };
+		} catch (error) {
+			return { 
+				data: null, 
+				error: error instanceof Error ? error.message : 'Failed to update fuel entry fields' 
+			};
+		}
+	}
+
+	async deleteFuelEntryFields(entryId: string): Promise<ApiResponse<boolean>> {
+		const client = this.ensureInitialized();
+		return this.query(() => 
+			client
+				.from('fuel_entry_fields')
+				.delete()
+				.eq('fuel_entry_id', entryId)
 		);
 	}
 

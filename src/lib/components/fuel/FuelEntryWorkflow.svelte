@@ -137,8 +137,14 @@
 		if (data?.activity) {
 			items.push(data.activity.code);
 		}
-		if (data?.field) {
+		
+		// Handle field display in progress
+		if (data?.fieldSelectionMode === 'multiple' && data?.selectedFields?.length > 0) {
+			items.push(`${data.selectedFields.length} Field${data.selectedFields.length !== 1 ? 's' : ''}`);
+		} else if (data?.field) {
 			items.push(data.field.name);
+		} else if (data?.zone) {
+			items.push(data.zone.name);
 		}
 		
 		progressItems = items;
@@ -270,15 +276,18 @@
 				</button>
 			</div>
 		{:else if $currentStep === 3}
-			<!-- Location Selection (Field or Zone - Optional) -->
+			<!-- Location Selection (Field, Zone, or Multiple Fields - Optional) -->
 			<LocationSelection
 				selectedField={$workflowData.field}
 				selectedZone={$workflowData.zone}
-				onLocationSelect={(field, zone) => {
-					fuelEntryWorkflowStore.setLocation(field, zone);
+				fieldSelectionMode={$workflowData.fieldSelectionMode}
+				selectedFields={$workflowData.selectedFields}
+				onLocationSelect={(field, zone, selectedFields = []) => {
+					fuelEntryWorkflowStore.setLocation(field, zone, selectedFields);
 				}}
 				onAutoAdvance={handleAutoAdvance}
 				errors={getCurrentStepErrors()}
+				allowModeToggle={true}
 			/>
 			
 			<!-- Continue Button -->
@@ -354,10 +363,30 @@
 					{/if}
 					
 					<!-- Field Info -->
-					{#if $workflowData.field}
+					{#if $workflowData.fieldSelectionMode === 'multiple' && $workflowData.selectedFields.length > 0}
+						<div class="review-row">
+							<span class="review-label">Fields</span>
+							<span class="review-value">
+								{$workflowData.selectedFields.length} field{$workflowData.selectedFields.length !== 1 ? 's' : ''}
+							</span>
+						</div>
+						<div class="review-multi-fields">
+							{#each $workflowData.selectedFields as field, index}
+								<span class="field-chip">
+									{field.name}
+								</span>
+								{#if index < $workflowData.selectedFields.length - 1}, {/if}
+							{/each}
+						</div>
+					{:else if $workflowData.field}
 						<div class="review-row">
 							<span class="review-label">Field</span>
 							<span class="review-value">{$workflowData.field.name}</span>
+						</div>
+					{:else if $workflowData.zone}
+						<div class="review-row">
+							<span class="review-label">Zone</span>
+							<span class="review-value">{$workflowData.zone.name}</span>
 						</div>
 					{/if}
 					
@@ -712,6 +741,27 @@
 		font-weight: 700;
 		color: #9ca3af;
 		margin-left: 0.25rem;
+	}
+
+	/* Multi-field review display */
+	.review-multi-fields {
+		padding: 0.5rem 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.375rem;
+		align-items: center;
+	}
+
+	.field-chip {
+		display: inline-flex;
+		align-items: center;
+		background: #f0fdf4;
+		border: 1px solid #10b981;
+		border-radius: 16px;
+		padding: 0.25rem 0.625rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: #065f46;
 	}
 
 

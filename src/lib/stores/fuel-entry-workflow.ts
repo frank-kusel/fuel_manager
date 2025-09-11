@@ -2,7 +2,7 @@
 // Manages the complete fuel entry process with validation and state persistence
 
 import { writable, derived } from 'svelte/store';
-import type { FuelEntry, Vehicle, Driver, Activity, Field, Zone, Bowser, LoadingState } from '$lib/types';
+import type { FuelEntry, Vehicle, Driver, Activity, Field, Zone, Bowser, LoadingState, FieldSelectionState } from '$lib/types';
 
 export interface FuelEntryWorkflowStep {
 	id: string;
@@ -23,9 +23,11 @@ export interface FuelEntryData {
 	// Step 3: Activity Selection
 	activity: Activity | null;
 	
-	// Step 4: Location Selection (optional) - either field or zone
-	field: Field | null;
+	// Step 4: Location Selection (optional) - field, zone, or multiple fields
+	field: Field | null; // Single field (backward compatibility)
 	zone: Zone | null;
+	selectedFields: Field[]; // Multiple fields
+	fieldSelectionMode: 'single' | 'multiple';
 	
 	// Step 5: Odometer Reading
 	odometerStart: number | null;
@@ -121,6 +123,8 @@ const initialData: FuelEntryData = {
 	activity: null,
 	field: null,
 	zone: null,
+	selectedFields: [],
+	fieldSelectionMode: 'single',
 	odometerStart: null,
 	odometerEnd: null,
 	gaugeWorking: true,
@@ -317,15 +321,55 @@ function createFuelEntryWorkflowStore() {
 		setField: (field: Field | null) => {
 			update(state => ({
 				...state,
-				data: { ...state.data, field, zone: null }
+				data: { 
+					...state.data, 
+					field, 
+					zone: null,
+					selectedFields: [],
+					fieldSelectionMode: 'single'
+				}
 			}));
 			updateStepValidation();
 		},
 		
-		setLocation: (field: Field | null, zone: Zone | null) => {
+		setLocation: (field: Field | null, zone: Zone | null, selectedFields: Field[] = []) => {
+			const mode = selectedFields.length > 0 ? 'multiple' : 'single';
 			update(state => ({
 				...state,
-				data: { ...state.data, field, zone }
+				data: { 
+					...state.data, 
+					field: mode === 'single' ? field : null,
+					zone, 
+					selectedFields,
+					fieldSelectionMode: mode
+				}
+			}));
+			updateStepValidation();
+		},
+
+		setFieldSelectionMode: (mode: 'single' | 'multiple') => {
+			update(state => ({
+				...state,
+				data: {
+					...state.data,
+					fieldSelectionMode: mode,
+					field: mode === 'multiple' ? null : state.data.field,
+					selectedFields: mode === 'single' ? [] : state.data.selectedFields
+				}
+			}));
+			updateStepValidation();
+		},
+
+		setMultipleFields: (fields: Field[]) => {
+			update(state => ({
+				...state,
+				data: {
+					...state.data,
+					selectedFields: fields,
+					field: null,
+					zone: null,
+					fieldSelectionMode: 'multiple'
+				}
 			}));
 			updateStepValidation();
 		},
@@ -420,8 +464,9 @@ function createFuelEntryWorkflowStore() {
 					vehicle_id: currentData!.vehicle!.id,
 					driver_id: currentData!.driver!.id,
 					activity_id: currentData!.activity!.id,
-					field_id: currentData!.field?.id || null,
+					field_id: currentData!.fieldSelectionMode === 'single' ? (currentData!.field?.id || null) : null,
 					zone_id: currentData!.zone?.id || null,
+					field_selection_mode: currentData!.fieldSelectionMode,
 					bowser_id: currentData!.bowser!.id,
 					odometer_start: currentData!.odometerStart || null,
 					odometer_end: currentData!.odometerEnd || null,
@@ -442,7 +487,19 @@ function createFuelEntryWorkflowStore() {
 				
 				// Try to submit online first
 				try {
-					result = await supabaseService.createFuelEntry(fuelEntryData);
+					// Determine which fields to associate
+					const fieldIds: string[] = [];
+					if (currentData!.fieldSelectionMode === 'multiple' && currentData!.selectedFields.length > 0) {
+						fieldIds.push(...currentData!.selectedFields.map(f => f.id));
+					}
+
+					// Use new multi-field method if fields are selected, otherwise use legacy method
+					if (fieldIds.length > 0) {
+						result = await supabaseService.createFuelEntryWithFields(fuelEntryData, fieldIds);
+					} else {
+						result = await supabaseService.createFuelEntry(fuelEntryData);
+					}
+					
 					if (result.error) {
 						throw new Error(result.error);
 					}

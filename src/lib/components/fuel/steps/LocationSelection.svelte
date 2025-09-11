@@ -3,28 +3,54 @@
 	import { browser } from '$app/environment';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import MultiFieldSelection from './MultiFieldSelection.svelte';
 	import supabaseService from '$lib/services/supabase';
-	import type { Field, Zone } from '$lib/types';
+	import type { Field, Zone, FieldSelectionState } from '$lib/types';
 	
 	interface Props {
 		selectedField: Field | null;
 		selectedZone: Zone | null;
-		onLocationSelect: (field: Field | null, zone: Zone | null) => void;
+		fieldSelectionMode?: 'single' | 'multiple';
+		selectedFields?: Field[];
+		onLocationSelect: (field: Field | null, zone: Zone | null, selectedFields?: Field[]) => void;
 		onAutoAdvance?: () => void;
 		errors: string[];
+		allowModeToggle?: boolean;
 	}
 	
-	let { selectedField, selectedZone, onLocationSelect, onAutoAdvance, errors }: Props = $props();
+	let { 
+		selectedField, 
+		selectedZone, 
+		fieldSelectionMode = 'single',
+		selectedFields = [],
+		onLocationSelect, 
+		onAutoAdvance, 
+		errors,
+		allowModeToggle = true
+	}: Props = $props();
 	
 	let fields: Field[] = $state([]);
 	let zones: Zone[] = $state([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let searchTerm = $state('');
-	let activeTab = $state<'fields' | 'zones'>('fields');
+	let activeTab = $state<'fields' | 'zones' | 'multi-fields'>('fields');
+	let currentMode = $state(fieldSelectionMode);
+	
+	// Field selection state for multi-field mode
+	let multiFieldState = $state<FieldSelectionState>({
+		mode: fieldSelectionMode,
+		selectedField: selectedField,
+		selectedFields: selectedFields,
+		selectedZone: selectedZone
+	});
 	
 	// Track selected location
-	let hasSelection = $derived(selectedField !== null || selectedZone !== null);
+	let hasSelection = $derived(
+		selectedField !== null || 
+		selectedZone !== null || 
+		(currentMode === 'multiple' && selectedFields.length > 0)
+	);
 	
 	onMount(async () => {
 		if (!browser) return;
@@ -107,16 +133,18 @@
 	}));
 	
 	function selectField(field: Field) {
-		onLocationSelect(field, null);
-		if (onAutoAdvance) {
-			setTimeout(() => {
-				onAutoAdvance();
-			}, 100);
+		if (currentMode === 'single') {
+			onLocationSelect(field, null, []);
+			if (onAutoAdvance) {
+				setTimeout(() => {
+					onAutoAdvance();
+				}, 100);
+			}
 		}
 	}
 	
 	function selectZone(zone: Zone) {
-		onLocationSelect(null, zone);
+		onLocationSelect(null, zone, []);
 		if (onAutoAdvance) {
 			setTimeout(() => {
 				onAutoAdvance();
@@ -125,11 +153,37 @@
 	}
 	
 	function skipLocation() {
-		onLocationSelect(null, null);
+		onLocationSelect(null, null, []);
 		if (onAutoAdvance) {
 			setTimeout(() => {
 				onAutoAdvance();
 			}, 100);
+		}
+	}
+
+	function toggleMode(mode: 'single' | 'multiple') {
+		currentMode = mode;
+		multiFieldState.mode = mode;
+		
+		// Clear selections when switching modes
+		if (mode === 'single') {
+			onLocationSelect(null, null, []);
+			activeTab = 'fields';
+		} else {
+			onLocationSelect(null, null, []);
+			activeTab = 'multi-fields';
+		}
+	}
+
+	function handleMultiFieldSelectionChange(state: FieldSelectionState) {
+		multiFieldState = state;
+		onLocationSelect(null, null, state.selectedFields);
+		
+		// Auto-advance if fields are selected and enabled
+		if (state.selectedFields.length > 0 && onAutoAdvance) {
+			setTimeout(() => {
+				onAutoAdvance?.();
+			}, 300);
 		}
 	}
 	
@@ -187,15 +241,45 @@
 	</div>
 	
 	{#if !loading}
+		<!-- Mode Toggle (if allowed) -->
+		{#if allowModeToggle}
+			<div class="mode-toggle">
+				<div class="mode-buttons">
+					<button 
+						class="mode-btn {currentMode === 'single' ? 'active' : ''}"
+						onclick={() => toggleMode('single')}
+					>
+						Single Field
+					</button>
+					<button 
+						class="mode-btn {currentMode === 'multiple' ? 'active' : ''}"
+						onclick={() => toggleMode('multiple')}
+					>
+						Multiple Fields
+					</button>
+				</div>
+			</div>
+		{/if}
+		
 		<!-- Tab Switcher -->
 		<div class="tab-switcher">
-			<button 
-				class="tab-btn" 
-				class:active={activeTab === 'fields'}
-				onclick={() => activeTab = 'fields'}
-			>
-				🌾 Fields ({fields.length})
-			</button>
+			{#if currentMode === 'single'}
+				<button 
+					class="tab-btn" 
+					class:active={activeTab === 'fields'}
+					onclick={() => activeTab = 'fields'}
+				>
+					🌾 Fields ({fields.length})
+				</button>
+			{:else}
+				<button 
+					class="tab-btn" 
+					class:active={activeTab === 'multi-fields'}
+					onclick={() => activeTab = 'multi-fields'}
+				>
+					🌾 Select Fields ({fields.length} available)
+				</button>
+			{/if}
 			<button 
 				class="tab-btn" 
 				class:active={activeTab === 'zones'}
@@ -243,6 +327,14 @@
 			<p>Failed to load locations</p>
 			<small>{error}</small>
 		</div>
+	{:else if activeTab === 'multi-fields'}
+		<!-- Multi-Field Selection -->
+		<MultiFieldSelection
+			selectionState={multiFieldState}
+			onSelectionChange={handleMultiFieldSelectionChange}
+			errors={errors}
+			maxSelections={10}
+		/>
 	{:else if activeTab === 'fields'}
 		{#if filteredFieldsCount === 0}
 			<div class="empty-state">
@@ -313,10 +405,25 @@
 			<Card class="selected-location-summary">
 				<div class="summary-header">
 					<span class="summary-icon">✓</span>
-					<h3>Selected Location</h3>
+					<h3>Selected Location{currentMode === 'multiple' && selectedFields.length > 1 ? 's' : ''}</h3>
 				</div>
 				<div class="summary-content">
-					{#if selectedField}
+					{#if currentMode === 'multiple' && selectedFields.length > 0}
+						<div class="summary-multi-fields">
+							<div class="multi-field-count">
+								{selectedFields.length} field{selectedFields.length !== 1 ? 's' : ''} selected
+							</div>
+							<div class="multi-field-list">
+								{#each selectedFields as field, index}
+									<span class="field-chip">
+										<span class="field-icon">{getFieldIcon(field.crop_type)}</span>
+										{field.name}
+									</span>
+									{#if index < selectedFields.length - 1}, {/if}
+								{/each}
+							</div>
+						</div>
+					{:else if selectedField}
 						<div class="summary-field">
 							<div class="summary-field-icon" style="color: {getFieldColor(selectedField.crop_type)}">
 								{getFieldIcon(selectedField.crop_type)}
@@ -346,7 +453,7 @@
 					{/if}
 				</div>
 				<div class="summary-actions">
-					<Button variant="outline" size="sm" onclick={() => onLocationSelect(null, null)}>
+					<Button variant="outline" size="sm" onclick={() => onLocationSelect(null, null, [])}>
 						Change Location
 					</Button>
 				</div>
@@ -360,6 +467,44 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+	}
+
+	/* Mode Toggle */
+	.mode-toggle {
+		margin-bottom: 1rem;
+	}
+
+	.mode-buttons {
+		display: flex;
+		gap: 0.25rem;
+		padding: 0.25rem;
+		background: var(--gray-100, #f3f4f6);
+		border-radius: 10px;
+	}
+
+	.mode-btn {
+		flex: 1;
+		padding: 0.75rem 1rem;
+		background: transparent;
+		border: none;
+		border-radius: 8px;
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--gray-600, #475569);
+		cursor: pointer;
+		transition: all 0.2s;
+		text-align: center;
+	}
+
+	.mode-btn.active {
+		background: white;
+		color: var(--gray-900, #0f172a);
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+
+	.mode-btn:hover:not(.active) {
+		background: rgba(255, 255, 255, 0.7);
+		color: var(--gray-700, #374151);
 	}
 
 	/* Tab Switcher */
@@ -884,6 +1029,43 @@
 	.summary-actions {
 		display: flex;
 		justify-content: flex-end;
+	}
+
+	/* Multi-Field Summary Styles */
+	.summary-multi-fields {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.multi-field-count {
+		font-weight: 600;
+		color: #065f46;
+		font-size: 0.875rem;
+	}
+
+	.multi-field-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.field-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		background: white;
+		border: 1px solid #10b981;
+		border-radius: 16px;
+		padding: 0.25rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: #065f46;
+	}
+
+	.field-chip .field-icon {
+		font-size: 0.875rem;
 	}
 
 	/* Loading State */

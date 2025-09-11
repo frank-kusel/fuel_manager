@@ -118,9 +118,13 @@ export interface FuelEntry {
 	vehicle_id: string;
 	driver_id: string;
 	activity_id: string;
-	field_id?: string;
+	field_id?: string; // Legacy single field (for backward compatibility)
 	zone_id?: string;
 	bowser_id: string;
+	
+	// Multi-field support
+	field_selection_mode?: 'single' | 'multiple';
+	fields?: Field[]; // Populated when joining with junction table
 	
 	// Odometer data
 	odometer_start: number | null;
@@ -144,6 +148,43 @@ export interface FuelEntry {
 	// System fields
 	created_at: string;
 	updated_at: string;
+}
+
+// Junction table interface for fuel entry to field relationships
+export interface FuelEntryField {
+	id: string;
+	fuel_entry_id: string;
+	field_id: string;
+	field?: Field; // Populated when joining with fields table
+	created_at: string;
+}
+
+// Extended interface for fuel entries with location details
+export interface FuelEntryWithLocation extends FuelEntry {
+	// Single field info (backward compatibility)
+	single_field_id?: string;
+	single_field_name?: string;
+	single_field_code?: string;
+	single_field_crop_type?: string;
+	
+	// Zone info
+	zone_id_info?: string;
+	zone_name?: string;
+	zone_code?: string;
+	zone_type?: string;
+	
+	// Location type and display
+	location_type: 'single_field' | 'zone' | 'multiple_fields' | 'unspecified';
+	location_display_name: string;
+	associated_fields_count: number;
+}
+
+// Form state interfaces for multi-field selection
+export interface FieldSelectionState {
+	mode: 'single' | 'multiple';
+	selectedField: Field | null; // For single mode
+	selectedFields: Field[]; // For multiple mode
+	selectedZone: Zone | null;
 }
 
 export interface RefillRecord {
