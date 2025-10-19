@@ -15,18 +15,16 @@
 		onLocationSelect: (field: Field | null, zone: Zone | null, selectedFields?: Field[]) => void;
 		onAutoAdvance?: () => void;
 		errors: string[];
-		allowModeToggle?: boolean;
 	}
-	
-	let { 
-		selectedField, 
-		selectedZone, 
+
+	let {
+		selectedField,
+		selectedZone,
 		fieldSelectionMode = 'single',
 		selectedFields = [],
-		onLocationSelect, 
-		onAutoAdvance, 
-		errors,
-		allowModeToggle = true
+		onLocationSelect,
+		onAutoAdvance,
+		errors
 	}: Props = $props();
 	
 	let fields: Field[] = $state([]);
@@ -34,22 +32,20 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let searchTerm = $state('');
-	let activeTab = $state<'fields' | 'zones' | 'multi-fields'>('fields');
-	let currentMode = $state(fieldSelectionMode);
-	
+	let activeTab = $state<'fields' | 'zones'>('fields');
+
 	// Field selection state for multi-field mode
 	let multiFieldState = $state<FieldSelectionState>({
-		mode: fieldSelectionMode,
+		mode: 'multiple', // Always use multiple mode for unified interface
 		selectedField: selectedField,
 		selectedFields: selectedFields,
 		selectedZone: selectedZone
 	});
-	
+
 	// Track selected location
 	let hasSelection = $derived(
-		selectedField !== null || 
-		selectedZone !== null || 
-		(currentMode === 'multiple' && selectedFields.length > 0)
+		selectedZone !== null ||
+		selectedFields.length > 0
 	);
 	
 	onMount(async () => {
@@ -79,48 +75,6 @@
 	});
 	
 	// Group fields by crop type
-	let groupedFields = $derived.by(() => {
-		const groups: Record<string, Field[]> = {};
-		
-		// Filter fields first
-		const filtered = fields.filter(field => {
-			if (!searchTerm) return true;
-			const search = searchTerm.toLowerCase();
-			return (
-				field.name.toLowerCase().includes(search) ||
-				field.code.toLowerCase().includes(search) ||
-				field.location?.toLowerCase().includes(search) ||
-				field.crop_type?.toLowerCase().includes(search)
-			);
-		});
-		
-		// Sort and group by crop type
-		const sorted = [...filtered].sort((a, b) => {
-			const cropA = a.crop_type || 'Other';
-			const cropB = b.crop_type || 'Other';
-			if (cropA < cropB) return -1;
-			if (cropA > cropB) return 1;
-			// If same crop, sort by name
-			const nameA = a.name || '';
-			const nameB = b.name || '';
-			if (nameA < nameB) return -1;
-			if (nameA > nameB) return 1;
-			return 0;
-		});
-		
-		// Group by crop type
-		sorted.forEach(field => {
-			const crop = field.crop_type || 'Other';
-			if (!groups[crop]) {
-				groups[crop] = [];
-			}
-			groups[crop].push(field);
-		});
-		
-		return groups;
-	});
-	
-	let filteredFieldsCount = $derived(Object.values(groupedFields).flat().length);
 	
 	let filteredZones = $derived(zones.filter(zone => {
 		if (!searchTerm) return true;
@@ -131,17 +85,6 @@
 			zone.description?.toLowerCase().includes(search)
 		);
 	}));
-	
-	function selectField(field: Field) {
-		if (currentMode === 'single') {
-			onLocationSelect(field, null, []);
-			if (onAutoAdvance) {
-				setTimeout(() => {
-					onAutoAdvance();
-				}, 100);
-			}
-		}
-	}
 	
 	function selectZone(zone: Zone) {
 		onLocationSelect(null, zone, []);
@@ -161,30 +104,10 @@
 		}
 	}
 
-	function toggleMode(mode: 'single' | 'multiple') {
-		currentMode = mode;
-		multiFieldState.mode = mode;
-		
-		// Clear selections when switching modes
-		if (mode === 'single') {
-			onLocationSelect(null, null, []);
-			activeTab = 'fields';
-		} else {
-			onLocationSelect(null, null, []);
-			activeTab = 'multi-fields';
-		}
-	}
-
 	function handleMultiFieldSelectionChange(state: FieldSelectionState) {
 		multiFieldState = state;
 		onLocationSelect(null, null, state.selectedFields);
-		
-		// Auto-advance if fields are selected and enabled
-		if (state.selectedFields.length > 0 && onAutoAdvance) {
-			setTimeout(() => {
-				onAutoAdvance?.();
-			}, 300);
-		}
+		// No auto-advance - let user manually proceed
 	}
 	
 	function getFieldIcon(cropType: string | null): string {
@@ -241,68 +164,40 @@
 	</div>
 	
 	{#if !loading}
-		<!-- Mode Toggle (if allowed) -->
-		{#if allowModeToggle}
-			<div class="mode-toggle">
-				<div class="mode-buttons">
-					<button 
-						class="mode-btn {currentMode === 'single' ? 'active' : ''}"
-						onclick={() => toggleMode('single')}
-					>
-						Single Field
-					</button>
-					<button 
-						class="mode-btn {currentMode === 'multiple' ? 'active' : ''}"
-						onclick={() => toggleMode('multiple')}
-					>
-						Multiple Fields
-					</button>
-				</div>
-			</div>
-		{/if}
-		
 		<!-- Tab Switcher -->
 		<div class="tab-switcher">
-			{#if currentMode === 'single'}
-				<button 
-					class="tab-btn" 
-					class:active={activeTab === 'fields'}
-					onclick={() => activeTab = 'fields'}
-				>
-					🌾 Fields ({fields.length})
-				</button>
-			{:else}
-				<button 
-					class="tab-btn" 
-					class:active={activeTab === 'multi-fields'}
-					onclick={() => activeTab = 'multi-fields'}
-				>
-					🌾 Select Fields ({fields.length} available)
-				</button>
-			{/if}
-			<button 
-				class="tab-btn" 
+			<button
+				class="tab-btn"
+				class:active={activeTab === 'fields'}
+				onclick={() => activeTab = 'fields'}
+			>
+				🌾 Fields ({fields.length})
+			</button>
+			<button
+				class="tab-btn"
 				class:active={activeTab === 'zones'}
 				onclick={() => activeTab = 'zones'}
 			>
 				📍 Zones ({zones.length})
 			</button>
 		</div>
-		
-		<!-- Search -->
-		<div class="search-container">
-			<div class="search-input">
-				<span class="search-icon">🔍</span>
-				<input 
-					type="text" 
-					placeholder="Search {activeTab === 'fields' ? 'fields' : 'zones'}..."
-					bind:value={searchTerm}
-				/>
-				{#if searchTerm}
-					<button class="clear-search" onclick={() => searchTerm = ''}>×</button>
-				{/if}
+
+		<!-- Search (only for zones tab - fields have their own search) -->
+		{#if activeTab === 'zones'}
+			<div class="search-container">
+				<div class="search-input">
+					<span class="search-icon">🔍</span>
+					<input
+						type="text"
+						placeholder="Search zones..."
+						bind:value={searchTerm}
+					/>
+					{#if searchTerm}
+						<button class="clear-search" onclick={() => searchTerm = ''}>×</button>
+					{/if}
+				</div>
 			</div>
-		</div>
+		{/if}
 	{/if}
 	
 	{#if loading}
@@ -327,52 +222,14 @@
 			<p>Failed to load locations</p>
 			<small>{error}</small>
 		</div>
-	{:else if activeTab === 'multi-fields'}
-		<!-- Multi-Field Selection -->
+	{:else if activeTab === 'fields'}
+		<!-- Multi-Field Selection (unified interface for single or multiple) -->
 		<MultiFieldSelection
 			selectionState={multiFieldState}
 			onSelectionChange={handleMultiFieldSelectionChange}
 			errors={errors}
 			maxSelections={10}
 		/>
-	{:else if activeTab === 'fields'}
-		{#if filteredFieldsCount === 0}
-			<div class="empty-state">
-				{searchTerm ? 'No fields found' : 'No fields available'}
-			</div>
-		{:else}
-			<div class="field-table-container">
-				<table class="field-table">
-					<colgroup>
-						<col class="col-name">
-						<col class="col-location">
-						<col class="col-area">
-					</colgroup>
-					<tbody>
-						{#each Object.entries(groupedFields) as [cropType, fieldList]}
-							<!-- Crop Type Group Header -->
-							<tr class="group-header">
-								<td colspan="3" class="group-title">
-									<span class="group-label">{cropType}</span>
-								</td>
-							</tr>
-							
-							<!-- Fields in this crop group -->
-							{#each fieldList as field (field.id)}
-								<tr 
-									class="field-row {selectedField?.id === field.id ? 'selected' : ''}"
-									onclick={() => selectField(field)}
-								>
-									<td class="field-name">{field.name}</td>
-									<td class="field-location">{field.location || 'Not set'}</td>
-									<td class="field-area">{formatArea(field.area)}</td>
-								</tr>
-							{/each}
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
 	{:else}
 		{#if filteredZones.length === 0}
 			<div class="empty-state">
@@ -400,66 +257,6 @@
 		{/if}
 	{/if}
 	
-	{#if hasSelection}
-		<div class="selection-summary">
-			<Card class="selected-location-summary">
-				<div class="summary-header">
-					<span class="summary-icon">✓</span>
-					<h3>Selected Location{currentMode === 'multiple' && selectedFields.length > 1 ? 's' : ''}</h3>
-				</div>
-				<div class="summary-content">
-					{#if currentMode === 'multiple' && selectedFields.length > 0}
-						<div class="summary-multi-fields">
-							<div class="multi-field-count">
-								{selectedFields.length} field{selectedFields.length !== 1 ? 's' : ''} selected
-							</div>
-							<div class="multi-field-list">
-								{#each selectedFields as field, index}
-									<span class="field-chip">
-										<span class="field-icon">{getFieldIcon(field.crop_type)}</span>
-										{field.name}
-									</span>
-									{#if index < selectedFields.length - 1}, {/if}
-								{/each}
-							</div>
-						</div>
-					{:else if selectedField}
-						<div class="summary-field">
-							<div class="summary-field-icon" style="color: {getFieldColor(selectedField.crop_type)}">
-								{getFieldIcon(selectedField.crop_type)}
-							</div>
-							<div class="summary-info">
-								<div class="summary-name">Field: {selectedField.name}</div>
-								<div class="summary-details">
-									{selectedField.code} • {formatArea(selectedField.area)}
-									{#if selectedField.crop_type}
-										• {selectedField.crop_type}
-									{/if}
-								</div>
-							</div>
-						</div>
-					{:else if selectedZone}
-						<div class="summary-zone">
-							<div class="summary-zone-badge" style="background-color: {selectedZone.color || '#95A5A6'}">
-								{selectedZone.code}
-							</div>
-							<div class="summary-info">
-								<div class="summary-name">Zone: {selectedZone.name}</div>
-								{#if selectedZone.description}
-									<div class="summary-details">{selectedZone.description}</div>
-								{/if}
-							</div>
-						</div>
-					{/if}
-				</div>
-				<div class="summary-actions">
-					<Button variant="outline" size="sm" onclick={() => onLocationSelect(null, null, [])}>
-						Change Location
-					</Button>
-				</div>
-			</Card>
-		</div>
-	{/if}
 </div>
 
 <style>
@@ -467,44 +264,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-	}
-
-	/* Mode Toggle */
-	.mode-toggle {
-		margin-bottom: 1rem;
-	}
-
-	.mode-buttons {
-		display: flex;
-		gap: 0.25rem;
-		padding: 0.25rem;
-		background: var(--gray-100, #f3f4f6);
-		border-radius: 10px;
-	}
-
-	.mode-btn {
-		flex: 1;
-		padding: 0.75rem 1rem;
-		background: transparent;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--gray-600, #475569);
-		cursor: pointer;
-		transition: all 0.2s;
-		text-align: center;
-	}
-
-	.mode-btn.active {
-		background: white;
-		color: var(--gray-900, #0f172a);
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	}
-
-	.mode-btn:hover:not(.active) {
-		background: rgba(255, 255, 255, 0.7);
-		color: var(--gray-700, #374151);
 	}
 
 	/* Tab Switcher */
@@ -761,122 +520,6 @@
 		color: var(--gray-900, #0f172a);
 	}
 
-	/* Clean table container */
-	.field-table-container {
-		background: transparent;
-		margin: 0;
-	}
-
-	/* Clean table design */
-	.field-table {
-		width: 100%;
-		border-collapse: separate;
-		border-spacing: 0;
-		table-layout: fixed;
-	}
-
-	/* Column widths using colgroup - Desktop (split in thirds) */
-	.col-name { width: 33.33%; }
-	.col-location { width: 33.33%; }
-	.col-area { width: 33.33%; }
-
-	.field-table td {
-		padding: 0.75rem 0.5rem;
-		text-align: left;
-		border: none;
-		font-size: 1rem;
-		vertical-align: middle;
-		border-bottom: 1px solid rgba(248, 250, 252, 0.8);
-	}
-
-	/* Right align the area column specifically */
-	.field-table td.field-area {
-		text-align: right;
-	}
-
-	.field-table tbody tr.field-row {
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.field-table tbody tr.field-row:hover {
-		background: rgba(0, 0, 0, 0.02);
-		border-bottom-color: rgba(203, 213, 225, 0.4);
-	}
-
-	.field-table tbody tr:last-child td {
-		border-bottom: none;
-	}
-
-	/* Group headers */
-	.field-table tbody tr.group-header td {
-		background: var(--background-200, #f9fafb);
-		border: none;
-	}
-	
-	.group-title {
-		padding: 1rem;
-		font-size: 1rem;
-		font-weight: 600;
-		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		border: none;
-		text-align: center;
-	}
-	
-	.group-label {
-		font-weight: 600;
-		color: #6b7280;
-		font-size: 1rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		display: block;
-		text-align: center;
-		width: 100%;
-	}
-
-	/* Selected field row */
-	.field-table tbody tr.field-row.selected {
-		background: rgba(37, 99, 235, 0.08);
-		border-radius: 0.5rem;
-	}
-
-	.field-table tbody tr.field-row.selected .field-name {
-		color: #2563eb;
-		font-weight: 600;
-	}
-
-	.field-table tbody tr.field-row.selected .field-location {
-		color: #1e293b;
-		font-weight: 500;
-	}
-
-	.field-table tbody tr.field-row.selected .field-area {
-		color: #475569;
-	}
-
-	/* Cell styling */
-	.field-name {
-		font-weight: 500;
-		color: #111827;
-		font-size: 0.875rem;
-	}
-	
-	.field-location {
-		font-weight: 400;
-		color: #6b7280;
-		font-size: 0.875rem;
-	}
-	
-	.field-area {
-		font-size: 0.875rem;
-		color: #6b7280;
-		font-variant-numeric: tabular-nums;
-		font-weight: 400;
-		text-align: right;
-	}
-
 	/* Zones Grid */
 	.zones-grid {
 		display: grid;
@@ -944,128 +587,6 @@
 
 	.zone-card.selected .zone-description {
 		color: rgba(255, 255, 255, 0.8);
-	}
-
-	/* Selection Summary */
-	.selection-summary {
-		margin-top: 1rem;
-	}
-
-	:global(.selected-location-summary) {
-		border: 2px solid #10b981;
-		background: #f0fdf4;
-	}
-
-	.summary-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-	}
-
-	.summary-icon {
-		background: #10b981;
-		color: var(--gray-900, #0f172a);
-		width: 1.5rem;
-		height: 1.5rem;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.875rem;
-		font-weight: bold;
-	}
-
-	.summary-header h3 {
-		color: #065f46;
-		font-size: 1rem;
-		font-weight: 600;
-		margin: 0;
-	}
-
-	.summary-content {
-		margin-bottom: 1rem;
-	}
-
-	.summary-field,
-	.summary-zone {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.summary-field-icon {
-		font-size: 1.5rem;
-		width: 2.5rem;
-		height: 2.5rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: white;
-		border-radius: 8px;
-		flex-shrink: 0;
-	}
-
-	.summary-zone-badge {
-		padding: 0.5rem 0.75rem;
-		border-radius: 6px;
-		color: var(--gray-900, #0f172a);
-		font-weight: 600;
-		font-size: 0.875rem;
-		flex-shrink: 0;
-	}
-
-	.summary-name {
-		font-weight: 600;
-		color: #0f172a;
-		margin-bottom: 0.25rem;
-	}
-
-	.summary-details {
-		font-size: 0.875rem;
-		color: #475569;
-	}
-
-	.summary-actions {
-		display: flex;
-		justify-content: flex-end;
-	}
-
-	/* Multi-Field Summary Styles */
-	.summary-multi-fields {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.multi-field-count {
-		font-weight: 600;
-		color: #065f46;
-		font-size: 0.875rem;
-	}
-
-	.multi-field-list {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		align-items: center;
-	}
-
-	.field-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.375rem;
-		background: white;
-		border: 1px solid #10b981;
-		border-radius: 16px;
-		padding: 0.25rem 0.75rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: #065f46;
-	}
-
-	.field-chip .field-icon {
-		font-size: 0.875rem;
 	}
 
 	/* Loading State */
@@ -1151,21 +672,6 @@
 
 	/* Mobile Responsiveness */
 	@media (max-width: 768px) {
-		.field-table-container {
-			margin: 0;
-		}
-
-		.field-name,
-		.field-location,
-		.field-area {
-			font-size: 14px;
-		}
-
-		/* Mobile column widths - equal thirds */
-		.col-name { width: 33.33%; }
-		.col-location { width: 33.33%; }
-		.col-area { width: 33.33%; }
-		
 		.zones-grid {
 			grid-template-columns: repeat(2, 1fr);
 		}

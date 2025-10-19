@@ -9,7 +9,7 @@ function _page($$payload, $$props) {
   head($$payload, ($$payload2) => {
     $$payload2.title = `<title>FarmTrack - Loading...</title>`;
   });
-  $$payload.out.push(`<div class="loading-container svelte-1w1qui2"><div class="loading-spinner svelte-1w1qui2"><div class="brand-icon svelte-1w1qui2">🚜</div> <h2 class="svelte-1w1qui2">Loading FarmTrack...</h2> <p class="svelte-1w1qui2">Redirecting to fuel management...</p></div></div>`);
+  $$payload.out.push(`<div class="loading-container svelte-1uha8ag"><div class="loading-spinner svelte-1uha8ag"><div class="brand-icon svelte-1uha8ag">🚜</div> <h2 class="svelte-1uha8ag">Loading FarmTrack...</h2> <p class="svelte-1uha8ag">Redirecting to fuel management...</p></div></div>`);
   pop();
 }
 export {

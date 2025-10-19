@@ -1,4 +1,5 @@
 import { K as attr, G as attr_class, Q as clsx, B as pop, z as push } from "./index2.js";
+/* empty css                                     */
 function Button($$payload, $$props) {
   push();
   let {
@@ -24,10 +25,10 @@ function Button($$payload, $$props) {
   const finalDisabled = disabled || loading;
   if (href) {
     $$payload.out.push("<!--[-->");
-    $$payload.out.push(`<a${attr("href", href)}${attr("target", target)}${attr_class(clsx(baseClasses), "svelte-1aot3tz", { "disabled": finalDisabled })} role="button"${attr("tabindex", finalDisabled ? -1 : 0)}>`);
+    $$payload.out.push(`<a${attr("href", href)}${attr("target", target)}${attr_class(clsx(baseClasses), "svelte-1xko78n", { "disabled": finalDisabled })} role="button"${attr("tabindex", finalDisabled ? -1 : 0)}>`);
     if (loading) {
       $$payload.out.push("<!--[-->");
-      $$payload.out.push(`<div class="loading-spinner svelte-1aot3tz"></div>`);
+      $$payload.out.push(`<div class="loading-spinner svelte-1xko78n"></div>`);
     } else {
       $$payload.out.push("<!--[!-->");
     }
@@ -36,10 +37,10 @@ function Button($$payload, $$props) {
     $$payload.out.push(`<!----></a>`);
   } else {
     $$payload.out.push("<!--[!-->");
-    $$payload.out.push(`<button${attr("type", type)}${attr_class(clsx(baseClasses), "svelte-1aot3tz")}${attr("disabled", finalDisabled, true)}>`);
+    $$payload.out.push(`<button${attr("type", type)}${attr_class(clsx(baseClasses), "svelte-1xko78n")}${attr("disabled", finalDisabled, true)}>`);
     if (loading) {
       $$payload.out.push("<!--[-->");
-      $$payload.out.push(`<div class="loading-spinner svelte-1aot3tz"></div>`);
+      $$payload.out.push(`<div class="loading-spinner svelte-1xko78n"></div>`);
     } else {
       $$payload.out.push("<!--[!-->");
     }

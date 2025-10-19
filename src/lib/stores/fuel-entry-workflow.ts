@@ -88,8 +88,8 @@ const defaultSteps: FuelEntryWorkflowStep[] = [
 		title: 'Select Location',
 		icon: '📍',
 		completed: false,
-		valid: true, // Optional step
-		required: false
+		valid: false,
+		required: true
 	},
 	{
 		id: 'odometer',
@@ -170,7 +170,10 @@ function createFuelEntryWorkflowStore() {
 				break;
 				
 			case 'location':
-				// Optional step - always valid (can have field, zone, or neither)
+				// Require at least one field or zone to be selected
+				if (!data.zone && data.selectedFields.length === 0) {
+					errors.push('Please select at least one field or zone');
+				}
 				break;
 				
 			case 'odometer':

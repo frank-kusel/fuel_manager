@@ -2,14 +2,10 @@ import { H as HYDRATION_ERROR, g as get_next_sibling, d as define_property, s as
 import "clsx";
 import "./environment.js";
 let public_env = {};
-let safe_public_env = {};
 function set_private_env(environment) {
 }
 function set_public_env(environment) {
   public_env = environment;
-}
-function set_safe_public_env(environment) {
-  safe_public_env = environment;
 }
 function hydration_mismatch(location) {
   {
@@ -456,6 +452,7 @@ const options = {
   app_template_contains_nonce: false,
   csp: { "mode": "auto", "directives": { "upgrade-insecure-requests": false, "block-all-mixed-content": false }, "reportOnly": { "upgrade-insecure-requests": false, "block-all-mixed-content": false } },
   csrf_check_origin: true,
+  csrf_trusted_origins: [],
   embedded: false,
   env_public_prefix: "PUBLIC_",
   env_private_prefix: "",
@@ -465,6 +462,7 @@ const options = {
   preload_strategy: "modulepreload",
   root,
   service_worker: false,
+  service_worker_options: void 0,
   templates: {
     app: ({ head, body, assets, nonce, env }) => '<!DOCTYPE html>\n<html lang="en" data-theme="light">\n	<head>\n		<meta charset="utf-8" />\n		<link rel="icon" href="' + assets + '/favicon.png" />\n		<meta name="viewport" content="width=device-width, initial-scale=1" />\n		<meta name="description" content="FarmTrack - Comprehensive Farm Management Platform" />\n		<meta name="theme-color" content="#f8fafc" />\n		<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8fafc" />\n		<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1f2937" />\n		\n		<!-- PWA Meta Tags -->\n		<link rel="manifest" href="/manifest.json" />\n		<meta name="mobile-web-app-capable" content="yes" />\n		<meta name="apple-mobile-web-app-capable" content="yes" />\n		<meta name="apple-mobile-web-app-status-bar-style" content="light-content" />\n		<meta name="apple-mobile-web-app-title" content="FarmTrack" />\n		<meta name="msapplication-TileColor" content="#f97316" />\n		<meta name="msapplication-navbutton-color" content="#f8fafc" />\n		\n		<!-- Splash screens for iOS -->\n		<link rel="apple-touch-startup-image" href="/splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">\n		<link rel="apple-touch-startup-image" href="/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">\n		<link rel="apple-touch-startup-image" href="/splash-1242x2208.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">\n		<link rel="apple-touch-startup-image" href="/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">\n		<link rel="apple-touch-startup-image" href="/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">\n		\n		' + head + '\n	</head>\n	<body data-sveltekit-preload-data="hover">\n		<div style="display: contents">' + body + "</div>\n	</body>\n</html>",
     error: ({ status, message }) => '<!doctype html>\n<html lang="en">\n	<head>\n		<meta charset="utf-8" />\n		<title>' + message + `</title>
@@ -538,7 +536,7 @@ const options = {
 		<div class="error">
 			<span class="status">` + status + '</span>\n			<div class="message">\n				<h1>' + message + "</h1>\n			</div>\n		</div>\n	</body>\n</html>\n"
   },
-  version_hash: "1130idt"
+  version_hash: "9nhddc"
 };
 async function get_hooks() {
   let handle;
@@ -559,14 +557,12 @@ async function get_hooks() {
   };
 }
 export {
-  set_private_env as a,
-  set_public_env as b,
-  set_safe_public_env as c,
-  set_read_implementation as d,
-  set_manifest as e,
+  set_public_env as a,
+  set_read_implementation as b,
+  set_manifest as c,
   get_hooks as g,
   options as o,
   public_env as p,
   read_implementation as r,
-  safe_public_env as s
+  set_private_env as s
 };

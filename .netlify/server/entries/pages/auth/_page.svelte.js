@@ -135,7 +135,7 @@ function _page($$payload, $$props) {
   head($$payload, ($$payload2) => {
     $$payload2.title = `<title>${escape_html("Login")} - FarmTrack</title>`;
   });
-  $$payload.out.push(`<div class="auth-container svelte-v25yam"><div class="auth-card svelte-v25yam"><div class="auth-header svelte-v25yam"><div class="brand-icon svelte-v25yam">🚜</div> <h1 class="svelte-v25yam">FarmTrack</h1> <p class="tagline svelte-v25yam">Farm Management Platform</p></div> <form class="auth-form svelte-v25yam"><h2 class="svelte-v25yam">${escape_html("Sign In")}</h2> `);
+  $$payload.out.push(`<div class="auth-container svelte-1s728sz"><div class="auth-card svelte-1s728sz"><div class="auth-header svelte-1s728sz"><div class="brand-icon svelte-1s728sz">🚜</div> <h1 class="svelte-1s728sz">FarmTrack</h1> <p class="tagline svelte-1s728sz">Farm Management Platform</p></div> <form class="auth-form svelte-1s728sz"><h2 class="svelte-1s728sz">${escape_html("Sign In")}</h2> `);
   {
     $$payload.out.push("<!--[!-->");
   }
@@ -143,7 +143,7 @@ function _page($$payload, $$props) {
   {
     $$payload.out.push("<!--[!-->");
   }
-  $$payload.out.push(`<!--]--> <div class="form-group svelte-v25yam"><label for="email" class="svelte-v25yam">Email Address</label> <input id="email" type="email"${attr("value", email)} placeholder="Enter your email"${attr("disabled", loading, true)} required class="svelte-v25yam"/></div> <div class="form-group svelte-v25yam"><label for="password" class="svelte-v25yam">Password</label> <input id="password" type="password"${attr("value", password)} placeholder="Enter your password"${attr("disabled", loading, true)} required class="svelte-v25yam"/></div> `);
+  $$payload.out.push(`<!--]--> <div class="form-group svelte-1s728sz"><label for="email" class="svelte-1s728sz">Email Address</label> <input id="email" type="email"${attr("value", email)} placeholder="Enter your email"${attr("disabled", loading, true)} required class="svelte-1s728sz"/></div> <div class="form-group svelte-1s728sz"><label for="password" class="svelte-1s728sz">Password</label> <input id="password" type="password"${attr("value", password)} placeholder="Enter your password"${attr("disabled", loading, true)} required class="svelte-1s728sz"/></div> `);
   {
     $$payload.out.push("<!--[!-->");
   }
@@ -158,7 +158,7 @@ function _page($$payload, $$props) {
       $$payload2.out.push(`<!---->${escape_html("Sign In")}`);
     }
   });
-  $$payload.out.push(`<!----></form> <div class="auth-footer svelte-v25yam"><p class="svelte-v25yam">${escape_html("Don't have an account?")} <button class="link-button svelte-v25yam"${attr("disabled", loading, true)}>${escape_html("Create Account")}</button></p></div></div></div>`);
+  $$payload.out.push(`<!----></form> <div class="auth-footer svelte-1s728sz"><p class="svelte-1s728sz">${escape_html("Don't have an account?")} <button class="link-button svelte-1s728sz"${attr("disabled", loading, true)}>${escape_html("Create Account")}</button></p></div></div></div>`);
   if ($$store_subs) unsubscribe_stores($$store_subs);
   pop();
 }

@@ -16,7 +16,7 @@ function Card($$payload, $$props) {
     hover && "card-hover",
     className
   ].filter(Boolean).join(" ");
-  $$payload.out.push(`<div${attr_class(clsx(classes), "svelte-1v5uc5n")}>`);
+  $$payload.out.push(`<div${attr_class(clsx(classes), "svelte-7d5xe5")}>`);
   children($$payload);
   $$payload.out.push(`<!----></div>`);
   pop();

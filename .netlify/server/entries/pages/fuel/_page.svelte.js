@@ -1,11 +1,10 @@
-import { P as ensure_array_like, J as escape_html, B as pop, z as push, N as attr_style, O as stringify, G as attr_class, K as attr, E as store_get, I as unsubscribe_stores, F as head } from "../../../chunks/index2.js";
-import { B as Button } from "../../../chunks/Button.js";
+import { M as ensure_array_like, J as escape_html, B as pop, z as push, K as attr, G as attr_class, F as head, E as store_get, O as attr_style, P as stringify, I as unsubscribe_stores } from "../../../chunks/index2.js";
+/* empty css                                                   */
 /* empty css                                                 */
-import { C as Card } from "../../../chunks/Card.js";
 import { d as derived, w as writable } from "../../../chunks/index.js";
 function VehicleSelection($$payload, $$props) {
   push();
-  let { selectedVehicle, onVehicleSelect, errors } = $$props;
+  let { selectedVehicle, errors } = $$props;
   let vehicles = [];
   (() => {
     const groups = {};
@@ -30,18 +29,14 @@ function VehicleSelection($$payload, $$props) {
     });
     return groups;
   })();
-  function formatOdometer(reading, unit) {
-    if (reading === null) return "Not set";
-    return `${new Intl.NumberFormat().format(reading)} ${unit || "km"}`;
-  }
-  $$payload.out.push(`<div class="vehicle-selection svelte-1w2cn5"><div class="step-header svelte-1w2cn5"><h2 class="svelte-1w2cn5">Vehicle</h2></div> `);
+  $$payload.out.push(`<div class="vehicle-selection svelte-fspqbb">`);
   if (errors.length > 0) {
     $$payload.out.push("<!--[-->");
     const each_array = ensure_array_like(errors);
-    $$payload.out.push(`<div class="error-messages svelte-1w2cn5"><!--[-->`);
+    $$payload.out.push(`<div class="error-messages svelte-fspqbb"><!--[-->`);
     for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
       let error = each_array[$$index];
-      $$payload.out.push(`<div class="error-message svelte-1w2cn5"><span class="error-icon svelte-1w2cn5">⚠️</span> ${escape_html(error)}</div>`);
+      $$payload.out.push(`<div class="error-message svelte-fspqbb"><span class="error-icon svelte-fspqbb">⚠️</span> ${escape_html(error)}</div>`);
     }
     $$payload.out.push(`<!--]--></div>`);
   } else {
@@ -51,33 +46,17 @@ function VehicleSelection($$payload, $$props) {
   {
     $$payload.out.push("<!--[-->");
     const each_array_1 = ensure_array_like(Array(6));
-    $$payload.out.push(`<div class="loading-state svelte-1w2cn5"><div class="vehicles-grid svelte-1w2cn5"><!--[-->`);
+    $$payload.out.push(`<div class="loading-state svelte-fspqbb"><div class="vehicles-grid svelte-fspqbb"><!--[-->`);
     for (let $$index_1 = 0, $$length = each_array_1.length; $$index_1 < $$length; $$index_1++) {
       each_array_1[$$index_1];
-      $$payload.out.push(`<div class="vehicle-card-skeleton svelte-1w2cn5"><div class="skeleton-header svelte-1w2cn5"><div class="skeleton-icon svelte-1w2cn5"></div> <div class="skeleton-content svelte-1w2cn5"><div class="skeleton-line svelte-1w2cn5"></div> <div class="skeleton-line short svelte-1w2cn5"></div></div></div> <div class="skeleton-body svelte-1w2cn5"><div class="skeleton-line svelte-1w2cn5"></div> <div class="skeleton-line short svelte-1w2cn5"></div></div></div>`);
+      $$payload.out.push(`<div class="vehicle-card-skeleton svelte-fspqbb"><div class="skeleton-header svelte-fspqbb"><div class="skeleton-icon svelte-fspqbb"></div> <div class="skeleton-content svelte-fspqbb"><div class="skeleton-line svelte-fspqbb"></div> <div class="skeleton-line short svelte-fspqbb"></div></div></div> <div class="skeleton-body svelte-fspqbb"><div class="skeleton-line svelte-fspqbb"></div> <div class="skeleton-line short svelte-fspqbb"></div></div></div>`);
     }
     $$payload.out.push(`<!--]--></div></div>`);
   }
   $$payload.out.push(`<!--]--> `);
   if (selectedVehicle) {
     $$payload.out.push("<!--[-->");
-    $$payload.out.push(`<div class="selection-summary svelte-1w2cn5">`);
-    Card($$payload, {
-      class: "selected-vehicle-summary",
-      children: ($$payload2) => {
-        $$payload2.out.push(`<div class="summary-header svelte-1w2cn5"><span class="summary-icon svelte-1w2cn5">✓</span> <h3 class="svelte-1w2cn5">Selected Vehicle</h3></div> <div class="summary-content svelte-1w2cn5"><div class="summary-vehicle svelte-1w2cn5"><div class="summary-name svelte-1w2cn5">${escape_html(selectedVehicle.name || `${selectedVehicle.make || ""} ${selectedVehicle.model || ""}`.trim())}</div> <div class="summary-reg svelte-1w2cn5">${escape_html(selectedVehicle.registration || "")}</div></div> <div class="summary-details svelte-1w2cn5"><div class="summary-detail svelte-1w2cn5"><span class="svelte-1w2cn5">Current Odometer:</span> <strong class="svelte-1w2cn5">${escape_html(formatOdometer(selectedVehicle.current_odometer, selectedVehicle.odometer_unit))}</strong></div></div></div> <div class="summary-actions svelte-1w2cn5">`);
-        Button($$payload2, {
-          variant: "outline",
-          size: "sm",
-          onclick: () => onVehicleSelect(null),
-          children: ($$payload3) => {
-            $$payload3.out.push(`<!---->Change Vehicle`);
-          }
-        });
-        $$payload2.out.push(`<!----></div>`);
-      }
-    });
-    $$payload.out.push(`<!----></div>`);
+    $$payload.out.push(`<div class="selected-summary svelte-fspqbb"><div class="selected-item svelte-fspqbb"><div class="selected-label svelte-fspqbb">Selected Vehicle</div> <div class="selected-name svelte-fspqbb">${escape_html(selectedVehicle.name || `${selectedVehicle.make || ""} ${selectedVehicle.model || ""}`.trim())}</div> <div class="selected-detail svelte-fspqbb">${escape_html(selectedVehicle.registration || "")}</div></div></div>`);
   } else {
     $$payload.out.push("<!--[!-->");
   }
@@ -86,64 +65,35 @@ function VehicleSelection($$payload, $$props) {
 }
 function DriverSelection($$payload, $$props) {
   push();
-  let { selectedDriver, onDriverSelect } = $$props;
+  let { selectedDriver } = $$props;
   let drivers = [];
-  drivers.filter((driver) => {
-    return true;
-  }).sort((a, b) => {
+  [...drivers].sort((a, b) => {
     const codeA = a.employee_code || "ZZZ";
     const codeB = b.employee_code || "ZZZ";
     return codeA.localeCompare(codeB);
   });
-  $$payload.out.push(`<div class="driver-selection svelte-7q3g20">`);
-  {
-    $$payload.out.push("<!--[!-->");
-  }
-  $$payload.out.push(`<!--]--> `);
+  $$payload.out.push(`<div class="driver-selection svelte-13kq9od">`);
   {
     $$payload.out.push("<!--[-->");
     const each_array = ensure_array_like(Array(6));
-    $$payload.out.push(`<div class="loading-state svelte-7q3g20"><div class="drivers-grid svelte-7q3g20"><!--[-->`);
+    $$payload.out.push(`<div class="loading-state svelte-13kq9od"><div class="drivers-grid svelte-13kq9od"><!--[-->`);
     for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
       each_array[$$index];
-      $$payload.out.push(`<div class="driver-card-skeleton svelte-7q3g20"><div class="skeleton-header svelte-7q3g20"><div class="skeleton-avatar svelte-7q3g20"></div> <div class="skeleton-content svelte-7q3g20"><div class="skeleton-line svelte-7q3g20"></div> <div class="skeleton-line short svelte-7q3g20"></div></div></div> <div class="skeleton-body svelte-7q3g20"><div class="skeleton-line svelte-7q3g20"></div> <div class="skeleton-line short svelte-7q3g20"></div></div></div>`);
+      $$payload.out.push(`<div class="driver-card-skeleton svelte-13kq9od"><div class="skeleton-header svelte-13kq9od"><div class="skeleton-avatar svelte-13kq9od"></div> <div class="skeleton-content svelte-13kq9od"><div class="skeleton-line svelte-13kq9od"></div> <div class="skeleton-line short svelte-13kq9od"></div></div></div> <div class="skeleton-body svelte-13kq9od"><div class="skeleton-line svelte-13kq9od"></div> <div class="skeleton-line short svelte-13kq9od"></div></div></div>`);
     }
     $$payload.out.push(`<!--]--></div></div>`);
   }
   $$payload.out.push(`<!--]--> `);
   if (selectedDriver) {
     $$payload.out.push("<!--[-->");
-    $$payload.out.push(`<div class="selection-summary svelte-7q3g20">`);
-    Card($$payload, {
-      class: "selected-driver-summary",
-      children: ($$payload2) => {
-        $$payload2.out.push(`<div class="summary-header svelte-7q3g20"><span class="summary-icon svelte-7q3g20">✓</span> <h3 class="svelte-7q3g20">Selected Driver</h3></div> <div class="summary-content svelte-7q3g20"><div class="summary-driver svelte-7q3g20"><div class="summary-avatar svelte-7q3g20">${escape_html(selectedDriver.name.charAt(0).toUpperCase())}</div> <div class="summary-info svelte-7q3g20"><div class="summary-name svelte-7q3g20">${escape_html(selectedDriver.name)}</div> `);
-        if (selectedDriver.employee_code) {
-          $$payload2.out.push("<!--[-->");
-          $$payload2.out.push(`<div class="summary-code svelte-7q3g20">#${escape_html(selectedDriver.employee_code)}</div>`);
-        } else {
-          $$payload2.out.push("<!--[!-->");
-        }
-        $$payload2.out.push(`<!--]--></div></div> `);
-        if (selectedDriver.license_number) {
-          $$payload2.out.push("<!--[-->");
-          $$payload2.out.push(`<div class="summary-details svelte-7q3g20"><div class="summary-detail svelte-7q3g20"><span class="svelte-7q3g20">License:</span> <strong class="svelte-7q3g20">${escape_html(selectedDriver.license_number)}</strong></div></div>`);
-        } else {
-          $$payload2.out.push("<!--[!-->");
-        }
-        $$payload2.out.push(`<!--]--></div> <div class="summary-actions svelte-7q3g20">`);
-        Button($$payload2, {
-          variant: "outline",
-          size: "sm",
-          onclick: () => onDriverSelect(null),
-          children: ($$payload3) => {
-            $$payload3.out.push(`<!---->Change Driver`);
-          }
-        });
-        $$payload2.out.push(`<!----></div>`);
-      }
-    });
-    $$payload.out.push(`<!----></div>`);
+    $$payload.out.push(`<div class="selected-summary svelte-13kq9od"><div class="selected-item svelte-13kq9od"><div class="selected-label svelte-13kq9od">Selected Driver</div> <div class="selected-name svelte-13kq9od">${escape_html(selectedDriver.name)}</div> `);
+    if (selectedDriver.employee_code) {
+      $$payload.out.push("<!--[-->");
+      $$payload.out.push(`<div class="selected-detail svelte-13kq9od">#${escape_html(selectedDriver.employee_code)}</div>`);
+    } else {
+      $$payload.out.push("<!--[!-->");
+    }
+    $$payload.out.push(`<!--]--></div></div>`);
   } else {
     $$payload.out.push("<!--[!-->");
   }
@@ -152,7 +102,7 @@ function DriverSelection($$payload, $$props) {
 }
 function ActivitySelection($$payload, $$props) {
   push();
-  let { selectedActivity, onActivitySelect } = $$props;
+  let { selectedActivity } = $$props;
   let activities = [];
   let groupedActivities = (() => {
     const groups = {};
@@ -180,22 +130,7 @@ function ActivitySelection($$payload, $$props) {
     return groups;
   })();
   Object.values(groupedActivities).flat().length;
-  function getActivityIcon(activity) {
-    return activity.icon || "⚙️";
-  }
-  function getActivityColor(activityName) {
-    const name = activityName.toLowerCase();
-    if (name.includes("plowing") || name.includes("plough")) return "#8b5cf6";
-    if (name.includes("seeding") || name.includes("planting")) return "#10b981";
-    if (name.includes("harvesting") || name.includes("harvest")) return "#f59e0b";
-    if (name.includes("spraying") || name.includes("spray")) return "#06b6d4";
-    if (name.includes("cultivation") || name.includes("cultivat")) return "#84cc16";
-    if (name.includes("transport") || name.includes("hauling")) return "#6b7280";
-    if (name.includes("mowing") || name.includes("cutting")) return "#ef4444";
-    if (name.includes("irrigation") || name.includes("watering")) return "#3b82f6";
-    return "#6366f1";
-  }
-  $$payload.out.push(`<div class="activity-selection svelte-6el3tg">`);
+  $$payload.out.push(`<div class="activity-selection svelte-hfgmfu">`);
   {
     $$payload.out.push("<!--[!-->");
   }
@@ -203,47 +138,17 @@ function ActivitySelection($$payload, $$props) {
   {
     $$payload.out.push("<!--[-->");
     const each_array = ensure_array_like(Array(8));
-    $$payload.out.push(`<div class="loading-state svelte-6el3tg"><div class="activities-grid svelte-6el3tg"><!--[-->`);
+    $$payload.out.push(`<div class="loading-state svelte-hfgmfu"><div class="activities-grid svelte-hfgmfu"><!--[-->`);
     for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
       each_array[$$index];
-      $$payload.out.push(`<div class="activity-card-skeleton svelte-6el3tg"><div class="skeleton-header svelte-6el3tg"><div class="skeleton-icon svelte-6el3tg"></div> <div class="skeleton-content svelte-6el3tg"><div class="skeleton-line svelte-6el3tg"></div> <div class="skeleton-line short svelte-6el3tg"></div></div></div></div>`);
+      $$payload.out.push(`<div class="activity-card-skeleton svelte-hfgmfu"><div class="skeleton-header svelte-hfgmfu"><div class="skeleton-icon svelte-hfgmfu"></div> <div class="skeleton-content svelte-hfgmfu"><div class="skeleton-line svelte-hfgmfu"></div> <div class="skeleton-line short svelte-hfgmfu"></div></div></div></div>`);
     }
     $$payload.out.push(`<!--]--></div></div>`);
   }
   $$payload.out.push(`<!--]--> `);
   if (selectedActivity) {
     $$payload.out.push("<!--[-->");
-    $$payload.out.push(`<div class="selection-summary svelte-6el3tg">`);
-    Card($$payload, {
-      class: "selected-activity-summary",
-      children: ($$payload2) => {
-        $$payload2.out.push(`<div class="summary-header svelte-6el3tg"><span class="summary-icon svelte-6el3tg">✓</span> <h3 class="svelte-6el3tg">Selected Activity</h3></div> <div class="summary-content svelte-6el3tg"><div class="summary-activity svelte-6el3tg"><div class="summary-activity-icon svelte-6el3tg"${attr_style(`color: ${stringify(getActivityColor(selectedActivity.name))}`)}>${escape_html(getActivityIcon(selectedActivity))}</div> <div class="summary-info svelte-6el3tg"><div class="summary-name svelte-6el3tg">${escape_html(selectedActivity.name)}</div> `);
-        if (selectedActivity.name_zulu) {
-          $$payload2.out.push("<!--[-->");
-          $$payload2.out.push(`<div class="summary-name-zulu svelte-6el3tg">${escape_html(selectedActivity.name_zulu)}</div>`);
-        } else {
-          $$payload2.out.push("<!--[!-->");
-        }
-        $$payload2.out.push(`<!--]--> `);
-        if (selectedActivity.description) {
-          $$payload2.out.push("<!--[-->");
-          $$payload2.out.push(`<div class="summary-description svelte-6el3tg">${escape_html(selectedActivity.description)}</div>`);
-        } else {
-          $$payload2.out.push("<!--[!-->");
-        }
-        $$payload2.out.push(`<!--]--></div></div></div> <div class="summary-actions svelte-6el3tg">`);
-        Button($$payload2, {
-          variant: "outline",
-          size: "sm",
-          onclick: () => onActivitySelect(null),
-          children: ($$payload3) => {
-            $$payload3.out.push(`<!---->Change Activity`);
-          }
-        });
-        $$payload2.out.push(`<!----></div>`);
-      }
-    });
-    $$payload.out.push(`<!----></div>`);
+    $$payload.out.push(`<div class="selected-summary svelte-hfgmfu"><div class="selected-item svelte-hfgmfu"><div class="selected-label svelte-hfgmfu">Selected Activity</div> <div class="selected-name svelte-hfgmfu">${escape_html(selectedActivity.name)}</div> <div class="selected-detail svelte-hfgmfu">${escape_html(selectedActivity.code)}</div></div></div>`);
   } else {
     $$payload.out.push("<!--[!-->");
   }
@@ -253,83 +158,25 @@ function ActivitySelection($$payload, $$props) {
 function LocationSelection($$payload, $$props) {
   push();
   let {
-    selectedField,
     selectedZone,
-    onLocationSelect,
+    selectedFields = [],
     errors
   } = $$props;
-  let fields = [];
-  let hasSelection = selectedField !== null || selectedZone !== null;
-  let groupedFields = (() => {
-    const groups = {};
-    const filtered = fields.filter((field) => {
-      return true;
-    });
-    const sorted = [...filtered].sort((a, b) => {
-      const cropA = a.crop_type || "Other";
-      const cropB = b.crop_type || "Other";
-      if (cropA < cropB) return -1;
-      if (cropA > cropB) return 1;
-      const nameA = a.name || "";
-      const nameB = b.name || "";
-      if (nameA < nameB) return -1;
-      if (nameA > nameB) return 1;
-      return 0;
-    });
-    sorted.forEach((field) => {
-      const crop = field.crop_type || "Other";
-      if (!groups[crop]) {
-        groups[crop] = [];
-      }
-      groups[crop].push(field);
-    });
-    return groups;
-  })();
-  Object.values(groupedFields).flat().length;
-  function getFieldIcon(cropType) {
-    if (!cropType) return "🌾";
-    const crop = cropType.toLowerCase();
-    if (crop.includes("wheat")) return "🌾";
-    if (crop.includes("corn") || crop.includes("maize")) return "🌽";
-    if (crop.includes("soy")) return "🫘";
-    if (crop.includes("barley")) return "🌾";
-    if (crop.includes("oat")) return "🌾";
-    if (crop.includes("rice")) return "🌾";
-    if (crop.includes("cotton")) return "🤍";
-    if (crop.includes("sunflower")) return "🌻";
-    return "🌱";
-  }
-  function getFieldColor(cropType) {
-    if (!cropType) return "#10b981";
-    const crop = cropType.toLowerCase();
-    if (crop.includes("wheat")) return "#f59e0b";
-    if (crop.includes("corn") || crop.includes("maize")) return "#eab308";
-    if (crop.includes("soy")) return "#10b981";
-    if (crop.includes("barley")) return "#d97706";
-    if (crop.includes("oat")) return "#92400e";
-    if (crop.includes("rice")) return "#059669";
-    if (crop.includes("cotton")) return "#6b7280";
-    if (crop.includes("sunflower")) return "#f59e0b";
-    return "#10b981";
-  }
-  function formatArea(area) {
-    if (area === null) return "Not specified";
-    return `${new Intl.NumberFormat().format(area)} ha`;
-  }
-  $$payload.out.push(`<div class="location-selection svelte-7ay6o6">`);
+  selectedZone !== null || selectedFields.length > 0;
+  $$payload.out.push(`<div class="location-selection svelte-1cdw10">`);
   if (errors.length > 0) {
     $$payload.out.push("<!--[-->");
     const each_array = ensure_array_like(errors);
-    $$payload.out.push(`<div class="error-messages svelte-7ay6o6"><!--[-->`);
+    $$payload.out.push(`<div class="error-messages svelte-1cdw10"><!--[-->`);
     for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
       let error = each_array[$$index];
-      $$payload.out.push(`<div class="error-message svelte-7ay6o6"><span class="error-icon svelte-7ay6o6">⚠️</span> ${escape_html(error)}</div>`);
+      $$payload.out.push(`<div class="error-message svelte-1cdw10"><span class="error-icon svelte-1cdw10">⚠️</span> ${escape_html(error)}</div>`);
     }
     $$payload.out.push(`<!--]--></div>`);
   } else {
     $$payload.out.push("<!--[!-->");
   }
-  $$payload.out.push(`<!--]--> <div class="skip-option svelte-7ay6o6"><div class="skip-message svelte-7ay6o6">⏭️ Skip Location Selection (Optional)</div></div> `);
+  $$payload.out.push(`<!--]--> <div class="skip-option svelte-1cdw10"><div class="skip-message svelte-1cdw10">Skip Location</div></div> `);
   {
     $$payload.out.push("<!--[!-->");
   }
@@ -337,63 +184,12 @@ function LocationSelection($$payload, $$props) {
   {
     $$payload.out.push("<!--[-->");
     const each_array_1 = ensure_array_like(Array(6));
-    $$payload.out.push(`<div class="loading-state svelte-7ay6o6"><div class="fields-grid svelte-7ay6o6"><!--[-->`);
+    $$payload.out.push(`<div class="loading-state svelte-1cdw10"><div class="fields-grid svelte-1cdw10"><!--[-->`);
     for (let $$index_1 = 0, $$length = each_array_1.length; $$index_1 < $$length; $$index_1++) {
       each_array_1[$$index_1];
-      $$payload.out.push(`<div class="field-card-skeleton svelte-7ay6o6"><div class="skeleton-header svelte-7ay6o6"><div class="skeleton-icon svelte-7ay6o6"></div> <div class="skeleton-content svelte-7ay6o6"><div class="skeleton-line svelte-7ay6o6"></div> <div class="skeleton-line short svelte-7ay6o6"></div></div></div></div>`);
+      $$payload.out.push(`<div class="field-card-skeleton svelte-1cdw10"><div class="skeleton-header svelte-1cdw10"><div class="skeleton-icon svelte-1cdw10"></div> <div class="skeleton-content svelte-1cdw10"><div class="skeleton-line svelte-1cdw10"></div> <div class="skeleton-line short svelte-1cdw10"></div></div></div></div>`);
     }
     $$payload.out.push(`<!--]--></div></div>`);
-  }
-  $$payload.out.push(`<!--]--> `);
-  if (hasSelection) {
-    $$payload.out.push("<!--[-->");
-    $$payload.out.push(`<div class="selection-summary svelte-7ay6o6">`);
-    Card($$payload, {
-      class: "selected-location-summary",
-      children: ($$payload2) => {
-        $$payload2.out.push(`<div class="summary-header svelte-7ay6o6"><span class="summary-icon svelte-7ay6o6">✓</span> <h3 class="svelte-7ay6o6">Selected Location</h3></div> <div class="summary-content svelte-7ay6o6">`);
-        if (selectedField) {
-          $$payload2.out.push("<!--[-->");
-          $$payload2.out.push(`<div class="summary-field svelte-7ay6o6"><div class="summary-field-icon svelte-7ay6o6"${attr_style(`color: ${stringify(getFieldColor(selectedField.crop_type))}`)}>${escape_html(getFieldIcon(selectedField.crop_type))}</div> <div class="summary-info svelte-7ay6o6"><div class="summary-name svelte-7ay6o6">Field: ${escape_html(selectedField.name)}</div> <div class="summary-details svelte-7ay6o6">${escape_html(selectedField.code)} • ${escape_html(formatArea(selectedField.area))} `);
-          if (selectedField.crop_type) {
-            $$payload2.out.push("<!--[-->");
-            $$payload2.out.push(`• ${escape_html(selectedField.crop_type)}`);
-          } else {
-            $$payload2.out.push("<!--[!-->");
-          }
-          $$payload2.out.push(`<!--]--></div></div></div>`);
-        } else {
-          $$payload2.out.push("<!--[!-->");
-          if (selectedZone) {
-            $$payload2.out.push("<!--[-->");
-            $$payload2.out.push(`<div class="summary-zone svelte-7ay6o6"><div class="summary-zone-badge svelte-7ay6o6"${attr_style(`background-color: ${stringify(selectedZone.color || "#95A5A6")}`)}>${escape_html(selectedZone.code)}</div> <div class="summary-info svelte-7ay6o6"><div class="summary-name svelte-7ay6o6">Zone: ${escape_html(selectedZone.name)}</div> `);
-            if (selectedZone.description) {
-              $$payload2.out.push("<!--[-->");
-              $$payload2.out.push(`<div class="summary-details svelte-7ay6o6">${escape_html(selectedZone.description)}</div>`);
-            } else {
-              $$payload2.out.push("<!--[!-->");
-            }
-            $$payload2.out.push(`<!--]--></div></div>`);
-          } else {
-            $$payload2.out.push("<!--[!-->");
-          }
-          $$payload2.out.push(`<!--]-->`);
-        }
-        $$payload2.out.push(`<!--]--></div> <div class="summary-actions svelte-7ay6o6">`);
-        Button($$payload2, {
-          variant: "outline",
-          size: "sm",
-          onclick: () => onLocationSelect(null, null),
-          children: ($$payload3) => {
-            $$payload3.out.push(`<!---->Change Location`);
-          }
-        });
-        $$payload2.out.push(`<!----></div>`);
-      }
-    });
-    $$payload.out.push(`<!----></div>`);
-  } else {
-    $$payload.out.push("<!--[!-->");
   }
   $$payload.out.push(`<!--]--></div>`);
   pop();
@@ -402,45 +198,49 @@ function OdometerReading($$payload, $$props) {
   push();
   let {
     selectedVehicle,
-    odometerEnd
+    odometerEnd,
+    canProceedToNext: canProceedToNext2 = false,
+    onNext
   } = $$props;
   let currentOdo = selectedVehicle?.current_odometer?.toString() || "";
   selectedVehicle?.current_odometer || 0;
   let newOdo = odometerEnd?.toString() || "";
   let isBrokenGauge = false;
-  $$payload.out.push(`<div class="odometer-reading svelte-7hfff">`);
+  $$payload.out.push(`<div class="odometer-reading svelte-n0vyi8">`);
   if (
     // Update distance when values change
     selectedVehicle
   ) {
     $$payload.out.push("<!--[-->");
-    $$payload.out.push(`<div class="odo-card current-odo svelte-7hfff"><div class="current-odo-header svelte-7hfff"><div class="odo-label svelte-7hfff">Current</div> <div class="current-odo-controls svelte-7hfff">`);
+    $$payload.out.push(`<div class="odo-section svelte-n0vyi8"><div class="odo-card current-odo svelte-n0vyi8"><div class="current-odo-controls svelte-n0vyi8">`);
     {
       $$payload.out.push("<!--[!-->");
-      $$payload.out.push(`<button class="odo-control-btn edit-btn svelte-7hfff" title="Manual override">✏️</button>`);
+      $$payload.out.push(`<button class="odo-control-btn edit-btn svelte-n0vyi8" title="Manual override">✏️</button>`);
     }
-    $$payload.out.push(`<!--]--></div></div> `);
-    {
-      $$payload.out.push("<!--[!-->");
-      $$payload.out.push(`<div${attr_class("odo-value svelte-7hfff", void 0, { "editable": selectedVehicle })}>${escape_html(currentOdo || "No reading")}</div>`);
-    }
-    $$payload.out.push(`<!--]--> `);
+    $$payload.out.push(`<!--]--></div> <input type="number" inputmode="decimal" step="0.1"${attr("value", currentOdo)} placeholder="Old" class="current-odo-input svelte-n0vyi8" autocomplete="off"${attr("readonly", true, true)}/></div> `);
     {
       $$payload.out.push("<!--[!-->");
     }
     $$payload.out.push(`<!--]--></div> `);
     {
       $$payload.out.push("<!--[-->");
-      $$payload.out.push(`<div class="odo-card new-odo svelte-7hfff"><input type="number" inputmode="numeric" pattern="[0-9]*"${attr("value", newOdo)} placeholder="_" class="new-odo-input svelte-7hfff" autocomplete="off"/> <div class="odo-label svelte-7hfff">New</div></div> `);
+      $$payload.out.push(`<div class="odo-section svelte-n0vyi8"><div class="odo-card new-odo svelte-n0vyi8"><input type="number" inputmode="decimal" step="0.1"${attr("value", newOdo)} placeholder="New" class="new-odo-input svelte-n0vyi8" autocomplete="off"/></div> `);
       {
         $$payload.out.push("<!--[!-->");
       }
-      $$payload.out.push(`<!--]--> <div class="gauge-toggle svelte-7hfff"><label class="checkbox svelte-7hfff"><input type="checkbox"${attr("checked", isBrokenGauge, true)} class="svelte-7hfff"/> <span>Broken Gauge</span></label></div>`);
+      $$payload.out.push(`<!--]--></div> <div class="gauge-toggle svelte-n0vyi8"><label class="checkbox svelte-n0vyi8"><input type="checkbox"${attr("checked", isBrokenGauge, true)} class="svelte-n0vyi8"/> <span>Broken Gauge</span></label></div>`);
     }
     $$payload.out.push(`<!--]-->`);
   } else {
     $$payload.out.push("<!--[!-->");
-    $$payload.out.push(`<div class="no-vehicle svelte-7hfff">Select a vehicle first</div>`);
+    $$payload.out.push(`<div class="no-vehicle svelte-n0vyi8">Select a vehicle first</div>`);
+  }
+  $$payload.out.push(`<!--]--> `);
+  if (canProceedToNext2 && onNext) {
+    $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<button class="continue-button-fixed svelte-n0vyi8"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"></path></svg></button>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
   }
   $$payload.out.push(`<!--]--></div>`);
   pop();
@@ -450,27 +250,29 @@ function FuelDataEntry($$payload, $$props) {
   let {
     selectedVehicle,
     selectedBowser,
-    litresDispensed
+    litresDispensed,
+    canProceedToNext: canProceedToNext2 = false,
+    onNext
   } = $$props;
   let fuelAmount = litresDispensed?.toString() || "";
   selectedBowser?.id || "";
   let selectedBowserInfo = null;
-  $$payload.out.push(`<div class="fuel-data-entry svelte-a26ygd">`);
+  $$payload.out.push(`<div class="fuel-data-entry svelte-1cd30ed">`);
   if (
-    // Update selected bowser when values change
     // Check for reading continuity
     // Allow small rounding differences
     selectedVehicle
   ) {
     $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<div class="fuel-input-container svelte-1cd30ed"><input type="number" inputmode="decimal" step="0.1"${attr("value", fuelAmount)} placeholder="Enter fuel" class="fuel-input svelte-1cd30ed" autocomplete="off"/> <div class="fuel-label svelte-1cd30ed">Litres</div> `);
     {
       $$payload.out.push("<!--[-->");
-      $$payload.out.push(`<div class="loading svelte-a26ygd">Loading fuel bowsers...</div>`);
+      $$payload.out.push(`<div class="loading-status svelte-1cd30ed">Loading fuel bowsers...</div>`);
     }
-    $$payload.out.push(`<!--]--> <div class="fuel-input-container svelte-a26ygd"><input type="number" inputmode="numeric" pattern="[0-9]*"${attr("value", fuelAmount)} placeholder="Enter fuel" class="fuel-input svelte-a26ygd" autocomplete="off"/> <div class="fuel-label svelte-a26ygd">Litres dispensed</div></div> <div class="calculations svelte-a26ygd"><div class="calc-header svelte-a26ygd"><h3 class="svelte-a26ygd">Bowser Readings</h3></div> <div class="calc-item svelte-a26ygd"><span class="calc-label svelte-a26ygd">Start:</span> <div class="calc-item-right svelte-a26ygd">`);
+    $$payload.out.push(`<!--]--></div> <div class="calculations svelte-1cd30ed"><div class="calc-header svelte-1cd30ed"><h3 class="svelte-1cd30ed">Bowser Readings</h3></div> <div class="calc-item svelte-1cd30ed"><span class="calc-label svelte-1cd30ed">Start:</span> <div class="calc-item-right svelte-1cd30ed">`);
     {
       $$payload.out.push("<!--[!-->");
-      $$payload.out.push(`<span class="calc-value editable svelte-a26ygd">`);
+      $$payload.out.push(`<span class="calc-value editable svelte-1cd30ed">`);
       {
         $$payload.out.push("<!--[!-->");
         $$payload.out.push(`-`);
@@ -481,10 +283,10 @@ function FuelDataEntry($$payload, $$props) {
     {
       $$payload.out.push("<!--[!-->");
     }
-    $$payload.out.push(`<!--]--></div></div> <div class="calc-item svelte-a26ygd"><span class="calc-label svelte-a26ygd">End:</span> <div class="calc-item-right svelte-a26ygd">`);
+    $$payload.out.push(`<!--]--></div></div> <div class="calc-item svelte-1cd30ed"><span class="calc-label svelte-1cd30ed">End:</span> <div class="calc-item-right svelte-1cd30ed">`);
     {
       $$payload.out.push("<!--[!-->");
-      $$payload.out.push(`<span${attr_class("calc-value svelte-a26ygd", void 0, { "editable": selectedBowserInfo })}>`);
+      $$payload.out.push(`<span${attr_class("calc-value svelte-1cd30ed", void 0, { "editable": selectedBowserInfo })}>`);
       {
         $$payload.out.push("<!--[!-->");
         $$payload.out.push(`-`);
@@ -502,7 +304,14 @@ function FuelDataEntry($$payload, $$props) {
     $$payload.out.push(`<!--]-->`);
   } else {
     $$payload.out.push("<!--[!-->");
-    $$payload.out.push(`<div class="no-vehicle svelte-a26ygd">Select a vehicle first</div>`);
+    $$payload.out.push(`<div class="no-vehicle svelte-1cd30ed">Select a vehicle first</div>`);
+  }
+  $$payload.out.push(`<!--]--> `);
+  if (canProceedToNext2 && onNext) {
+    $$payload.out.push("<!--[-->");
+    $$payload.out.push(`<button class="continue-button-fixed svelte-1cd30ed"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"></path></svg></button>`);
+  } else {
+    $$payload.out.push("<!--[!-->");
   }
   $$payload.out.push(`<!--]--></div>`);
   pop();
@@ -537,9 +346,8 @@ const defaultSteps = [
     title: "Select Location",
     icon: "📍",
     completed: false,
-    valid: true,
-    // Optional step
-    required: false
+    valid: false,
+    required: true
   },
   {
     id: "odometer",
@@ -572,6 +380,8 @@ const initialData = {
   activity: null,
   field: null,
   zone: null,
+  selectedFields: [],
+  fieldSelectionMode: "single",
   odometerStart: null,
   odometerEnd: null,
   gaugeWorking: true,
@@ -609,6 +419,9 @@ function createFuelEntryWorkflowStore() {
         if (!data.activity) errors.push("Please select an activity");
         break;
       case "location":
+        if (!data.zone && data.selectedFields.length === 0) {
+          errors.push("Please select at least one field or zone");
+        }
         break;
       case "odometer":
         if (!data.gaugeWorking) {
@@ -735,14 +548,52 @@ function createFuelEntryWorkflowStore() {
     setField: (field) => {
       update((state) => ({
         ...state,
-        data: { ...state.data, field, zone: null }
+        data: {
+          ...state.data,
+          field,
+          zone: null,
+          selectedFields: [],
+          fieldSelectionMode: "single"
+        }
       }));
       updateStepValidation();
     },
-    setLocation: (field, zone) => {
+    setLocation: (field, zone, selectedFields = []) => {
+      const mode = selectedFields.length > 0 ? "multiple" : "single";
       update((state) => ({
         ...state,
-        data: { ...state.data, field, zone }
+        data: {
+          ...state.data,
+          field: mode === "single" ? field : null,
+          zone,
+          selectedFields,
+          fieldSelectionMode: mode
+        }
+      }));
+      updateStepValidation();
+    },
+    setFieldSelectionMode: (mode) => {
+      update((state) => ({
+        ...state,
+        data: {
+          ...state.data,
+          fieldSelectionMode: mode,
+          field: mode === "multiple" ? null : state.data.field,
+          selectedFields: mode === "single" ? [] : state.data.selectedFields
+        }
+      }));
+      updateStepValidation();
+    },
+    setMultipleFields: (fields) => {
+      update((state) => ({
+        ...state,
+        data: {
+          ...state.data,
+          selectedFields: fields,
+          field: null,
+          zone: null,
+          fieldSelectionMode: "multiple"
+        }
       }));
       updateStepValidation();
     },
@@ -820,8 +671,9 @@ function createFuelEntryWorkflowStore() {
           vehicle_id: currentData.vehicle.id,
           driver_id: currentData.driver.id,
           activity_id: currentData.activity.id,
-          field_id: currentData.field?.id || null,
+          field_id: currentData.fieldSelectionMode === "single" ? currentData.field?.id || null : null,
           zone_id: currentData.zone?.id || null,
+          field_selection_mode: currentData.fieldSelectionMode,
           bowser_id: currentData.bowser.id,
           odometer_start: currentData.odometerStart || null,
           odometer_end: currentData.odometerEnd || null,
@@ -840,7 +692,15 @@ function createFuelEntryWorkflowStore() {
         let result;
         let isOffline = false;
         try {
-          result = await supabaseService.createFuelEntry(fuelEntryData);
+          const fieldIds = [];
+          if (currentData.fieldSelectionMode === "multiple" && currentData.selectedFields.length > 0) {
+            fieldIds.push(...currentData.selectedFields.map((f) => f.id));
+          }
+          if (fieldIds.length > 0) {
+            result = await supabaseService.createFuelEntryWithFields(fuelEntryData, fieldIds);
+          } else {
+            result = await supabaseService.createFuelEntry(fuelEntryData);
+          }
           if (result.error) {
             throw new Error(result.error);
           }
@@ -923,252 +783,254 @@ const isSubmittingEntry = derived(fuelEntryWorkflowStore, ($store) => $store.isS
 function FuelEntryWorkflow($$payload, $$props) {
   push();
   var $$store_subs;
-  function handlePrevious() {
-    fuelEntryWorkflowStore.previousStep();
+  async function handleNext() {
+    fuelEntryWorkflowStore.nextStep();
+    scrollToTop();
   }
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function getStepTitle(step) {
+    const titles = [
+      "Vehicle",
+      "Driver",
+      "Activity",
+      "Location",
+      "Odometer",
+      "Fuel Data",
+      "Review & Submit"
+    ];
+    return titles[step] || "";
+  }
+  let progressItems = [];
   function getCurrentStepErrors() {
     const currentStepId = store_get($$store_subs ??= {}, "$currentStepData", currentStepData)?.id || "";
     return store_get($$store_subs ??= {}, "$workflowErrors", workflowErrors)[currentStepId] || [];
   }
-  $$payload.out.push(`<div class="fuel-entry-workflow svelte-1lv6g9m"><div class="dashboard-header svelte-1lv6g9m"><div class="header-content svelte-1lv6g9m"><h1 class="svelte-1lv6g9m">Fuel Entry</h1></div></div> <div class="step-info svelte-1lv6g9m"><span class="step-badge svelte-1lv6g9m">Step ${escape_html(store_get($$store_subs ??= {}, "$currentStep", currentStep) + 1)} of 7</span> <span class="step-title svelte-1lv6g9m">${escape_html(store_get($$store_subs ??= {}, "$currentStepData", currentStepData)?.title || "")}</span></div> <div class="step-content svelte-1lv6g9m">`);
+  head($$payload, ($$payload2) => {
+    $$payload2.out.push(`<link rel="preconnect" href="https://fonts.googleapis.com"/> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/> <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>`);
+  });
+  $$payload.out.push(`<div class="fuel-entry-workflow svelte-2venva"><div class="app-header-card svelte-2venva"><div class="dashboard-header svelte-2venva"><div class="header-content svelte-2venva"><h1 class="svelte-2venva">${escape_html(getStepTitle(store_get($$store_subs ??= {}, "$currentStep", currentStep)))}</h1></div></div> <div class="progress-summary svelte-2venva">`);
+  if (progressItems.length > 0) {
+    $$payload.out.push("<!--[-->");
+    const each_array = ensure_array_like(progressItems);
+    $$payload.out.push(`<!--[-->`);
+    for (let i = 0, $$length = each_array.length; i < $$length; i++) {
+      let item = each_array[i];
+      if (i > 0) {
+        $$payload.out.push("<!--[-->");
+        $$payload.out.push(`<span class="progress-separator svelte-2venva">•</span>`);
+      } else {
+        $$payload.out.push("<!--[!-->");
+      }
+      $$payload.out.push(`<!--]--> <span class="progress-item svelte-2venva">${escape_html(item)}</span>`);
+    }
+    $$payload.out.push(`<!--]-->`);
+  } else {
+    $$payload.out.push("<!--[!-->");
+    $$payload.out.push(`<span class="progress-placeholder"> </span>`);
+  }
+  $$payload.out.push(`<!--]--></div> <div class="progress-track svelte-2venva"><div class="progress-indicator svelte-2venva"${attr_style(`width: ${stringify(Math.round((store_get($$store_subs ??= {}, "$currentStep", currentStep) + 1) / 7 * 100))}%`)}></div></div></div> <div class="step-content svelte-2venva">`);
   if (store_get($$store_subs ??= {}, "$currentStep", currentStep) === 0) {
     $$payload.out.push("<!--[-->");
-    $$payload.out.push(`<div class="step-container svelte-1lv6g9m">`);
     VehicleSelection($$payload, {
       selectedVehicle: store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle,
-      onVehicleSelect: (vehicle) => {
-        console.log("Vehicle selected:", vehicle);
-        fuelEntryWorkflowStore.setVehicle(vehicle);
-      },
       errors: getCurrentStepErrors()
     });
-    $$payload.out.push(`<!----></div>`);
+    $$payload.out.push(`<!----> <div class="step-actions svelte-2venva"><button class="continue-button svelte-2venva"${attr("disabled", !store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext), true)}>Continue →</button></div>`);
   } else {
     $$payload.out.push("<!--[!-->");
     if (store_get($$store_subs ??= {}, "$currentStep", currentStep) === 1) {
       $$payload.out.push("<!--[-->");
-      $$payload.out.push(`<div class="step-container svelte-1lv6g9m"><div class="step-nav svelte-1lv6g9m">`);
-      if (store_get($$store_subs ??= {}, "$canGoBackToPrevious", canGoBackToPrevious)) {
-        $$payload.out.push("<!--[-->");
-        Button($$payload, {
-          variant: "outline",
-          onclick: handlePrevious,
-          class: "nav-button",
-          children: ($$payload2) => {
-            $$payload2.out.push(`<!---->← Back`);
-          }
-        });
-      } else {
-        $$payload.out.push("<!--[!-->");
-      }
-      $$payload.out.push(`<!--]--></div> `);
       DriverSelection($$payload, {
         selectedDriver: store_get($$store_subs ??= {}, "$workflowData", workflowData).driver,
-        onDriverSelect: (driver) => {
-          console.log("Driver selected:", driver);
-          fuelEntryWorkflowStore.setDriver(driver);
-          if (driver?.default_vehicle && !store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle) {
-            console.log("Auto-selecting default vehicle:", driver.default_vehicle);
-            fuelEntryWorkflowStore.setVehicle(driver.default_vehicle);
-          }
-        },
         errors: getCurrentStepErrors()
       });
-      $$payload.out.push(`<!----></div>`);
+      $$payload.out.push(`<!----> <div class="step-actions svelte-2venva"><button class="continue-button svelte-2venva"${attr("disabled", !store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext), true)}>Continue →</button></div>`);
     } else {
       $$payload.out.push("<!--[!-->");
       if (store_get($$store_subs ??= {}, "$currentStep", currentStep) === 2) {
         $$payload.out.push("<!--[-->");
-        $$payload.out.push(`<div class="step-container svelte-1lv6g9m"><div class="step-nav svelte-1lv6g9m">`);
-        if (store_get($$store_subs ??= {}, "$canGoBackToPrevious", canGoBackToPrevious)) {
-          $$payload.out.push("<!--[-->");
-          Button($$payload, {
-            variant: "outline",
-            onclick: handlePrevious,
-            class: "nav-button",
-            children: ($$payload2) => {
-              $$payload2.out.push(`<!---->← Back`);
-            }
-          });
-        } else {
-          $$payload.out.push("<!--[!-->");
-        }
-        $$payload.out.push(`<!--]--></div> `);
         ActivitySelection($$payload, {
           selectedActivity: store_get($$store_subs ??= {}, "$workflowData", workflowData).activity,
-          onActivitySelect: (activity) => {
-            console.log("Activity selected:", activity);
-            fuelEntryWorkflowStore.setActivity(activity);
-          },
           errors: getCurrentStepErrors()
         });
-        $$payload.out.push(`<!----></div>`);
+        $$payload.out.push(`<!----> <div class="step-actions svelte-2venva"><button class="continue-button svelte-2venva"${attr("disabled", !store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext), true)}>Continue →</button></div>`);
       } else {
         $$payload.out.push("<!--[!-->");
         if (store_get($$store_subs ??= {}, "$currentStep", currentStep) === 3) {
           $$payload.out.push("<!--[-->");
-          $$payload.out.push(`<div class="step-container svelte-1lv6g9m"><div class="step-nav svelte-1lv6g9m">`);
-          if (store_get($$store_subs ??= {}, "$canGoBackToPrevious", canGoBackToPrevious)) {
-            $$payload.out.push("<!--[-->");
-            Button($$payload, {
-              variant: "outline",
-              onclick: handlePrevious,
-              class: "nav-button",
-              children: ($$payload2) => {
-                $$payload2.out.push(`<!---->← Back`);
-              }
-            });
-          } else {
-            $$payload.out.push("<!--[!-->");
-          }
-          $$payload.out.push(`<!--]--></div> `);
           LocationSelection($$payload, {
             selectedField: store_get($$store_subs ??= {}, "$workflowData", workflowData).field,
             selectedZone: store_get($$store_subs ??= {}, "$workflowData", workflowData).zone,
-            onLocationSelect: (field, zone) => {
-              console.log("Location selected:", { field, zone });
-              fuelEntryWorkflowStore.setLocation(field, zone);
-            },
+            fieldSelectionMode: store_get($$store_subs ??= {}, "$workflowData", workflowData).fieldSelectionMode,
+            selectedFields: store_get($$store_subs ??= {}, "$workflowData", workflowData).selectedFields,
             errors: getCurrentStepErrors()
           });
-          $$payload.out.push(`<!----></div>`);
+          $$payload.out.push(`<!----> <div class="step-actions svelte-2venva"><button class="continue-button svelte-2venva"${attr("disabled", !store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext), true)}>Continue →</button></div>`);
         } else {
           $$payload.out.push("<!--[!-->");
           if (store_get($$store_subs ??= {}, "$currentStep", currentStep) === 4) {
             $$payload.out.push("<!--[-->");
-            $$payload.out.push(`<div class="step-container svelte-1lv6g9m"><div class="step-nav svelte-1lv6g9m">`);
-            if (store_get($$store_subs ??= {}, "$canGoBackToPrevious", canGoBackToPrevious)) {
-              $$payload.out.push("<!--[-->");
-              Button($$payload, {
-                variant: "outline",
-                onclick: handlePrevious,
-                class: "nav-button",
-                children: ($$payload2) => {
-                  $$payload2.out.push(`<!---->← Back`);
-                }
-              });
-            } else {
-              $$payload.out.push("<!--[!-->");
-            }
-            $$payload.out.push(`<!--]--> <button class="continue-button svelte-1lv6g9m"${attr("disabled", !store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext), true)}>Continue →</button></div> `);
             OdometerReading($$payload, {
               selectedVehicle: store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle,
               odometerStart: store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerStart,
               odometerEnd: store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerEnd,
               gaugeWorking: store_get($$store_subs ??= {}, "$workflowData", workflowData).gaugeWorking,
-              errors: getCurrentStepErrors()
+              errors: getCurrentStepErrors(),
+              canProceedToNext: store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext),
+              onNext: handleNext
             });
-            $$payload.out.push(`<!----></div>`);
           } else {
             $$payload.out.push("<!--[!-->");
             if (store_get($$store_subs ??= {}, "$currentStep", currentStep) === 5) {
               $$payload.out.push("<!--[-->");
-              $$payload.out.push(`<div class="step-container svelte-1lv6g9m"><div class="step-nav svelte-1lv6g9m">`);
-              if (store_get($$store_subs ??= {}, "$canGoBackToPrevious", canGoBackToPrevious)) {
-                $$payload.out.push("<!--[-->");
-                Button($$payload, {
-                  variant: "outline",
-                  onclick: handlePrevious,
-                  class: "nav-button",
-                  children: ($$payload2) => {
-                    $$payload2.out.push(`<!---->← Back`);
-                  }
-                });
-              } else {
-                $$payload.out.push("<!--[!-->");
-              }
-              $$payload.out.push(`<!--]--> <button class="continue-button svelte-1lv6g9m"${attr("disabled", !store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext), true)}>Continue →</button></div> `);
               FuelDataEntry($$payload, {
                 selectedVehicle: store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle,
                 selectedBowser: store_get($$store_subs ??= {}, "$workflowData", workflowData).bowser,
                 bowserReadingStart: store_get($$store_subs ??= {}, "$workflowData", workflowData).bowserReadingStart,
                 bowserReadingEnd: store_get($$store_subs ??= {}, "$workflowData", workflowData).bowserReadingEnd,
                 litresDispensed: store_get($$store_subs ??= {}, "$workflowData", workflowData).litresDispensed,
-                errors: getCurrentStepErrors()
+                errors: getCurrentStepErrors(),
+                canProceedToNext: store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext),
+                onNext: handleNext
               });
-              $$payload.out.push(`<!----></div>`);
             } else {
               $$payload.out.push("<!--[!-->");
               if (store_get($$store_subs ??= {}, "$currentStep", currentStep) === 6) {
                 $$payload.out.push("<!--[-->");
-                $$payload.out.push(`<div class="step-container svelte-1lv6g9m"><div class="step-nav svelte-1lv6g9m">`);
-                if (store_get($$store_subs ??= {}, "$canGoBackToPrevious", canGoBackToPrevious)) {
-                  $$payload.out.push("<!--[-->");
-                  Button($$payload, {
-                    variant: "outline",
-                    onclick: handlePrevious,
-                    class: "nav-button",
-                    children: ($$payload2) => {
-                      $$payload2.out.push(`<!---->← Back`);
-                    }
-                  });
-                } else {
-                  $$payload.out.push("<!--[!-->");
-                }
-                $$payload.out.push(`<!--]--></div> <div class="review-card svelte-1lv6g9m"><div class="review-header svelte-1lv6g9m"><h3 class="svelte-1lv6g9m">Review Entry</h3> <p class="svelte-1lv6g9m">Please verify all information before submitting</p></div> <div class="review-grid svelte-1lv6g9m">`);
+                $$payload.out.push(`<div class="step-container"><div class="review-summary svelte-2venva">`);
                 if (store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle) {
                   $$payload.out.push("<!--[-->");
-                  $$payload.out.push(`<div class="review-item svelte-1lv6g9m"><span class="item-label svelte-1lv6g9m">Vehicle</span> <span class="item-value svelte-1lv6g9m">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle.name || `${store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle.make || ""} ${store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle.model || ""}`.trim() || "Unnamed")}</span></div>`);
+                  $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">Vehicle</span> <span class="review-value svelte-2venva">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle.name || `${store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle.make || ""} ${store_get($$store_subs ??= {}, "$workflowData", workflowData).vehicle.model || ""}`.trim() || "Unnamed")}</span></div>`);
                 } else {
                   $$payload.out.push("<!--[!-->");
                 }
                 $$payload.out.push(`<!--]--> `);
                 if (store_get($$store_subs ??= {}, "$workflowData", workflowData).driver) {
                   $$payload.out.push("<!--[-->");
-                  $$payload.out.push(`<div class="review-item svelte-1lv6g9m"><span class="item-label svelte-1lv6g9m">Driver</span> <span class="item-value svelte-1lv6g9m">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).driver.name)}</span></div>`);
+                  $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">Driver</span> <span class="review-value svelte-2venva">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).driver.name)}</span></div>`);
                 } else {
                   $$payload.out.push("<!--[!-->");
                 }
                 $$payload.out.push(`<!--]--> `);
                 if (store_get($$store_subs ??= {}, "$workflowData", workflowData).activity) {
                   $$payload.out.push("<!--[-->");
-                  $$payload.out.push(`<div class="review-item svelte-1lv6g9m"><span class="item-label svelte-1lv6g9m">Activity</span> <span class="item-value svelte-1lv6g9m">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).activity.name)}</span></div>`);
+                  $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">Activity</span> <span class="review-value svelte-2venva">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).activity.name)}</span></div>`);
                 } else {
                   $$payload.out.push("<!--[!-->");
                 }
                 $$payload.out.push(`<!--]--> `);
-                if (store_get($$store_subs ??= {}, "$workflowData", workflowData).field) {
+                if (store_get($$store_subs ??= {}, "$workflowData", workflowData).fieldSelectionMode === "multiple" && store_get($$store_subs ??= {}, "$workflowData", workflowData).selectedFields.length > 0) {
                   $$payload.out.push("<!--[-->");
-                  $$payload.out.push(`<div class="review-item svelte-1lv6g9m"><span class="item-label svelte-1lv6g9m">Field</span> <span class="item-value svelte-1lv6g9m">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).field.name)}</span></div>`);
+                  const each_array_1 = ensure_array_like(store_get($$store_subs ??= {}, "$workflowData", workflowData).selectedFields);
+                  $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">Fields</span> <span class="review-value svelte-2venva">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).selectedFields.length)} field${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).selectedFields.length !== 1 ? "s" : "")}</span></div> <div class="review-multi-fields svelte-2venva"><!--[-->`);
+                  for (let index = 0, $$length = each_array_1.length; index < $$length; index++) {
+                    let field = each_array_1[index];
+                    $$payload.out.push(`<span class="field-chip svelte-2venva">${escape_html(field.name)}</span> `);
+                    if (index < store_get($$store_subs ??= {}, "$workflowData", workflowData).selectedFields.length - 1) {
+                      $$payload.out.push("<!--[-->");
+                      $$payload.out.push(`,`);
+                    } else {
+                      $$payload.out.push("<!--[!-->");
+                    }
+                    $$payload.out.push(`<!--]-->`);
+                  }
+                  $$payload.out.push(`<!--]--></div>`);
+                } else {
+                  $$payload.out.push("<!--[!-->");
+                  if (store_get($$store_subs ??= {}, "$workflowData", workflowData).field) {
+                    $$payload.out.push("<!--[-->");
+                    $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">Field</span> <span class="review-value svelte-2venva">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).field.name)}</span></div>`);
+                  } else {
+                    $$payload.out.push("<!--[!-->");
+                    if (store_get($$store_subs ??= {}, "$workflowData", workflowData).zone) {
+                      $$payload.out.push("<!--[-->");
+                      $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">Zone</span> <span class="review-value svelte-2venva">${escape_html(store_get($$store_subs ??= {}, "$workflowData", workflowData).zone.name)}</span></div>`);
+                    } else {
+                      $$payload.out.push("<!--[!-->");
+                    }
+                    $$payload.out.push(`<!--]-->`);
+                  }
+                  $$payload.out.push(`<!--]-->`);
+                }
+                $$payload.out.push(`<!--]--> `);
+                if (store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerStart !== null) {
+                  $$payload.out.push("<!--[-->");
+                  $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">ODO Start</span> <span class="review-value svelte-2venva">${escape_html(new Intl.NumberFormat("en-US").format(store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerStart))} km</span></div>`);
                 } else {
                   $$payload.out.push("<!--[!-->");
                 }
                 $$payload.out.push(`<!--]--> `);
-                if (store_get($$store_subs ??= {}, "$workflowData", workflowData).gaugeWorking && store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerStart !== null && store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerEnd !== null) {
+                if (store_get($$store_subs ??= {}, "$workflowData", workflowData).gaugeWorking && store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerEnd !== null) {
                   $$payload.out.push("<!--[-->");
-                  $$payload.out.push(`<div class="review-item odometer-group svelte-1lv6g9m"><span class="item-label svelte-1lv6g9m">Odometer</span> <div class="odometer-values svelte-1lv6g9m"><span class="odo-start svelte-1lv6g9m">${escape_html(new Intl.NumberFormat().format(store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerStart))}</span> <span class="odo-arrow svelte-1lv6g9m">→</span> <span class="odo-end svelte-1lv6g9m">${escape_html(new Intl.NumberFormat().format(store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerEnd))}</span></div></div>`);
+                  $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">ODO End</span> <span class="review-value svelte-2venva">${escape_html(new Intl.NumberFormat("en-US").format(store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerEnd))} km</span></div> `);
+                  if (store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerStart !== null) {
+                    $$payload.out.push("<!--[-->");
+                    $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">Distance</span> <span class="review-value svelte-2venva">${escape_html(new Intl.NumberFormat("en-US").format(store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerEnd - store_get($$store_subs ??= {}, "$workflowData", workflowData).odometerStart))} km</span></div>`);
+                  } else {
+                    $$payload.out.push("<!--[!-->");
+                  }
+                  $$payload.out.push(`<!--]-->`);
+                } else {
+                  $$payload.out.push("<!--[!-->");
+                  if (!store_get($$store_subs ??= {}, "$workflowData", workflowData).gaugeWorking) {
+                    $$payload.out.push("<!--[-->");
+                    $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">ODO Status</span> <span class="review-value svelte-2venva">Gauge broken</span></div>`);
+                  } else {
+                    $$payload.out.push("<!--[!-->");
+                  }
+                  $$payload.out.push(`<!--]-->`);
+                }
+                $$payload.out.push(`<!--]--> `);
+                if (store_get($$store_subs ??= {}, "$workflowData", workflowData).bowser) {
+                  $$payload.out.push("<!--[-->");
+                  if (store_get($$store_subs ??= {}, "$workflowData", workflowData).bowserReadingStart !== null) {
+                    $$payload.out.push("<!--[-->");
+                    $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">Bowser Start</span> <span class="review-value svelte-2venva">${escape_html(new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(store_get($$store_subs ??= {}, "$workflowData", workflowData).bowserReadingStart))} L</span></div>`);
+                  } else {
+                    $$payload.out.push("<!--[!-->");
+                  }
+                  $$payload.out.push(`<!--]--> `);
+                  if (store_get($$store_subs ??= {}, "$workflowData", workflowData).bowserReadingEnd !== null) {
+                    $$payload.out.push("<!--[-->");
+                    $$payload.out.push(`<div class="review-row svelte-2venva"><span class="review-label svelte-2venva">Bowser End</span> <span class="review-value svelte-2venva">${escape_html(new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(store_get($$store_subs ??= {}, "$workflowData", workflowData).bowserReadingEnd))} L</span></div>`);
+                  } else {
+                    $$payload.out.push("<!--[!-->");
+                  }
+                  $$payload.out.push(`<!--]-->`);
                 } else {
                   $$payload.out.push("<!--[!-->");
                 }
                 $$payload.out.push(`<!--]--> `);
                 if (store_get($$store_subs ??= {}, "$workflowData", workflowData).bowser && store_get($$store_subs ??= {}, "$workflowData", workflowData).litresDispensed) {
                   $$payload.out.push("<!--[-->");
-                  $$payload.out.push(`<div class="review-item fuel-highlight svelte-1lv6g9m"><span class="item-label svelte-1lv6g9m">Fuel Dispensed</span> <span class="item-value fuel-value svelte-1lv6g9m">${escape_html(new Intl.NumberFormat().format(store_get($$store_subs ??= {}, "$workflowData", workflowData).litresDispensed))}L</span></div>`);
+                  $$payload.out.push(`<div class="fuel-total svelte-2venva"><span class="fuel-amount svelte-2venva">${escape_html(new Intl.NumberFormat("en-US").format(store_get($$store_subs ??= {}, "$workflowData", workflowData).litresDispensed))}</span> <span class="fuel-unit svelte-2venva">L</span></div>`);
                 } else {
                   $$payload.out.push("<!--[!-->");
                 }
-                $$payload.out.push(`<!--]--></div></div> `);
+                $$payload.out.push(`<!--]--></div> `);
                 if (getCurrentStepErrors().length > 0) {
                   $$payload.out.push("<!--[-->");
-                  const each_array = ensure_array_like(getCurrentStepErrors());
-                  $$payload.out.push(`<div class="validation-errors svelte-1lv6g9m"><div class="error-card svelte-1lv6g9m"><div class="error-header svelte-1lv6g9m"><span class="error-icon svelte-1lv6g9m">⚠️</span> <h3 class="svelte-1lv6g9m">Please complete all required steps</h3></div> <div class="error-list svelte-1lv6g9m"><!--[-->`);
-                  for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
-                    let error = each_array[$$index];
-                    $$payload.out.push(`<div class="error-item svelte-1lv6g9m">${escape_html(error)}</div>`);
+                  const each_array_2 = ensure_array_like(getCurrentStepErrors());
+                  $$payload.out.push(`<div class="error-message svelte-2venva"><!--[-->`);
+                  for (let $$index_2 = 0, $$length = each_array_2.length; $$index_2 < $$length; $$index_2++) {
+                    let error = each_array_2[$$index_2];
+                    $$payload.out.push(`<p class="svelte-2venva">${escape_html(error)}</p>`);
                   }
-                  $$payload.out.push(`<!--]--></div></div></div>`);
+                  $$payload.out.push(`<!--]--></div>`);
                 } else {
                   $$payload.out.push("<!--[!-->");
                 }
-                $$payload.out.push(`<!--]--> <div class="submit-container svelte-1lv6g9m"><button class="submit-button svelte-1lv6g9m"${attr("disabled", !store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext) || store_get($$store_subs ??= {}, "$isSubmittingEntry", isSubmittingEntry), true)}>`);
+                $$payload.out.push(`<!--]--> <button class="submit-btn svelte-2venva"${attr("disabled", !store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext) || store_get($$store_subs ??= {}, "$isSubmittingEntry", isSubmittingEntry), true)}>`);
                 if (store_get($$store_subs ??= {}, "$isSubmittingEntry", isSubmittingEntry)) {
                   $$payload.out.push("<!--[-->");
-                  $$payload.out.push(`<span class="submit-loader svelte-1lv6g9m"></span> Submitting...`);
+                  $$payload.out.push(`Submitting...`);
                 } else {
                   $$payload.out.push("<!--[!-->");
-                  $$payload.out.push(`Submit Entry`);
+                  $$payload.out.push(`Submit`);
                 }
-                $$payload.out.push(`<!--]--></button></div></div>`);
+                $$payload.out.push(`<!--]--></button></div>`);
               } else {
                 $$payload.out.push("<!--[!-->");
               }
@@ -1184,7 +1046,7 @@ function FuelEntryWorkflow($$payload, $$props) {
     }
     $$payload.out.push(`<!--]-->`);
   }
-  $$payload.out.push(`<!--]--></div> <div class="keyboard-hints svelte-1lv6g9m"><small class="svelte-1lv6g9m">💡 Keyboard shortcuts: <kbd class="svelte-1lv6g9m">→</kbd> or <kbd class="svelte-1lv6g9m">Enter</kbd> to continue • <kbd class="svelte-1lv6g9m">←</kbd> to go back • <kbd class="svelte-1lv6g9m">Esc</kbd> to restart</small></div></div> `);
+  $$payload.out.push(`<!--]--></div> <div class="keyboard-hints svelte-2venva"><small>💡 Keyboard shortcuts: <kbd class="svelte-2venva">→</kbd> or <kbd class="svelte-2venva">Enter</kbd> to continue • <kbd class="svelte-2venva">←</kbd> to go back • <kbd class="svelte-2venva">Esc</kbd> to restart</small></div> <button${attr_class(`back-button-fixed ${stringify(store_get($$store_subs ??= {}, "$canGoBackToPrevious", canGoBackToPrevious) ? "visible" : "hidden")}`, "svelte-2venva")}${attr("disabled", !store_get($$store_subs ??= {}, "$canGoBackToPrevious", canGoBackToPrevious), true)} aria-label="Previous step"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></button> <button${attr_class(`next-button-fixed ${stringify(store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext) && store_get($$store_subs ??= {}, "$currentStep", currentStep) < store_get($$store_subs ??= {}, "$fuelEntryWorkflowStore", fuelEntryWorkflowStore).steps.length - 1 ? "visible" : "hidden")}`, "svelte-2venva")}${attr("disabled", !store_get($$store_subs ??= {}, "$canProceedToNext", canProceedToNext), true)} aria-label="Next step"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"></path></svg></button></div> `);
   {
     $$payload.out.push("<!--[!-->");
   }
@@ -1196,7 +1058,7 @@ function _page($$payload) {
   head($$payload, ($$payload2) => {
     $$payload2.title = `<title>Fuel Management - FarmTrack</title>`;
   });
-  $$payload.out.push(`<div class="fuel-management-page svelte-1x5u956">`);
+  $$payload.out.push(`<div class="fuel-management-page svelte-1lvqx35">`);
   FuelEntryWorkflow($$payload);
   $$payload.out.push(`<!----></div>`);
 }

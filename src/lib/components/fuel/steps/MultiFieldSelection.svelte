@@ -279,7 +279,7 @@
 							{@const isSelected = selectedFieldIds.includes(field.id)}
 							{@const isDisabled = !isSelected && isMaxReached}
 							
-							<label 
+							<label
 								class="field-checkbox-card {isSelected ? 'selected' : ''} {isDisabled ? 'disabled' : ''}"
 								for="field-{field.id}"
 							>
@@ -291,14 +291,8 @@
 									onchange={() => toggleFieldSelection(field)}
 								/>
 								<div class="field-content">
-									<div class="field-header">
+									<div class="field-info-row">
 										<span class="field-name">{field.name}</span>
-										<span class="field-code">{field.code}</span>
-									</div>
-									<div class="field-details">
-										{#if field.location}
-											<span class="field-location">{field.location}</span>
-										{/if}
 										<span class="field-area">{formatArea(field.area)}</span>
 									</div>
 								</div>
@@ -591,9 +585,9 @@
 	.field-checkbox-card {
 		position: relative;
 		display: flex;
-		align-items: flex-start;
+		align-items: center;
 		gap: 0.75rem;
-		padding: 1rem;
+		padding: 0.75rem;
 		background: white;
 		border: 2px solid #e5e7eb;
 		border-radius: 8px;
@@ -634,44 +628,30 @@
 		min-width: 0;
 	}
 
-	.field-header {
+	.field-info-row {
 		display: flex;
 		justify-content: space-between;
-		align-items: flex-start;
-		margin-bottom: 0.5rem;
-		gap: 0.5rem;
+		align-items: center;
+		gap: 1rem;
 	}
 
 	.field-checkbox-card .field-name {
 		font-weight: 600;
 		color: #111827;
 		font-size: 0.875rem;
-	}
-
-	.field-code {
-		font-size: 0.75rem;
-		color: #6b7280;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		flex-shrink: 0;
-	}
-
-	.field-details {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.field-location {
-		font-size: 0.75rem;
-		color: #6b7280;
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.field-area {
 		font-size: 0.75rem;
 		color: #6b7280;
 		font-variant-numeric: tabular-nums;
+		font-weight: 500;
+		flex-shrink: 0;
 	}
 
 	/* States */

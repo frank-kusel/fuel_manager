@@ -475,15 +475,28 @@
 	<div class="keyboard-hints">
 		<small>💡 Keyboard shortcuts: <kbd>→</kbd> or <kbd>Enter</kbd> to continue • <kbd>←</kbd> to go back • <kbd>Esc</kbd> to restart</small>
 	</div>
-	
+
 	<!-- Fixed Position Back Button -->
-	<button 
+	<button
 		class="back-button-fixed {$canGoBackToPrevious ? 'visible' : 'hidden'}"
 		onclick={handlePrevious}
 		disabled={!$canGoBackToPrevious}
+		aria-label="Previous step"
 	>
 		<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
 			<path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+		</svg>
+	</button>
+
+	<!-- Fixed Position Next Button -->
+	<button
+		class="next-button-fixed {$canProceedToNext && $currentStep < $fuelEntryWorkflowStore.steps.length - 1 ? 'visible' : 'hidden'}"
+		onclick={handleNext}
+		disabled={!$canProceedToNext}
+		aria-label="Next step"
+	>
+		<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+			<path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
 		</svg>
 	</button>
 </div>
@@ -588,6 +601,50 @@
 	.back-button-fixed:disabled {
 		opacity: 0;
 		transform: translateX(-100%);
+		pointer-events: none;
+	}
+
+	/* Fixed Position Next Button - Above Bottom Nav Bar (Right Side) */
+	.next-button-fixed {
+		position: fixed;
+		bottom: 5rem;
+		right: 1rem;
+		z-index: 200;
+		width: 56px;
+		height: 56px;
+		border-radius: 28px;
+		border: none;
+		background: rgba(37, 99, 235, 0.95);
+		color: white;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+		backdrop-filter: blur(12px);
+	}
+
+	.next-button-fixed.visible {
+		opacity: 1;
+		transform: translateX(0);
+	}
+
+	.next-button-fixed.hidden {
+		opacity: 0;
+		transform: translateX(100%);
+		pointer-events: none;
+	}
+
+	.next-button-fixed:hover:not(:disabled) {
+		background: rgba(29, 78, 216, 0.98);
+		transform: scale(1.05);
+		box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+	}
+
+	.next-button-fixed:disabled {
+		opacity: 0;
+		transform: translateX(100%);
 		pointer-events: none;
 	}
 	

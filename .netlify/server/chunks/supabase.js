@@ -18,7 +18,7 @@ class SupabaseService {
   // Load Supabase configuration from environment variables
   async loadConfig() {
     const url = "https://szskplrwmeuahwvicyos.supabase.co";
-    const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MDkzMTEsImV4cCI6MjA2OTI4NTMxMX0.phbhjcVVF-ENJn167Pd0XxlF_VicDcJW7id5K8Vy7Mc";
+    const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6c2twbHJ3bWV1YWh3dmljeW9zIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzcwOTMxMSwiZXhwIjoyMDY5Mjg1MzExfQ.HIpUnovx2W9ZSqsfwBR0iGJJtCm3w6TU5oTMnphENdU";
     return { url, key };
   }
   // Ensure client is initialized
@@ -174,6 +174,119 @@ class SupabaseService {
       () => client.from("fuel_entries").update({ ...updates, updated_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("id", id).select().single()
     );
   }
+  // Multi-field fuel entry operations
+  async createFuelEntryWithFields(entry, fieldIds = []) {
+    const client = this.ensureInitialized();
+    try {
+      const { data: fuelEntry, error: entryError } = await client.from("fuel_entries").insert({
+        ...entry,
+        field_selection_mode: fieldIds.length > 1 ? "multiple" : "single"
+      }).select().single();
+      if (entryError) {
+        return { data: null, error: entryError.message };
+      }
+      if (fieldIds.length > 0 && entry.field_selection_mode === "multiple") {
+        const junctionEntries = fieldIds.map((fieldId) => ({
+          fuel_entry_id: fuelEntry.id,
+          field_id: fieldId
+        }));
+        const { error: junctionError } = await client.from("fuel_entry_fields").insert(junctionEntries);
+        if (junctionError) {
+          await client.from("fuel_entries").delete().eq("id", fuelEntry.id);
+          return { data: null, error: junctionError.message };
+        }
+      }
+      return { data: fuelEntry, error: null };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error.message : "Failed to create fuel entry with fields"
+      };
+    }
+  }
+  async getFuelEntryFields(entryId) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("fuel_entry_fields").select(`
+					field_id,
+					fields (
+						id,
+						code,
+						name,
+						type,
+						area,
+						location,
+						crop_type,
+						active,
+						created_at,
+						updated_at
+					)
+				`).eq("fuel_entry_id", entryId)
+    );
+  }
+  async getFuelEntriesWithLocation(startDate, endDate) {
+    const client = this.ensureInitialized();
+    let query = client.from("fuel_entries_with_fields").select(`
+				*,
+				vehicles (
+					code,
+					name,
+					type
+				),
+				drivers (
+					employee_code,
+					name
+				),
+				activities (
+					code,
+					name,
+					category
+				),
+				bowsers (
+					name,
+					registration
+				)
+			`).order("entry_date", { ascending: false });
+    if (startDate) {
+      query = query.gte("entry_date", startDate);
+    }
+    if (endDate) {
+      query = query.lte("entry_date", endDate);
+    }
+    return this.query(() => query);
+  }
+  async updateFuelEntryFields(entryId, fieldIds) {
+    const client = this.ensureInitialized();
+    try {
+      await client.from("fuel_entry_fields").delete().eq("fuel_entry_id", entryId);
+      if (fieldIds.length > 0) {
+        const junctionEntries = fieldIds.map((fieldId) => ({
+          fuel_entry_id: entryId,
+          field_id: fieldId
+        }));
+        const { error: insertError } = await client.from("fuel_entry_fields").insert(junctionEntries);
+        if (insertError) {
+          return { data: null, error: insertError.message };
+        }
+        await client.from("fuel_entries").update({
+          field_selection_mode: fieldIds.length > 1 ? "multiple" : "single",
+          updated_at: (/* @__PURE__ */ new Date()).toISOString()
+        }).eq("id", entryId);
+      }
+      return { data: true, error: null };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error.message : "Failed to update fuel entry fields"
+      };
+    }
+  }
+  async deleteFuelEntryFields(entryId) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("fuel_entry_fields").delete().eq("fuel_entry_id", entryId)
+    );
+  }
   // Bowser operations
   async getBowsers() {
     const client = this.ensureInitialized();
@@ -294,23 +407,25 @@ class SupabaseService {
     return this.query(async () => {
       const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
       const monthStart = new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth(), 1).toISOString().split("T")[0];
-      const now = /* @__PURE__ */ new Date();
-      const dayOfWeek = now.getDay();
-      const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const weekStart = new Date(now.getTime() - daysToSubtract * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
-      const [dailyFuel, weeklyFuel, monthlyFuel, recentEntries, bowsers, vehicles, tankStatus] = await Promise.all([
+      const prevMonthStart = new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth() - 1, 1).toISOString().split("T")[0];
+      const prevMonthEnd = new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth(), 0).toISOString().split("T")[0];
+      const past7DaysStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
+      const [dailyFuel, weeklyFuel, monthlyFuel, previousMonthFuel, recentEntries, bowsers, vehicles, tankStatus] = await Promise.all([
         // Today's fuel usage
         client.from("fuel_entries").select("litres_used, litres_dispensed").gte("entry_date", today),
-        // This week's fuel usage
-        client.from("fuel_entries").select("litres_used, litres_dispensed, odometer_start, odometer_end").gte("entry_date", weekStart),
+        // Past 7 days fuel usage
+        client.from("fuel_entries").select("litres_used, litres_dispensed, odometer_start, odometer_end").gte("entry_date", past7DaysStart),
         // This month's fuel usage
         client.from("fuel_entries").select("litres_used, litres_dispensed, odometer_start, odometer_end, vehicle_id, fuel_consumption_l_per_100km, gauge_working").gte("entry_date", monthStart),
+        // Previous month's fuel usage
+        client.from("fuel_entries").select("litres_used, litres_dispensed").gte("entry_date", prevMonthStart).lte("entry_date", prevMonthEnd),
         // Recent fuel entries with vehicle info - using LEFT JOINs to include entries with missing relationships
         client.from("fuel_entries").select(`
 						*,
-						vehicles!left(code, name, type),
+						vehicles!left(code, name, type, odometer_unit, average_consumption_l_per_100km),
 						drivers!left(employee_code, name),
-						activities!left(name, category)
+						activities!left(name, category),
+						fields!left(name, code)
 					`).order("entry_date", { ascending: false }).order("time", { ascending: false }).limit(10),
         // Bowser levels
         client.from("bowsers").select("name, current_reading, capacity, fuel_type").eq("active", true),
@@ -322,6 +437,7 @@ class SupabaseService {
       const dailyUsage = dailyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
       const weeklyUsage = weeklyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
       const monthlyUsage = monthlyFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+      const previousMonthUsage = previousMonthFuel.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
       const monthlyDistance = monthlyFuel.data?.reduce((sum, entry) => {
         if (entry.gauge_working && entry.odometer_start && entry.odometer_end) {
           const distance = entry.odometer_end - entry.odometer_start;
@@ -350,6 +466,7 @@ class SupabaseService {
           dailyFuel: Math.round(dailyUsage * 100) / 100,
           weeklyFuel: Math.round(weeklyUsage * 100) / 100,
           monthlyFuel: Math.round(monthlyUsage * 100) / 100,
+          previousMonthFuel: Math.round(previousMonthUsage * 100) / 100,
           // Distance and efficiency
           monthlyDistance: Math.round(monthlyDistance),
           averageEfficiency: Math.round(avgEfficiency * 100) / 100,
@@ -512,6 +629,250 @@ class SupabaseService {
     const client = this.ensureInitialized();
     return this.query(
       () => client.from("vehicles").select("id, code, name, type, average_consumption_l_per_100km, consumption_entries_count").not("average_consumption_l_per_100km", "is", null).gte("consumption_entries_count", 3).eq("active", true).order("average_consumption_l_per_100km", { ascending: true }).limit(limit)
+    );
+  }
+  // Get fuel records for a specific vehicle
+  async getVehicleFuelRecords(vehicleId, startDate, endDate) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("fuel_entries").select("id, entry_date, litres_dispensed, litres_used, time, vehicle_id").eq("vehicle_id", vehicleId).gte("entry_date", startDate).lte("entry_date", endDate).order("entry_date", { ascending: false }).order("time", { ascending: false })
+    );
+  }
+  // Reconciliation operations
+  async createTankReconciliation(data) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("tank_reconciliations").insert({
+        reconciliation_date: data.reconciliationDate,
+        calculated_level: data.calculatedLevel,
+        measured_level: data.measuredLevel,
+        accepted: Math.abs((data.calculatedLevel - data.measuredLevel) / 24e3 * 100) <= 5,
+        // 24000L tank capacity
+        notes: data.notes
+      }).select().single()
+    );
+  }
+  // Flexible date range reconciliation methods for new Tools section
+  async getDateRangeReconciliationData(startDate, endDate) {
+    const client = this.ensureInitialized();
+    try {
+      const fuelResult = await client.from("fuel_entries").select("litres_dispensed").gte("entry_date", startDate).lte("entry_date", endDate);
+      const fuelDispensed = fuelResult.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+      let bowserStart = 0;
+      let bowserEnd = 0;
+      try {
+        const bowserStartResult = await client.from("fuel_entries").select("bowser_reading_start, entry_date, time").gte("entry_date", startDate).lte("entry_date", endDate).not("bowser_reading_start", "is", null).order("entry_date", { ascending: true }).order("time", { ascending: true }).limit(1);
+        const bowserEndResult = await client.from("fuel_entries").select("bowser_reading_end, entry_date, time").gte("entry_date", startDate).lte("entry_date", endDate).not("bowser_reading_end", "is", null).order("entry_date", { ascending: false }).order("time", { ascending: false }).limit(1);
+        bowserStart = parseFloat(bowserStartResult.data?.[0]?.bowser_reading_start) || 0;
+        bowserEnd = parseFloat(bowserEndResult.data?.[0]?.bowser_reading_end) || 0;
+      } catch (bowserError) {
+        console.warn("Could not fetch bowser readings:", bowserError);
+        bowserStart = 0;
+        bowserEnd = 0;
+      }
+      return {
+        data: {
+          fuelDispensed,
+          bowserStart,
+          bowserEnd
+        },
+        error: null
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error.message : "Failed to get date range reconciliation data"
+      };
+    }
+  }
+  async getTankReconciliationData(date) {
+    const client = this.ensureInitialized();
+    try {
+      let tankCalculated = 0;
+      try {
+        const tankStatusResult = await client.from("tank_status").select("current_calculated_level").eq("tank_id", "tank_a").single();
+        tankCalculated = tankStatusResult.data?.current_calculated_level || 0;
+      } catch (tankError) {
+        console.warn("Could not fetch tank status:", tankError);
+      }
+      let tankMeasured = 0;
+      try {
+        const tankReadingResult = await client.from("tank_readings").select("reading_value").eq("tank_id", "tank_a").lte("reading_date", date).order("reading_date", { ascending: false }).limit(1);
+        tankMeasured = tankReadingResult.data?.[0]?.reading_value || 0;
+      } catch (readingError) {
+        console.warn("Could not fetch tank readings:", readingError);
+      }
+      return {
+        data: {
+          tankCalculated,
+          tankMeasured
+        },
+        error: null
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error.message : "Failed to get tank reconciliation data"
+      };
+    }
+  }
+  async createFuelReconciliation(data) {
+    const client = this.ensureInitialized();
+    const bowserDifference = data.bowserEnd - data.bowserStart;
+    const fuelVariance = Math.abs(data.fuelDispensed - bowserDifference);
+    const reconciliationStatus = fuelVariance <= 1 ? "reconciled" : "discrepancy";
+    return this.query(
+      () => client.from("fuel_reconciliations").insert({
+        start_date: data.startDate,
+        end_date: data.endDate,
+        fuel_dispensed: data.fuelDispensed,
+        fuel_received: bowserDifference,
+        discrepancy_count: fuelVariance > 1 ? 1 : 0,
+        status: reconciliationStatus,
+        reconciled_date: (/* @__PURE__ */ new Date()).toISOString(),
+        notes: `Bowser: ${data.bowserStart}L → ${data.bowserEnd}L (${bowserDifference}L added).`
+      }).select().single()
+    );
+  }
+  // Database management methods for new Tools section
+  async getTables() {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("information_schema.tables").select("table_name, table_schema").eq("table_schema", "public").order("table_name")
+    );
+  }
+  async getTableData(tableName, limit = 50) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from(tableName).select("*").limit(limit)
+    );
+  }
+  async executeQuery(query) {
+    const client = this.ensureInitialized();
+    return this.query(async () => {
+      const { data, error } = await client.rpc("execute_sql", { query_text: query });
+      return { data, error };
+    });
+  }
+  // Reconciliation history method for new Tools section
+  async getReconciliationHistory(limit = 50) {
+    const client = this.ensureInitialized();
+    try {
+      let fuelRecords = [];
+      try {
+        const fuelResult = await client.from("fuel_reconciliations").select("*").order("reconciled_date", { ascending: false }).limit(Math.floor(limit / 2));
+        fuelRecords = (fuelResult.data || []).map((record) => ({
+          ...record,
+          type: "fuel",
+          date: record.reconciled_date || record.created_at
+        }));
+      } catch (fuelError) {
+        console.warn("Could not fetch fuel reconciliations:", fuelError);
+      }
+      let tankRecords = [];
+      try {
+        const tankResult = await client.from("tank_reconciliations").select("*").order("reconciliation_date", { ascending: false }).limit(Math.floor(limit / 2));
+        tankRecords = (tankResult.data || []).map((record) => ({
+          ...record,
+          type: "tank",
+          date: record.reconciliation_date,
+          status: record.accepted ? "reconciled" : "discrepancy"
+        }));
+      } catch (tankError) {
+        console.warn("Could not fetch tank reconciliations:", tankError);
+      }
+      const allRecords = [...fuelRecords, ...tankRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, limit);
+      return { data: allRecords, error: null };
+    } catch (error) {
+      return {
+        data: [],
+        error: error instanceof Error ? error.message : "Failed to get reconciliation history"
+      };
+    }
+  }
+  // Fuel entry management methods for inline editing
+  async getFuelEntriesForPeriod(startDate, endDate) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("fuel_entries").select(`
+					*,
+					vehicles:vehicle_id(id, code, name),
+					drivers:driver_id(id, employee_code, name),
+					activities:activity_id(id, name),
+					fields:field_id(id, code, name),
+					zones:zone_id(id, code, name)
+				`).gte("entry_date", startDate).lte("entry_date", endDate).order("entry_date", { ascending: false }).order("time", { ascending: false })
+    );
+  }
+  // Tank level management methods for tank adjustment
+  async getTankDataForDate(date) {
+    const client = this.ensureInitialized();
+    try {
+      let calculatedLevel = 0;
+      try {
+        const tankStatusResult = await client.from("tank_status").select("current_calculated_level").eq("tank_id", "tank_a").single();
+        calculatedLevel = tankStatusResult.data?.current_calculated_level || 0;
+      } catch (tankError) {
+        console.warn("Could not fetch tank status:", tankError);
+      }
+      let measuredLevel = 0;
+      try {
+        const tankReadingResult = await client.from("tank_readings").select("reading_value").eq("tank_id", "tank_a").lte("reading_date", date).order("reading_date", { ascending: false }).limit(1);
+        measuredLevel = tankReadingResult.data?.[0]?.reading_value || 0;
+      } catch (readingError) {
+        console.warn("Could not fetch tank readings:", readingError);
+      }
+      return {
+        data: {
+          calculatedLevel,
+          measuredLevel,
+          date
+        },
+        error: null
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error.message : "Failed to get tank data"
+      };
+    }
+  }
+  async updateTankCalculatedLevel(date, newLevel, notes) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("tank_status").update({
+        current_calculated_level: newLevel,
+        updated_at: (/* @__PURE__ */ new Date()).toISOString(),
+        notes
+      }).eq("tank_id", "tank_a")
+    );
+  }
+  async updateTankMeasuredLevel(date, newLevel, notes) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("tank_readings").upsert({
+        tank_id: "tank_a",
+        reading_date: date,
+        reading_value: newLevel,
+        reading_type: "manual_adjustment",
+        notes,
+        updated_at: (/* @__PURE__ */ new Date()).toISOString()
+      }).select()
+    );
+  }
+  async createTankAdjustmentLog(data) {
+    const client = this.ensureInitialized();
+    return this.query(
+      () => client.from("tank_adjustment_logs").insert({
+        adjustment_date: data.date,
+        adjustments_made: data.adjustments,
+        notes: data.notes,
+        previous_calculated_level: data.previousCalculated,
+        new_calculated_level: data.newCalculated,
+        previous_measured_level: data.previousMeasured,
+        new_measured_level: data.newMeasured,
+        created_at: (/* @__PURE__ */ new Date()).toISOString()
+      }).select()
     );
   }
   // Connection test

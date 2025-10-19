@@ -1,6 +1,7 @@
-import { a as getRequestEvent, g as get_event_state, E as EVENT_STATE, w as with_event, b as create_remote_cache_key, d as stringify_remote_arg, s as stringify } from "./chunks/event-state.js";
+import { get_request_store, with_request_store } from "@sveltejs/kit/internal/server";
 import { parse } from "devalue";
 import { error, json } from "@sveltejs/kit";
+import { c as create_remote_cache_key, a as stringify_remote_arg, s as stringify } from "./chunks/shared.js";
 import { B as BROWSER } from "./chunks/false.js";
 import { b as base, c as app_dir, p as prerendering } from "./chunks/environment.js";
 function create_validator(validate_or_fn, maybe_fn) {
@@ -16,15 +17,14 @@ function create_validator(validate_or_fn, maybe_fn) {
   }
   if ("~standard" in validate_or_fn) {
     return async (arg) => {
-      const event = getRequestEvent();
-      const state = get_event_state(event);
+      const { event, state } = get_request_store();
       const validate = validate_or_fn["~standard"].validate;
       const result = await validate(arg);
       if (result.issues) {
         error(
           400,
           await state.handleValidationError({
-            ...result,
+            issues: result.issues,
             event
           })
         );
@@ -36,17 +36,10 @@ function create_validator(validate_or_fn, maybe_fn) {
     'Invalid validator passed to remote function. Expected "unchecked" or a Standard Schema (https://standardschema.dev)'
   );
 }
-function get_response(id, arg, event, get_result) {
-  const state = get_event_state(event);
+async function get_response(id, arg, state, get_result) {
+  await 0;
   const cache_key = create_remote_cache_key(id, stringify_remote_arg(arg, state.transport));
   return (state.remote_data ??= {})[cache_key] ??= get_result();
-}
-function check_experimental(feature) {
-  {
-    throw new Error(
-      `Cannot use \`${feature}\` from \`$app/server\` without the experimental flag set to true. Please set kit.experimental.remoteFunctions to \`true\` in your config.`
-    );
-  }
 }
 function parse_remote_response(data, transport) {
   const revivers = {};
@@ -55,11 +48,9 @@ function parse_remote_response(data, transport) {
   }
   return parse(data, revivers);
 }
-async function run_remote_function(event, allow_cookies, arg, validate, fn) {
+async function run_remote_function(event, state, allow_cookies, arg, validate, fn) {
   const cleansed = {
     ...event,
-    // @ts-expect-error this isn't part of the public `RequestEvent` type
-    [EVENT_STATE]: event[EVENT_STATE],
     setHeaders: () => {
       throw new Error("setHeaders is not allowed in remote functions");
     },
@@ -87,24 +78,29 @@ async function run_remote_function(event, allow_cookies, arg, validate, fn) {
     route: { id: null },
     url: new URL(event.url.origin)
   };
-  const validated = await with_event(cleansed, () => validate(arg));
-  return with_event(cleansed, () => fn(validated));
+  const validated = await with_request_store({ event: cleansed, state }, () => validate(arg));
+  return with_request_store({ event: cleansed, state }, () => fn(validated));
 }
 // @__NO_SIDE_EFFECTS__
 function command(validate_or_fn, maybe_fn) {
-  check_experimental("command");
   const fn = maybe_fn ?? validate_or_fn;
   const validate = create_validator(validate_or_fn, maybe_fn);
   const __ = { type: "command", id: "", name: "" };
   const wrapper = (arg) => {
-    const event = getRequestEvent();
-    if (!event.isRemoteRequest) {
+    const { event, state } = get_request_store();
+    if (state.is_endpoint_request) {
+      if (!["POST", "PUT", "PATCH", "DELETE"].includes(event.request.method)) {
+        throw new Error(
+          `Cannot call a command (\`${__.name}(${maybe_fn ? "..." : ""})\`) from a ${event.request.method} handler`
+        );
+      }
+    } else if (!event.isRemoteRequest) {
       throw new Error(
         `Cannot call a command (\`${__.name}(${maybe_fn ? "..." : ""})\`) during server-side rendering`
       );
     }
-    get_event_state(event).refreshes ??= {};
-    const promise = Promise.resolve(run_remote_function(event, true, arg, validate, fn));
+    state.refreshes ??= {};
+    const promise = Promise.resolve(run_remote_function(event, state, true, arg, validate, fn));
     promise.updates = () => {
       throw new Error(`Cannot call '${__.name}(...).updates(...)' on the server`);
     };
@@ -121,7 +117,6 @@ function command(validate_or_fn, maybe_fn) {
 }
 // @__NO_SIDE_EFFECTS__
 function form(fn) {
-  check_experimental("form");
   function create_instance(key) {
     const instance = {};
     instance.method = "POST";
@@ -152,10 +147,9 @@ function form(fn) {
       id: "",
       /** @param {FormData} form_data */
       fn: async (form_data) => {
-        const event = getRequestEvent();
-        const state = get_event_state(event);
+        const { event, state } = get_request_store();
         state.refreshes ??= {};
-        const result = await run_remote_function(event, true, form_data, (d) => d, fn);
+        const result = await run_remote_function(event, state, true, form_data, (d) => d, fn);
         if (!event.isRemoteRequest) {
           (state.remote_data ??= {})[__.id] = result;
         }
@@ -174,7 +168,7 @@ function form(fn) {
     Object.defineProperty(instance, "result", {
       get() {
         try {
-          const { remote_data } = get_event_state(getRequestEvent());
+          const { remote_data } = get_request_store().state;
           return remote_data?.[__.id];
         } catch {
           return void 0;
@@ -191,13 +185,14 @@ function form(fn) {
       Object.defineProperty(instance, "for", {
         /** @type {RemoteForm<any>['for']} */
         value: (key2) => {
-          const state = get_event_state(getRequestEvent());
-          let instance2 = (state.form_instances ??= /* @__PURE__ */ new Map()).get(key2);
+          const { state } = get_request_store();
+          const cache_key = __.id + "|" + JSON.stringify(key2);
+          let instance2 = (state.form_instances ??= /* @__PURE__ */ new Map()).get(cache_key);
           if (!instance2) {
             instance2 = create_instance(key2);
             instance2.__.id = `${__.id}/${encodeURIComponent(JSON.stringify(key2))}`;
             instance2.__.name = __.name;
-            state.form_instances.set(key2, instance2);
+            state.form_instances.set(cache_key, instance2);
           }
           return instance2;
         }
@@ -209,7 +204,6 @@ function form(fn) {
 }
 // @__NO_SIDE_EFFECTS__
 function prerender(validate_or_fn, fn_or_options, maybe_options) {
-  check_experimental("prerender");
   const maybe_fn = typeof fn_or_options === "function" ? fn_or_options : void 0;
   const options = maybe_options ?? (maybe_fn ? void 0 : fn_or_options);
   const fn = maybe_fn ?? validate_or_fn;
@@ -224,14 +218,13 @@ function prerender(validate_or_fn, fn_or_options, maybe_options) {
   };
   const wrapper = (arg) => {
     const promise = (async () => {
-      const event = getRequestEvent();
-      const state = get_event_state(event);
+      const { event, state } = get_request_store();
       const payload = stringify_remote_arg(arg, state.transport);
       const id = __.id;
       const url = `${base}/${app_dir}/remote/${id}${payload ? `/${payload}` : ""}`;
       if (!state.prerendering && !BROWSER && !event.isRemoteRequest) {
         try {
-          return await get_response(id, arg, event, async () => {
+          return await get_response(id, arg, state, async () => {
             const response = await fetch(new URL(url, event.url.origin).href);
             if (!response.ok) {
               throw new Error("Prerendered response not found");
@@ -255,8 +248,8 @@ function prerender(validate_or_fn, fn_or_options, maybe_options) {
       const promise2 = get_response(
         id,
         arg,
-        event,
-        () => run_remote_function(event, false, arg, validate, fn)
+        state,
+        () => run_remote_function(event, state, false, arg, validate, fn)
       );
       if (state.prerendering) {
         state.prerendering.remote_responses.set(url, promise2);
@@ -283,7 +276,6 @@ function prerender(validate_or_fn, fn_or_options, maybe_options) {
 }
 // @__NO_SIDE_EFFECTS__
 function query(validate_or_fn, maybe_fn) {
-  check_experimental("query");
   const fn = maybe_fn ?? validate_or_fn;
   const validate = create_validator(validate_or_fn, maybe_fn);
   const __ = { type: "query", id: "", name: "" };
@@ -293,25 +285,121 @@ function query(validate_or_fn, maybe_fn) {
         `Cannot call query '${__.name}' while prerendering, as prerendered pages need static data. Use 'prerender' from $app/server instead`
       );
     }
-    const event = getRequestEvent();
+    const { event, state } = get_request_store();
     const promise = get_response(
       __.id,
       arg,
-      event,
-      () => run_remote_function(event, false, arg, validate, fn)
+      state,
+      () => run_remote_function(event, state, false, arg, validate, fn)
     );
     promise.catch(() => {
     });
-    promise.refresh = async () => {
-      const event2 = getRequestEvent();
-      const state = get_event_state(event2);
-      const refreshes = state?.refreshes;
+    promise.set = (value) => {
+      const { state: state2 } = get_request_store();
+      const refreshes = state2.refreshes;
+      if (!refreshes) {
+        throw new Error(
+          `Cannot call set on query '${__.name}' because it is not executed in the context of a command/form remote function`
+        );
+      }
+      const cache_key = create_remote_cache_key(__.id, stringify_remote_arg(arg, state2.transport));
+      refreshes[cache_key] = (state2.remote_data ??= {})[cache_key] = Promise.resolve(value);
+    };
+    promise.refresh = () => {
+      const { state: state2 } = get_request_store();
+      const refreshes = state2.refreshes;
       if (!refreshes) {
         throw new Error(
           `Cannot call refresh on query '${__.name}' because it is not executed in the context of a command/form remote function`
         );
       }
-      const cache_key = create_remote_cache_key(__.id, stringify_remote_arg(arg, state.transport));
+      const cache_key = create_remote_cache_key(__.id, stringify_remote_arg(arg, state2.transport));
+      refreshes[cache_key] = promise;
+      return promise.then(() => {
+      });
+    };
+    promise.withOverride = () => {
+      throw new Error(`Cannot call '${__.name}.withOverride()' on the server`);
+    };
+    return (
+      /** @type {RemoteQuery<Output>} */
+      promise
+    );
+  };
+  Object.defineProperty(wrapper, "__", { value: __ });
+  return wrapper;
+}
+// @__NO_SIDE_EFFECTS__
+function batch(validate_or_fn, maybe_fn) {
+  const fn = maybe_fn ?? validate_or_fn;
+  const validate = create_validator(validate_or_fn, maybe_fn);
+  const __ = {
+    type: "query_batch",
+    id: "",
+    name: "",
+    run: (args) => {
+      const { event, state } = get_request_store();
+      return run_remote_function(
+        event,
+        state,
+        false,
+        args,
+        (array) => Promise.all(array.map(validate)),
+        fn
+      );
+    }
+  };
+  let batching = { args: [], resolvers: [] };
+  const wrapper = (arg) => {
+    if (prerendering) {
+      throw new Error(
+        `Cannot call query.batch '${__.name}' while prerendering, as prerendered pages need static data. Use 'prerender' from $app/server instead`
+      );
+    }
+    const { event, state } = get_request_store();
+    const promise = get_response(__.id, arg, state, () => {
+      return new Promise((resolve, reject) => {
+        batching.args.push(arg);
+        batching.resolvers.push({ resolve, reject });
+        if (batching.args.length > 1) return;
+        setTimeout(async () => {
+          const batched = batching;
+          batching = { args: [], resolvers: [] };
+          try {
+            const get_result = await run_remote_function(
+              event,
+              state,
+              false,
+              batched.args,
+              (array) => Promise.all(array.map(validate)),
+              fn
+            );
+            for (let i = 0; i < batched.resolvers.length; i++) {
+              try {
+                batched.resolvers[i].resolve(get_result(batched.args[i], i));
+              } catch (error2) {
+                batched.resolvers[i].reject(error2);
+              }
+            }
+          } catch (error2) {
+            for (const resolver of batched.resolvers) {
+              resolver.reject(error2);
+            }
+          }
+        }, 0);
+      });
+    });
+    promise.catch(() => {
+    });
+    promise.refresh = async () => {
+      const { state: state2 } = get_request_store();
+      const refreshes = state2.refreshes;
+      if (!refreshes) {
+        throw new Error(
+          `Cannot call refresh on query.batch '${__.name}' because it is not executed in the context of a command/form remote function`
+        );
+      }
+      const cache_key = create_remote_cache_key(__.id, stringify_remote_arg(arg, state2.transport));
       refreshes[cache_key] = await /** @type {Promise<any>} */
       promise;
     };
@@ -326,6 +414,7 @@ function query(validate_or_fn, maybe_fn) {
   Object.defineProperty(wrapper, "__", { value: __ });
   return wrapper;
 }
+Object.defineProperty(query, "batch", { value: batch, enumerable: true });
 export {
   command,
   form,
