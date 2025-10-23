@@ -24,31 +24,47 @@
 	let fieldNamesMap = $state<Record<string, string>>({}); // entryId -> comma-separated field names
 	
 	// Helper function to fetch field names for ALL entries (field_id is deprecated, all fields now in junction table)
+	// OPTIMIZED: Single batched query instead of N queries (fixes N+1 problem)
 	async function fetchFieldNamesForEntries(entries: any[]) {
 		const { default: supabaseService } = await import('$lib/services/supabase');
 		const client = (supabaseService as any).client;
 
-		// Fetch for ALL entries, not just multi-field (field_id column is deprecated)
-		for (const entry of entries) {
-			if (!fieldNamesMap[entry.id]) {
-				try {
-					const result = await client
-						.from('fuel_entry_fields')
-						.select(`
-							field_id,
-							fields!inner(name, code)
-						`)
-						.eq('fuel_entry_id', entry.id);
+		// Only fetch for entries we don't have cached
+		const entryIds = entries.map(e => e.id).filter(id => !fieldNamesMap[id]);
+		if (entryIds.length === 0) return;
 
-					if (result.data && result.data.length > 0) {
-						const fieldNames = result.data.map((f: any) => f.fields.name || f.fields.code).join(', ');
-						// Create new object to trigger reactivity
-						fieldNamesMap = { ...fieldNamesMap, [entry.id]: fieldNames };
+		try {
+			// Single query for all entries using IN clause
+			const result = await client
+				.from('fuel_entry_fields')
+				.select(`
+					fuel_entry_id,
+					field_id,
+					fields!inner(name, code)
+				`)
+				.in('fuel_entry_id', entryIds);
+
+			if (result.data && result.data.length > 0) {
+				// Group field names by entry_id
+				const grouped = result.data.reduce((acc: Record<string, string[]>, row: any) => {
+					if (!acc[row.fuel_entry_id]) {
+						acc[row.fuel_entry_id] = [];
 					}
-				} catch (error) {
-					console.error(`Failed to fetch fields for entry ${entry.id}:`, error);
+					acc[row.fuel_entry_id].push(row.fields.name || row.fields.code);
+					return acc;
+				}, {});
+
+				// Convert to comma-separated strings
+				const newMap: Record<string, string> = {};
+				for (const [entryId, fields] of Object.entries(grouped)) {
+					newMap[entryId] = fields.join(', ');
 				}
+
+				// Merge with existing map to trigger reactivity
+				fieldNamesMap = { ...fieldNamesMap, ...newMap };
 			}
+		} catch (error) {
+			console.error('Failed to fetch fields for entries:', error);
 		}
 	}
 

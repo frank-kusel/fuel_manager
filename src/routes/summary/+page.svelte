@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import supabaseService from '$lib/services/supabase';
+	import { summaryCacheStore } from '$lib/stores/summary-cache';
 
 	interface FuelSummaryEntry {
 		id: string;
@@ -29,70 +30,133 @@
 
 	onMount(() => {
 		if (browser) {
-			loadEntries();
+			// Check if we have valid cached data
+			const cachedData = summaryCacheStore.getCachedData();
+			if (cachedData) {
+				// Use cached data for instant load
+				entries = cachedData.entries;
+				fieldNamesMap = cachedData.fieldNamesMap;
+				loading = false;
+			} else {
+				// Load fresh data
+				loadEntries();
+			}
 		}
 	});
 
 	// Helper function to fetch field names for ALL entries (field_id is deprecated, all fields now in junction table)
+	// OPTIMIZED: Single batched query instead of N queries (fixes N+1 problem)
 	async function fetchFieldNamesForEntries(entries: FuelSummaryEntry[]) {
-		// Fetch for ALL entries, not just multi-field (field_id column is deprecated)
-		for (const entry of entries) {
-			if (!fieldNamesMap[entry.id]) {
-				try {
-					const result = await supabaseService['client']
-						.from('fuel_entry_fields')
-						.select(`
-							field_id,
-							fields!inner(name, code)
-						`)
-						.eq('fuel_entry_id', entry.id);
+		// Only fetch for entries we don't have cached
+		const entryIds = entries.map(e => e.id).filter(id => !fieldNamesMap[id]);
+		if (entryIds.length === 0) return;
 
-					if (result.data && result.data.length > 0) {
-						const fieldNames = result.data.map((f: any) => f.fields.name || f.fields.code).join(', ');
-						// Create new object to trigger reactivity
-						fieldNamesMap = { ...fieldNamesMap, [entry.id]: fieldNames };
+		try {
+			// Single query for all entries using IN clause
+			const result = await supabaseService['client']
+				.from('fuel_entry_fields')
+				.select(`
+					fuel_entry_id,
+					field_id,
+					fields!inner(name, code)
+				`)
+				.in('fuel_entry_id', entryIds);
+
+			if (result.data && result.data.length > 0) {
+				// Group field names by entry_id
+				const grouped = result.data.reduce((acc: Record<string, string[]>, row: any) => {
+					if (!acc[row.fuel_entry_id]) {
+						acc[row.fuel_entry_id] = [];
 					}
-				} catch (error) {
-					console.error(`Failed to fetch fields for entry ${entry.id}:`, error);
+					acc[row.fuel_entry_id].push(row.fields.name || row.fields.code);
+					return acc;
+				}, {});
+
+				// Convert to comma-separated strings
+				const newMap: Record<string, string> = {};
+				for (const [entryId, fields] of Object.entries(grouped)) {
+					newMap[entryId] = fields.join(', ');
 				}
+
+				// Merge with existing map to trigger reactivity
+				fieldNamesMap = { ...fieldNamesMap, ...newMap };
 			}
+		} catch (error) {
+			console.error('Failed to fetch fields for entries:', error);
 		}
 	}
 
 	async function loadEntries() {
 		try {
 			loading = true;
+			summaryCacheStore.setLoading(true);
 			await supabaseService.init();
 
 			// Get date range for last 30 days
 			const endDate = new Date().toISOString().split('T')[0];
 			const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-			const { data, error: fetchError } = await supabaseService['client']
-				.from('fuel_entries')
-				.select(
+			// OPTIMIZED: Fetch entries and field names in parallel
+			const [entriesResult, fieldNamesResult] = await Promise.all([
+				// Query 1: Fetch entries
+				supabaseService['client']
+					.from('fuel_entries')
+					.select(
+						`
+						*,
+						vehicles!left(code, name),
+						drivers!left(employee_code, name),
+						activities!left(name, code),
+						fields!left(code, name),
+						zones!left(code, name)
 					`
-					*,
-					vehicles!left(code, name),
-					drivers!left(employee_code, name),
-					activities!left(name, code),
-					fields!left(code, name),
-					zones!left(code, name)
-				`
-				)
-				.gte('entry_date', startDate)
-				.lte('entry_date', endDate)
-				.order('entry_date', { ascending: false })
-				.order('time', { ascending: false });
+					)
+					.gte('entry_date', startDate)
+					.lte('entry_date', endDate)
+					.order('entry_date', { ascending: false })
+					.order('time', { ascending: false }),
 
-			if (fetchError) throw fetchError;
+				// Query 2: Fetch field names for all entries in date range (parallel)
+				supabaseService['client']
+					.from('fuel_entry_fields')
+					.select(`
+						fuel_entry_id,
+						field_id,
+						fields!inner(name, code),
+						fuel_entries!inner(entry_date)
+					`)
+					.gte('fuel_entries.entry_date', startDate)
+					.lte('fuel_entries.entry_date', endDate)
+			]);
 
-			entries = data || [];
+			if (entriesResult.error) throw entriesResult.error;
 
-			// Fetch field names for multi-field entries
-			await fetchFieldNamesForEntries(entries);
+			entries = entriesResult.data || [];
+
+			// Process field names result (if available)
+			if (fieldNamesResult.data && fieldNamesResult.data.length > 0) {
+				const grouped = fieldNamesResult.data.reduce((acc: Record<string, string[]>, row: any) => {
+					if (!acc[row.fuel_entry_id]) {
+						acc[row.fuel_entry_id] = [];
+					}
+					acc[row.fuel_entry_id].push(row.fields.name || row.fields.code);
+					return acc;
+				}, {});
+
+				const newMap: Record<string, string> = {};
+				for (const [entryId, fields] of Object.entries(grouped)) {
+					newMap[entryId] = fields.join(', ');
+				}
+
+				fieldNamesMap = newMap;
+			}
+
+			// Update cache with loaded data
+			summaryCacheStore.updateCache(entries, fieldNamesMap);
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load entries';
+			const errorMsg = err instanceof Error ? err.message : 'Failed to load entries';
+			error = errorMsg;
+			summaryCacheStore.setError(errorMsg);
 		} finally {
 			loading = false;
 		}
@@ -181,13 +245,19 @@
 		} else if (date.toDateString() === yesterday.toDateString()) {
 			return 'Yesterday';
 		} else {
-			return date.toLocaleDateString('en-ZA', { 
-				weekday: 'long', 
-				year: 'numeric', 
-				month: 'long', 
-				day: 'numeric' 
+			return date.toLocaleDateString('en-ZA', {
+				weekday: 'long',
+				year: 'numeric',
+				month: 'long',
+				day: 'numeric'
 			});
 		}
+	}
+
+	// Manual refresh - invalidate cache and reload
+	async function handleRefresh() {
+		summaryCacheStore.invalidate();
+		await loadEntries();
 	}
 </script>
 
@@ -203,6 +273,11 @@
 		<div class="header-content">
 			<h1>Summary</h1>
 		</div>
+		<button class="refresh-btn" onclick={handleRefresh} disabled={loading} title="Refresh data">
+			<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+			</svg>
+		</button>
 	</div>
 
 	{#if loading}
@@ -255,7 +330,7 @@
 					<div class="entries-list">
 						{#each daySummary.entries as entry, index (entry.id)}
 							<div class="entry-card" class:expanded={expandedEntry === entry.id}>
-								<div class="entry-card-header" on:click={() => expandedEntry = expandedEntry === entry.id ? null : entry.id}>
+								<div class="entry-card-header" onclick={() => expandedEntry = expandedEntry === entry.id ? null : entry.id}>
 									<div class="entry-vehicle-info">
 										<div class="vehicle-code-container">
 											<span class="entry-number">#{daySummary.entries.length - index}</span>
@@ -338,6 +413,34 @@
 		color: var(--color-text-primary);
 		margin: 0 0 0.5rem 0;
 		line-height: 1.2;
+	}
+
+	.refresh-btn {
+		padding: 0.625rem;
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 0.5rem;
+		cursor: pointer;
+		color: #6b7280;
+		transition: all 0.2s ease;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.refresh-btn:hover:not(:disabled) {
+		background: #f9fafb;
+		border-color: #f97316;
+		color: #f97316;
+	}
+
+	.refresh-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.refresh-btn:active:not(:disabled) {
+		transform: rotate(180deg);
 	}
 
 	.header-actions {
