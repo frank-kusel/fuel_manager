@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import supabaseService from '$lib/services/supabase';
+	import { bowsers as allBowsers, referenceDataLoading } from '$lib/stores/reference-data';
 	import type { Bowser, Vehicle } from '$lib/types';
-	
+
 	interface Props {
 		selectedVehicle: Vehicle | null;
 		selectedBowser: Bowser | null;
@@ -14,11 +14,13 @@
 		canProceedToNext?: boolean;
 		onNext?: () => void;
 	}
-	
+
 	let { selectedVehicle, selectedBowser, bowserReadingStart, bowserReadingEnd, litresDispensed, onFuelDataUpdate, errors, canProceedToNext = false, onNext }: Props = $props();
-	
-	let bowsers: Bowser[] = $state([]);
-	let loading = $state(true);
+
+	// Filter bowsers based on vehicle fuel type
+	let bowsers = $derived($allBowsers.filter(bowser =>
+		selectedVehicle ? bowser.fuel_type === selectedVehicle.fuel_type : true
+	));
 	
 	// Main fuel input
 	let fuelAmount = $state(litresDispensed?.toString() || '');
@@ -42,31 +44,16 @@
 		}
 	}
 	
-	onMount(async () => {
-		try {
-			await supabaseService.init();
-			const result = await supabaseService.getBowsers();
-			if (result.error) {
-				throw new Error(result.error);
-			}
-			bowsers = (result.data || []).filter(bowser => 
-				selectedVehicle ? bowser.fuel_type === selectedVehicle.fuel_type : true
-			);
-			
-			// Auto-select first bowser and pre-populate its current reading
-			if (bowsers.length > 0 && !selectedBowserId) {
-				const firstBowser = bowsers[0];
-				selectedBowserId = firstBowser.id;
-				// Pre-populate start reading with bowser's current reading
-				expectedStartReading = firstBowser.current_reading || 0;
-				startReading = firstBowser.current_reading || 0;
-				// Update parent immediately with bowser selection
-				onFuelDataUpdate(firstBowser, firstBowser.current_reading || 0, endReading, null);
-			}
-		} catch (err) {
-			console.error('Failed to load bowsers:', err);
-		} finally {
-			loading = false;
+	onMount(() => {
+		// Auto-select first bowser and pre-populate its current reading
+		if (bowsers.length > 0 && !selectedBowserId) {
+			const firstBowser = bowsers[0];
+			selectedBowserId = firstBowser.id;
+			// Pre-populate start reading with bowser's current reading
+			expectedStartReading = firstBowser.current_reading || 0;
+			startReading = firstBowser.current_reading || 0;
+			// Update parent immediately with bowser selection
+			onFuelDataUpdate(firstBowser, firstBowser.current_reading || 0, endReading, null);
 		}
 	});
 	
@@ -137,7 +124,7 @@
 			<div class="fuel-label">Litres</div>
 			
 			<!-- Loading state below input to prevent jumping -->
-			{#if loading}
+			{#if $referenceDataLoading}
 				<div class="loading-status">Loading fuel bowsers...</div>
 			{:else if bowsers.length === 0}
 				<div class="loading-status error">No fuel bowsers available</div>

@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import MultiFieldSelection from './MultiFieldSelection.svelte';
-	import supabaseService from '$lib/services/supabase';
+	import { fields, zones, referenceDataLoading, referenceDataError } from '$lib/stores/reference-data';
 	import type { Field, Zone, FieldSelectionState } from '$lib/types';
-	
+
 	interface Props {
 		selectedField: Field | null;
 		selectedZone: Zone | null;
@@ -26,11 +24,7 @@
 		onAutoAdvance,
 		errors
 	}: Props = $props();
-	
-	let fields: Field[] = $state([]);
-	let zones: Zone[] = $state([]);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+
 	let searchTerm = $state('');
 	let activeTab = $state<'fields' | 'zones'>('fields');
 
@@ -47,36 +41,10 @@
 		selectedZone !== null ||
 		selectedFields.length > 0
 	);
-	
-	onMount(async () => {
-		if (!browser) return;
-		
-		try {
-			await supabaseService.init();
-			const [fieldsResult, zonesResult] = await Promise.all([
-				supabaseService.getFields(),
-				supabaseService.getZones()
-			]);
-			
-			if (fieldsResult.error) {
-				throw new Error(fieldsResult.error);
-			}
-			if (zonesResult.error) {
-				throw new Error(zonesResult.error);
-			}
-			
-			fields = fieldsResult.data || [];
-			zones = zonesResult.data || [];
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load locations';
-		} finally {
-			loading = false;
-		}
-	});
-	
+
 	// Group fields by crop type
-	
-	let filteredZones = $derived(zones.filter(zone => {
+
+	let filteredZones = $derived($zones.filter(zone => {
 		if (!searchTerm) return true;
 		const search = searchTerm.toLowerCase();
 		return (
@@ -200,7 +168,7 @@
 		{/if}
 	{/if}
 	
-	{#if loading}
+	{#if $referenceDataLoading}
 		<div class="loading-state">
 			<div class="fields-grid">
 				{#each Array(6) as _}
@@ -216,11 +184,11 @@
 				{/each}
 			</div>
 		</div>
-	{:else if error}
+	{:else if $referenceDataError}
 		<div class="error-state">
 			<div class="error-icon">🚨</div>
 			<p>Failed to load locations</p>
-			<small>{error}</small>
+			<small>{$referenceDataError}</small>
 		</div>
 	{:else if activeTab === 'fields'}
 		<!-- Multi-Field Selection (unified interface for single or multiple) -->

@@ -20,7 +20,7 @@
 	});
 
 	async function handleRefresh() {
-		await dashboardStore.loadDashboardData();
+		await dashboardStore.loadDashboardData(true); // Force refresh
 	}
 </script>
 

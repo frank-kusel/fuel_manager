@@ -9,7 +9,10 @@ interface DashboardState {
 	loading: LoadingState;
 	error: string | null;
 	refreshInterval: number | null;
+	timestamp: number | null; // Cache timestamp
 }
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
 const initialState: DashboardState = {
 	stats: null,
@@ -21,7 +24,8 @@ const initialState: DashboardState = {
 	},
 	loading: 'idle',
 	error: null,
-	refreshInterval: null
+	refreshInterval: null,
+	timestamp: null
 };
 
 function createDashboardStore() {
@@ -62,9 +66,24 @@ function createDashboardStore() {
 			}));
 		},
 		
-		loadDashboardData: async () => {
+		loadDashboardData: async (forceRefresh = false) => {
+			// Check cache first (unless forcing refresh)
+			if (!forceRefresh) {
+				let currentState: DashboardState = initialState;
+				subscribe(state => { currentState = state; })();
+
+				if (currentState.timestamp) {
+					const now = Date.now();
+					const age = now - currentState.timestamp;
+					if (age < CACHE_DURATION && currentState.stats) {
+						// Cache is still valid, no need to reload
+						return;
+					}
+				}
+			}
+
 			update(state => ({ ...state, loading: 'loading', error: null }));
-			
+
 			try {
 				const { default: supabaseService } = await import('$lib/services/supabase');
 				await supabaseService.init();
@@ -112,13 +131,14 @@ function createDashboardStore() {
 				
 				activitySummaries.push(...Object.values(entriesByDate));
 				
-				update(state => ({ 
-					...state, 
+				update(state => ({
+					...state,
 					stats: statsResult.data,
 					vehicleSummaries,
 					activitySummaries,
 					loading: 'success',
-					error: null
+					error: null,
+					timestamp: Date.now() // Set cache timestamp
 				}));
 				
 			} catch (error) {
@@ -187,11 +207,19 @@ function createDashboardStore() {
 		},
 		
 		refreshData: async () => {
-			// Manual refresh
+			// Manual refresh - force reload
 			const { loadDashboardData } = createDashboardStore();
-			await loadDashboardData();
+			await loadDashboardData(true); // Force refresh
 		},
-		
+
+		// Invalidate cache (force reload on next access)
+		invalidate: () => {
+			update(state => ({
+				...state,
+				timestamp: null
+			}));
+		},
+
 		reset: () => {
 			update(state => {
 				if (state.refreshInterval) {

@@ -1,20 +1,19 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import supabaseService from '$lib/services/supabase';
+	import { drivers, referenceDataLoading, referenceDataError } from '$lib/stores/reference-data';
 	import type { Driver } from '$lib/types';
-	
+
 	interface Props {
 		selectedDriver: Driver | null;
 		onDriverSelect: (driver: Driver | null) => void;
 		onAutoAdvance?: () => void;
 		errors: string[];
 	}
-	
+
 	let { selectedDriver, onDriverSelect, onAutoAdvance, errors }: Props = $props();
-	
-	
+
+
 	function handleDriverSelect(driver: Driver) {
 		onDriverSelect(driver);
 		// Auto-advance immediately
@@ -24,27 +23,8 @@
 			}, 100);
 		}
 	}
-	
-	let drivers: Driver[] = $state([]);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-	
-	onMount(async () => {
-		try {
-			await supabaseService.init();
-			const result = await supabaseService.getDrivers();
-			if (result.error) {
-				throw new Error(result.error);
-			}
-			drivers = result.data || [];
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load drivers';
-		} finally {
-			loading = false;
-		}
-	});
-	
-	let filteredDrivers = $derived([...drivers].sort((a, b) => {
+
+	let filteredDrivers = $derived([...$drivers].sort((a, b) => {
 		const codeA = a.employee_code || 'ZZZ';
 		const codeB = b.employee_code || 'ZZZ';
 		return codeA.localeCompare(codeB);
@@ -54,7 +34,7 @@
 <div class="driver-selection">
 	
 	
-	{#if loading}
+	{#if $referenceDataLoading}
 		<div class="loading-state">
 			<div class="drivers-grid">
 				{#each Array(6) as _}
@@ -74,13 +54,13 @@
 				{/each}
 			</div>
 		</div>
-	{:else if error}
+	{:else if $referenceDataError}
 		<div class="error-state">
 			<div class="error-icon">🚨</div>
 			<p>Failed to load drivers</p>
-			<small>{error}</small>
+			<small>{$referenceDataError}</small>
 		</div>
-	{:else if drivers.length === 0}
+	{:else if $drivers.length === 0}
 		<div class="empty-state">No drivers available</div>
 	{:else if filteredDrivers.length === 0}
 		<div class="empty-state">No drivers found</div>

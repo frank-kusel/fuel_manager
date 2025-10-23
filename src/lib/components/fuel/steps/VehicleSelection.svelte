@@ -1,19 +1,18 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import supabaseService from '$lib/services/supabase';
+	import { vehicles, referenceDataLoading, referenceDataError } from '$lib/stores/reference-data';
 	import type { Vehicle } from '$lib/types';
-	
+
 	interface Props {
 		selectedVehicle: Vehicle | null;
 		onVehicleSelect: (vehicle: Vehicle | null) => void;
 		onAutoAdvance?: () => void;
 		errors: string[];
 	}
-	
+
 	let { selectedVehicle, onVehicleSelect, onAutoAdvance, errors }: Props = $props();
-	
+
 	function handleVehicleSelect(vehicle: Vehicle) {
 		onVehicleSelect(vehicle);
 		// Auto-advance immediately
@@ -23,17 +22,13 @@
 			}, 100);
 		}
 	}
-	
-	let vehicles: Vehicle[] = $state([]);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-	
+
 	// Group vehicles by type for better organization (active vehicles only)
 	let groupedVehicles = $derived.by(() => {
 		const groups: Record<string, Vehicle[]> = {};
-		
+
 		// Filter for active vehicles only, then sort
-		const activeVehicles = vehicles.filter(v => v.is_active !== false);
+		const activeVehicles = $vehicles.filter(v => v.is_active !== false);
 		const sorted = [...activeVehicles].sort((a, b) => {
 			const typeA = a.type || 'Other';
 			const typeB = b.type || 'Other';
@@ -46,7 +41,7 @@
 			if (nameA > nameB) return 1;
 			return 0;
 		});
-		
+
 		// Group by type
 		sorted.forEach(vehicle => {
 			const type = vehicle.type || 'Other';
@@ -55,23 +50,8 @@
 			}
 			groups[type].push(vehicle);
 		});
-		
-		return groups;
-	});
 
-	onMount(async () => {
-		try {
-			await supabaseService.init();
-			const result = await supabaseService.getVehicles();
-			if (result.error) {
-				throw new Error(result.error);
-			}
-			vehicles = result.data || [];
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load vehicles';
-		} finally {
-			loading = false;
-		}
+		return groups;
 	});
 	
 	function formatOdometer(reading: number | null, unit: string | null): string {
@@ -112,7 +92,7 @@
 		</div>
 	{/if}
 	
-	{#if loading}
+	{#if $referenceDataLoading}
 		<div class="loading-state">
 			<div class="vehicles-grid">
 				{#each Array(6) as _}
@@ -132,13 +112,13 @@
 				{/each}
 			</div>
 		</div>
-	{:else if error}
+	{:else if $referenceDataError}
 		<div class="error-state">
 			<div class="error-icon">🚨</div>
 			<p>Failed to load vehicles</p>
-			<small>{error}</small>
+			<small>{$referenceDataError}</small>
 		</div>
-	{:else if vehicles.length === 0}
+	{:else if $vehicles.length === 0}
 		<div class="empty-state">
 			<div class="empty-icon">🚜</div>
 			<p>No vehicles available</p>

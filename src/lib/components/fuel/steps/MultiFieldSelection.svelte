@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
-	import supabaseService from '$lib/services/supabase';
+	import { fields, referenceDataLoading, referenceDataError } from '$lib/stores/reference-data';
 	import type { Field, FieldSelectionState } from '$lib/types';
 
 	interface Props {
@@ -14,9 +12,6 @@
 
 	let { selectionState, onSelectionChange, onAutoAdvance, errors, maxSelections = 10 }: Props = $props();
 
-	let fields: Field[] = $state([]);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
 	let searchTerm = $state('');
 
 	// Derived states
@@ -24,31 +19,12 @@
 	let hasSelections = $derived(selectedFieldIds.length > 0);
 	let isMaxReached = $derived(selectedFieldIds.length >= maxSelections);
 
-	onMount(async () => {
-		if (!browser) return;
-		
-		try {
-			await supabaseService.init();
-			const result = await supabaseService.getFields();
-			
-			if (result.error) {
-				throw new Error(result.error);
-			}
-			
-			fields = result.data || [];
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load fields';
-		} finally {
-			loading = false;
-		}
-	});
-
 	// Group fields by crop type
 	let groupedFields = $derived.by(() => {
 		const groups: Record<string, Field[]> = {};
-		
+
 		// Filter fields first
-		const filtered = fields.filter(field => {
+		const filtered = $fields.filter(field => {
 			if (!searchTerm) return true;
 			const search = searchTerm.toLowerCase();
 			return (
@@ -222,18 +198,18 @@
 		{/if}
 	{/if}
 
-	{#if loading}
+	{#if $referenceDataLoading}
 		<div class="loading-state">
 			<div class="loading-spinner"></div>
 			<p>Loading fields...</p>
 		</div>
-	{:else if error}
+	{:else if $referenceDataError}
 		<div class="error-state">
 			<div class="error-icon">🚨</div>
 			<p>Failed to load fields</p>
-			<small>{error}</small>
+			<small>{$referenceDataError}</small>
 		</div>
-	{:else if fields.length === 0}
+	{:else if $fields.length === 0}
 		<div class="empty-state">
 			<div class="empty-icon">🌾</div>
 			<p>No fields configured</p>

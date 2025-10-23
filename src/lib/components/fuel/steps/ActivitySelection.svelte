@@ -1,20 +1,19 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import supabaseService from '$lib/services/supabase';
+	import { activities, referenceDataLoading, referenceDataError } from '$lib/stores/reference-data';
 	import type { Activity } from '$lib/types';
-	
+
 	interface Props {
 		selectedActivity: Activity | null;
 		onActivitySelect: (activity: Activity | null) => void;
 		onAutoAdvance?: () => void;
 		errors: string[];
 	}
-	
+
 	let { selectedActivity, onActivitySelect, onAutoAdvance, errors }: Props = $props();
-	
-	
+
+
 	function handleActivitySelect(activity: Activity) {
 		onActivitySelect(activity);
 		// Auto-advance immediately
@@ -24,39 +23,15 @@
 			}, 100);
 		}
 	}
-	
-	let activities: Activity[] = $state([]);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+
 	let searchTerm = $state('');
-	
-	onMount(async () => {
-		try {
-			await supabaseService.init();
-			// Get activities with legacy field
-			const { data, error: fetchError } = await supabaseService['client']
-				.from('activities')
-				.select('*')
-				.order('name', { ascending: true });
-			
-			const result = { data, error: fetchError?.message };
-			if (result.error) {
-				throw new Error(result.error);
-			}
-			activities = result.data || [];
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load activities';
-		} finally {
-			loading = false;
-		}
-	});
 	
 	// Group activities by category
 	let groupedActivities = $derived.by(() => {
 		const groups: Record<string, Activity[]> = {};
-		
+
 		// Filter activities first
-		const filtered = activities.filter(activity => {
+		const filtered = $activities.filter(activity => {
 			if (!searchTerm) return true;
 			const search = searchTerm.toLowerCase();
 			return (
@@ -117,7 +92,7 @@
 
 <div class="activity-selection">
 	
-	{#if !loading && activities.length > 0}
+	{#if !$referenceDataLoading && $activities.length > 0}
 		<div class="search-container">
 			<div class="search-input">
 				<span class="search-icon">🔍</span>
@@ -133,7 +108,7 @@
 		</div>
 	{/if}
 	
-	{#if loading}
+	{#if $referenceDataLoading}
 		<div class="loading-state">
 			<div class="activities-grid">
 				{#each Array(8) as _}
@@ -149,13 +124,13 @@
 				{/each}
 			</div>
 		</div>
-	{:else if error}
+	{:else if $referenceDataError}
 		<div class="error-state">
 			<div class="error-icon">🚨</div>
 			<p>Failed to load activities</p>
-			<small>{error}</small>
+			<small>{$referenceDataError}</small>
 		</div>
-	{:else if activities.length === 0}
+	{:else if $activities.length === 0}
 		<div class="empty-state">No activities available</div>
 	{:else if filteredActivitiesCount === 0}
 		<div class="empty-state">No activities found</div>

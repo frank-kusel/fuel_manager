@@ -9,8 +9,8 @@
 	import LocationSelection from './steps/LocationSelection.svelte';
 	import OdometerReading from './steps/OdometerReading.svelte';
 	import FuelDataEntry from './steps/FuelDataEntry.svelte';
-	
-	import { 
+
+	import {
 		fuelEntryWorkflowStore,
 		currentStep,
 		currentStepData,
@@ -21,12 +21,17 @@
 		canGoBackToPrevious,
 		isSubmittingEntry
 	} from '$lib/stores/fuel-entry-workflow';
-	
+
+	import { referenceDataStore } from '$lib/stores/reference-data';
+
 	let workflowContainer: HTMLElement;
 	let showSuccessModal = $state(false);
 	let submitResult = $state<{ success: boolean; error?: string } | null>(null);
-	
+
 	onMount(() => {
+		// Load reference data (will use cache if available)
+		referenceDataStore.loadAllData();
+
 		// Reset workflow on mount
 		fuelEntryWorkflowStore.reset();
 		
