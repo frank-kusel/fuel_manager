@@ -714,7 +714,8 @@ class SupabaseService {
 						vehicles!left(code, name, type, odometer_unit, average_consumption_l_per_100km),
 						drivers!left(employee_code, name),
 						activities!left(name, category),
-						fields!left(name, code)
+						fields!left(name, code),
+						zones!left(name, code)
 					`)
 					.order('entry_date', { ascending: false })
 					.order('time', { ascending: false })

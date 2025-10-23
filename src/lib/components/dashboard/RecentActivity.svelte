@@ -12,36 +12,69 @@
 	// Local state for expanded entries
 	let allEntries = $state<any[]>([]);
 	let isLoadingMore = $state(false);
-	
+
 	// Filter states
 	let showMissingData = $state(false);
 	let showOutsideRange = $state(false);
+
+	// Load more functionality - start with 4 weeks (1 month)
+	let weeksToShow = $state(4);
+
+	// Store field names for multi-field entries
+	let fieldNamesMap = $state<Record<string, string>>({}); // entryId -> comma-separated field names
 	
-	// Load more functionality - start with 1 week
-	let weeksToShow = $state(1);
-	
+	// Helper function to fetch field names for ALL entries (field_id is deprecated, all fields now in junction table)
+	async function fetchFieldNamesForEntries(entries: any[]) {
+		const { default: supabaseService } = await import('$lib/services/supabase');
+		const client = (supabaseService as any).client;
+
+		// Fetch for ALL entries, not just multi-field (field_id column is deprecated)
+		for (const entry of entries) {
+			if (!fieldNamesMap[entry.id]) {
+				try {
+					const result = await client
+						.from('fuel_entry_fields')
+						.select(`
+							field_id,
+							fields!inner(name, code)
+						`)
+						.eq('fuel_entry_id', entry.id);
+
+					if (result.data && result.data.length > 0) {
+						const fieldNames = result.data.map((f: any) => f.fields.name || f.fields.code).join(', ');
+						// Create new object to trigger reactivity
+						fieldNamesMap = { ...fieldNamesMap, [entry.id]: fieldNames };
+					}
+				} catch (error) {
+					console.error(`Failed to fetch fields for entry ${entry.id}:`, error);
+				}
+			}
+		}
+	}
+
 	// Initialize allEntries when initialEntries change
 	$effect(() => {
 		if (initialEntries && initialEntries.length > 0) {
 			allEntries = [...initialEntries];
+			fetchFieldNamesForEntries(initialEntries);
 		}
 	});
 	
 	// Function to load more entries from the database
 	async function loadMoreEntries() {
 		if (isLoadingMore) return;
-		
+
 		isLoadingMore = true;
 		try {
 			const { default: supabaseService } = await import('$lib/services/supabase');
 			await supabaseService.init();
-			
+
 			// Calculate the offset and limit
 			const offset = allEntries.length;
 			const limit = 10;
-			
+
 			const client = (supabaseService as any).client;
-			
+
 			const result = await client
 				.from('fuel_entries')
 				.select(`
@@ -49,14 +82,17 @@
 					vehicles!left(code, name, type, odometer_unit, average_consumption_l_per_100km),
 					drivers!left(employee_code, name),
 					activities!left(name, category),
-					fields!left(name, code)
+					fields!left(name, code),
+					zones!left(name, code)
 				`)
 				.order('entry_date', { ascending: false })
 				.order('time', { ascending: false })
 				.range(offset, offset + limit - 1);
-			
+
 			if (result.data && result.data.length > 0) {
 				allEntries = [...allEntries, ...result.data];
+				// Fetch field names for multi-field entries
+				await fetchFieldNamesForEntries(result.data);
 			}
 		} catch (error) {
 			console.error('Failed to load more entries:', error);
@@ -122,6 +158,45 @@
 	function formatTime(timeStr: string): string {
 		return timeStr.substring(0, 5); // HH:MM
 	}
+
+	// Get location display for an entry (prioritizes junction table since field_id is deprecated)
+	function getLocationDisplay(entry: any): string {
+		// Priority 1: Check junction table (field_id column is deprecated, all fields now in junction table)
+		if (fieldNamesMap[entry.id]) {
+			return fieldNamesMap[entry.id];
+		}
+
+		// Priority 2: Check zone
+		if (entry.zones?.name || entry.zones?.code) {
+			return entry.zones.name || entry.zones.code;
+		}
+
+		// Priority 3: Legacy field_id for old entries (backward compatibility)
+		if (entry.fields?.name || entry.fields?.code) {
+			return entry.fields.name || entry.fields.code;
+		}
+
+		// No location selected
+		return 'No field';
+	}
+
+	// Check if entry has location data
+	function hasLocationData(entry: any): boolean {
+		// Check junction table first (field_id column is deprecated)
+		if (fieldNamesMap[entry.id]) {
+			return true;
+		}
+		// Check zone
+		if (entry.zones?.name || entry.zones?.code) {
+			return true;
+		}
+		// Check legacy field_id for old entries
+		if (entry.fields?.name || entry.fields?.code) {
+			return true;
+		}
+		// No location data
+		return false;
+	}
 	
 	// Calculate hours or km used
 	function getUsage(entry: any): string {
@@ -178,28 +253,30 @@
 		return { current: '-', hasAverage: false, colorClass: 'consumption-neutral' };
 	}
 	
-	// Filter entries based on active filters  
+	// Filter entries based on active filters
 	const filteredEntries = $derived.by(() => {
 		if (!Array.isArray(allEntries)) {
 			return [];
 		}
-		
+
 		// First, filter by date range (weeks)
 		const weeksAgo = new Date();
 		weeksAgo.setDate(weeksAgo.getDate() - (weeksToShow * 7));
-		
+
 		let filtered = allEntries.filter(entry => {
 			if (!entry.entry_date) return false;
 			const entryDate = new Date(entry.entry_date);
 			return entryDate >= weeksAgo;
 		});
-		
-		
+
+
 		// Apply quality filters only when active
+		// IMPORTANT: Only filter when the filter is explicitly enabled
+		// Don't filter by default since field data loads asynchronously
 		if (showMissingData) {
-			filtered = filtered.filter(entry => !entry.fields?.name || !entry.activities?.name);
+			filtered = filtered.filter(entry => !hasLocationData(entry) || !entry.activities?.name);
 		}
-		
+
 		if (showOutsideRange) {
 			filtered = filtered.filter(entry => {
 				if (!entry.fuel_consumption_l_per_100km || !entry.vehicles?.average_consumption_l_per_100km) {
@@ -211,7 +288,7 @@
 				return difference > 2;
 			});
 		}
-		
+
 		return filtered;
 	});
 	
@@ -318,7 +395,7 @@
 					<div class="entries-grid">
 						{#each groupedEntries[dateGroup] as entry (entry.id)}
 							{@const consumption = getFuelConsumptionWithAverage(entry)}
-							{@const hasWarning = !entry.fields?.name || !entry.activities?.name}
+							{@const hasWarning = !hasLocationData(entry) || !entry.activities?.name}
 							<div class="fuel-card" class:warning={hasWarning}>
 								<div class="card-row">
 									<div class="vehicle-info">
@@ -328,10 +405,10 @@
 									</div>
 									<div class="fuel-amount">{Math.round((entry.litres_dispensed || 0) * 10) / 10}<span class="unit">L</span></div>
 								</div>
-								
+
 								<div class="card-row">
 									<div class="activity-info">
-										{entry.fields?.name || entry.fields?.code || 'No field'} <span class="separator">•</span> {entry.activities?.name || 'Unknown activity'} <span class="separator">•</span> {getUsage(entry)}
+										{getLocationDisplay(entry)} <span class="separator">•</span> {entry.activities?.name || 'Unknown activity'} <span class="separator">•</span> {getUsage(entry)}
 									</div>
 									<div class="consumption-info">
 										<span class="{consumption.colorClass}">{consumption.current}</span><span class="consumption-unit">{consumption.unit}</span>

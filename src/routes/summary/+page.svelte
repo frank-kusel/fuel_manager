@@ -7,6 +7,7 @@
 		id: string;
 		entry_date: string;
 		time: string;
+		field_selection_mode?: 'single' | 'multiple';
 		vehicles?: { code: string; name: string };
 		drivers?: { employee_code: string; name: string };
 		activities?: { name: string; code?: string };
@@ -24,12 +25,39 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let expandedEntry = $state<string | null>(null);
+	let fieldNamesMap = $state<Record<string, string>>({}); // entryId -> comma-separated field names
 
 	onMount(() => {
 		if (browser) {
 			loadEntries();
 		}
 	});
+
+	// Helper function to fetch field names for ALL entries (field_id is deprecated, all fields now in junction table)
+	async function fetchFieldNamesForEntries(entries: FuelSummaryEntry[]) {
+		// Fetch for ALL entries, not just multi-field (field_id column is deprecated)
+		for (const entry of entries) {
+			if (!fieldNamesMap[entry.id]) {
+				try {
+					const result = await supabaseService['client']
+						.from('fuel_entry_fields')
+						.select(`
+							field_id,
+							fields!inner(name, code)
+						`)
+						.eq('fuel_entry_id', entry.id);
+
+					if (result.data && result.data.length > 0) {
+						const fieldNames = result.data.map((f: any) => f.fields.name || f.fields.code).join(', ');
+						// Create new object to trigger reactivity
+						fieldNamesMap = { ...fieldNamesMap, [entry.id]: fieldNames };
+					}
+				} catch (error) {
+					console.error(`Failed to fetch fields for entry ${entry.id}:`, error);
+				}
+			}
+		}
+	}
 
 	async function loadEntries() {
 		try {
@@ -60,6 +88,9 @@
 			if (fetchError) throw fetchError;
 
 			entries = data || [];
+
+			// Fetch field names for multi-field entries
+			await fetchFieldNamesForEntries(entries);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load entries';
 		} finally {
@@ -82,6 +113,27 @@
 			minimumFractionDigits: 1,
 			maximumFractionDigits: 1
 		}).replace(/,/g, ' ');
+	}
+
+	// Get location display for an entry (prioritizes junction table since field_id is deprecated)
+	function getLocationDisplay(entry: FuelSummaryEntry): string {
+		// Priority 1: Check junction table (field_id column is deprecated, all fields now in junction table)
+		if (fieldNamesMap[entry.id]) {
+			return fieldNamesMap[entry.id];
+		}
+
+		// Priority 2: Check zone
+		if (entry.zones?.name || entry.zones?.code) {
+			return entry.zones.name || entry.zones.code;
+		}
+
+		// Priority 3: Legacy field_id for old entries (backward compatibility)
+		if (entry.fields?.name || entry.fields?.code) {
+			return entry.fields.name || entry.fields.code;
+		}
+
+		// No location selected
+		return 'No location';
 	}
 
 	// Group entries by date and calculate daily summaries
@@ -245,7 +297,7 @@
 											{/if}
 											<span class="context-value">{entry.activities?.code || entry.activities?.name || 'N/A'}</span>
 											<span class="context-separator">•</span>
-											<span class="context-value">{entry.fields?.code || entry.zones?.code || 'N/A'}</span>
+											<span class="context-value">{getLocationDisplay(entry)}</span>
 										</div>
 										<div class="entry-time-expanded">{entry.time}</div>
 									</div>
