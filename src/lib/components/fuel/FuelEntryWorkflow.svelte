@@ -451,6 +451,33 @@
 					</div>
 				{/if}
 
+				<!-- Date/Time Picker Section -->
+				<div class="datetime-section">
+					<h3 class="datetime-header">Entry Date & Time</h3>
+					<div class="datetime-inputs">
+						<div class="input-group">
+							<label for="entryDate" class="input-label">Date</label>
+							<input
+								id="entryDate"
+								type="date"
+								value={$workflowData.entryDate}
+								oninput={(e) => fuelEntryWorkflowStore.setEntryDate(e.currentTarget.value)}
+								class="datetime-input"
+							/>
+						</div>
+						<div class="input-group">
+							<label for="entryTime" class="input-label">Time</label>
+							<input
+								id="entryTime"
+								type="time"
+								value={$workflowData.entryTime}
+								oninput={(e) => fuelEntryWorkflowStore.setEntryTime(e.currentTarget.value)}
+								class="datetime-input"
+							/>
+						</div>
+					</div>
+				</div>
+
 				<!-- Submit Button -->
 				<button
 					class="submit-btn"
@@ -822,6 +849,84 @@
 	}
 
 
+	/* Date/Time Picker Section */
+	.datetime-section {
+		margin: 2rem 0 1rem 0;
+		padding: 1.5rem;
+		background: #f8fafc;
+		border-radius: 12px;
+		border: 1px solid #e2e8f0;
+	}
+
+	.datetime-header {
+		font-size: 1rem;
+		font-weight: 600;
+		color: #374151;
+		margin: 0 0 1rem 0;
+	}
+
+	.datetime-inputs {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+
+	.input-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.input-label {
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: #64748b;
+	}
+
+	.datetime-input {
+		width: 100%;
+		padding: 0.75rem;
+		border: 1px solid #cbd5e1;
+		border-radius: 8px;
+		font-size: 1rem;
+		font-weight: 500;
+		color: #1e293b;
+		background: white;
+		transition: all 0.2s ease;
+		box-sizing: border-box;
+		-webkit-appearance: none;
+		-moz-appearance: none;
+		appearance: none;
+	}
+
+	.datetime-input:focus {
+		outline: none;
+		border-color: #2563eb;
+		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+	}
+
+	.datetime-input:hover:not(:focus) {
+		border-color: #94a3b8;
+	}
+
+	/* Mobile datetime inputs */
+	@media (max-width: 768px) {
+		.datetime-section {
+			margin: 1.5rem 0 1rem 0;
+			padding: 1rem;
+		}
+
+		.datetime-inputs {
+			grid-template-columns: 1fr;
+			gap: 0.75rem;
+		}
+
+		.datetime-input {
+			font-size: 16px; /* Prevents iOS zoom on focus */
+			padding: 0.875rem;
+		}
+	}
+
 	/* Submit Button */
 	.submit-btn {
 		width: 100%;
@@ -836,11 +941,11 @@
 		transition: background 0.2s ease;
 		margin-top: 1rem;
 	}
-	
+
 	.submit-btn:hover:not(:disabled) {
 		background: #374151;
 	}
-	
+
 	.submit-btn:disabled {
 		background: #9ca3af;
 		cursor: not-allowed;

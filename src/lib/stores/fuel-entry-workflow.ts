@@ -43,6 +43,8 @@ export interface FuelEntryData {
 	// Step 7: Review & Notes
 	notes: string;
 	timestamp: Date;
+	entryDate: string; // YYYY-MM-DD format
+	entryTime: string; // HH:mm format
 }
 
 interface WorkflowState {
@@ -133,7 +135,9 @@ const initialData: FuelEntryData = {
 	bowserReadingEnd: null,
 	litresDispensed: null,
 	notes: '',
-	timestamp: new Date()
+	timestamp: new Date(),
+	entryDate: new Date().toISOString().split('T')[0], // Default to today
+	entryTime: new Date().toTimeString().substring(0, 5) // Default to current time
 };
 
 const initialState: WorkflowState = {
@@ -424,7 +428,23 @@ function createFuelEntryWorkflowStore() {
 			}));
 			updateStepValidation();
 		},
-		
+
+		setEntryDate: (entryDate: string) => {
+			update(state => ({
+				...state,
+				data: { ...state.data, entryDate }
+			}));
+			updateStepValidation();
+		},
+
+		setEntryTime: (entryTime: string) => {
+			update(state => ({
+				...state,
+				data: { ...state.data, entryTime }
+			}));
+			updateStepValidation();
+		},
+
 		// Workflow control
 		setLoading: (loading: LoadingState) => {
 			update(state => ({ ...state, loading }));
@@ -462,8 +482,8 @@ function createFuelEntryWorkflowStore() {
 				
 				// Create fuel entry data matching the database schema
 				const fuelEntryData = {
-					entry_date: new Date().toISOString().split('T')[0],
-					time: new Date().toTimeString().substring(0, 5),
+					entry_date: currentData!.entryDate,
+					time: currentData!.entryTime,
 					vehicle_id: currentData!.vehicle!.id,
 					driver_id: currentData!.driver!.id,
 					activity_id: currentData!.activity!.id,
