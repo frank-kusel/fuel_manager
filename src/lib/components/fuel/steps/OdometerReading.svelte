@@ -44,38 +44,32 @@
 		}
 	});
 	
-	// Update parent when values change
-	$effect(() => {
+	// Derived state for distance calculation
+	let distance = $derived.by(() => {
+		if (isBrokenGauge) {
+			return null;
+		}
+		const current = parseFloat(currentOdo);
+		const newReading = parseFloat(newOdo);
+		if (isNaN(current) || isNaN(newReading)) {
+			return null;
+		}
+		return newReading - current;
+	});
+
+	// Helper function to update parent (called from event handlers, not effects)
+	function updateParent() {
 		const start = currentOdo ? parseFloat(currentOdo) : null;
 		const end = isBrokenGauge ? start : (newOdo ? parseFloat(newOdo) : null);
 		onOdometerUpdate(start, end, !isBrokenGauge);
-	});
-	
+	}
+
 	// Number formatting function - spaces for thousands, period for decimal
 	function formatNumber(num: number | null): string {
 		if (num === null || num === undefined || isNaN(num)) return 'No reading';
 		// Format with US locale to ensure period for decimal, then replace commas with spaces
 		return new Intl.NumberFormat('en-US').format(num).replace(/,/g, ' ');
 	}
-	
-	
-	// Distance calculation
-	let distance = $state(null);
-	
-	// Update distance when values change
-	$effect(() => {
-		if (isBrokenGauge) {
-			distance = null;
-		} else {
-			const current = parseFloat(currentOdo);
-			const newReading = parseFloat(newOdo);
-			if (isNaN(current) || isNaN(newReading)) {
-				distance = null;
-			} else {
-				distance = newReading - current;
-			}
-		}
-	});
 </script>
 
 <div class="odometer-reading">
@@ -99,11 +93,12 @@
 					{/if}
 				</div>
 				
-				<input 
-					type="number" 
-					inputmode="decimal" 
+				<input
+					type="number"
+					inputmode="decimal"
 					step="0.1"
 					bind:value={currentOdo}
+					oninput={updateParent}
 					placeholder="Old"
 					class="current-odo-input"
 					onfocus={(e) => e.target.select()}
@@ -122,11 +117,12 @@
 			<!-- Main ODO Input -->
 			<div class="odo-section">
 				<div class="odo-card new-odo">
-					<input 
-						type="number" 
-						inputmode="decimal" 
+					<input
+						type="number"
+						inputmode="decimal"
 						step="0.1"
 						bind:value={newOdo}
+						oninput={updateParent}
 						placeholder="New"
 						class="new-odo-input"
 						autocomplete="off"
@@ -145,7 +141,7 @@
 			<!-- Gauge Status Toggle - moved below new reading -->
 			<div class="gauge-toggle">
 				<label class="checkbox">
-					<input type="checkbox" bind:checked={isBrokenGauge} />
+					<input type="checkbox" bind:checked={isBrokenGauge} onchange={updateParent} />
 					<span>Broken Gauge</span>
 				</label>
 			</div>
@@ -157,7 +153,7 @@
 			<!-- Gauge Status Toggle -->
 			<div class="gauge-toggle">
 				<label class="checkbox">
-					<input type="checkbox" bind:checked={isBrokenGauge} />
+					<input type="checkbox" bind:checked={isBrokenGauge} onchange={updateParent} />
 					<span>Broken Gauge</span>
 				</label>
 			</div>

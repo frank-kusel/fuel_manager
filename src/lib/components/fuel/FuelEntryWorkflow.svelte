@@ -28,13 +28,25 @@
 	let showSuccessModal = $state(false);
 	let submitResult = $state<{ success: boolean; error?: string } | null>(null);
 
+	// Update date/time when reaching review step
+	$effect(() => {
+		if ($currentStep === 6) {
+			// Update to current date/time when user reaches review/submit step
+			const now = new Date();
+			const currentDate = now.toISOString().split('T')[0];
+			const currentTime = now.toTimeString().substring(0, 5);
+			fuelEntryWorkflowStore.setEntryDate(currentDate);
+			fuelEntryWorkflowStore.setEntryTime(currentTime);
+		}
+	});
+
 	onMount(() => {
 		// Load reference data (will use cache if available)
 		referenceDataStore.loadAllData();
 
 		// Reset workflow on mount
 		fuelEntryWorkflowStore.reset();
-		
+
 		// Add keyboard shortcuts
 		function handleKeydown(event: KeyboardEvent) {
 			// Only handle shortcuts if not typing in an input field
@@ -98,11 +110,18 @@
 	}
 	
 	async function handleSubmit() {
-		
+
 		const result = await fuelEntryWorkflowStore.submitFuelEntry();
 		submitResult = result;
-		
+
 		if (result.success) {
+			// Refresh bowser and vehicle data to get updated readings
+			// This ensures the next fuel entry shows correct starting readings
+			await Promise.all([
+				referenceDataStore.loadBowsers(),
+				referenceDataStore.loadVehicles()
+			]);
+
 			showSuccessModal = true;
 			// Auto-hide success modal after 1.5 seconds
 			setTimeout(() => {

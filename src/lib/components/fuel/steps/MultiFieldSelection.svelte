@@ -132,17 +132,6 @@
 </script>
 
 <div class="multi-field-selection">
-	{#if errors.length > 0}
-		<div class="error-messages">
-			{#each errors as error}
-				<div class="error-message">
-					<span class="error-icon">⚠️</span>
-					{error}
-				</div>
-			{/each}
-		</div>
-	{/if}
-
 	<!-- Selection Summary -->
 	{#if hasSelections}
 		<div class="selection-summary">
@@ -173,7 +162,7 @@
 		</div>
 	{/if}
 
-	{#if !loading && fields.length > 0}
+	{#if !$referenceDataLoading && $fields.length > 0}
 		<!-- Search -->
 		<div class="search-container">
 			<div class="search-input">
@@ -483,7 +472,7 @@
 	.fields-container {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1rem;
 	}
 
 	.crop-group {
@@ -496,7 +485,7 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 1rem;
+		padding: 0.5rem 0.75rem;
 		background: #f9fafb;
 		border-bottom: 1px solid #e5e7eb;
 	}
@@ -504,22 +493,22 @@
 	.group-info {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.375rem;
 	}
 
 	.group-icon {
-		font-size: 1.25rem;
+		font-size: 1rem;
 	}
 
 	.group-title {
-		font-size: 1rem;
+		font-size: 0.875rem;
 		font-weight: 600;
 		color: #374151;
 		margin: 0;
 	}
 
 	.group-count {
-		font-size: 0.875rem;
+		font-size: 0.75rem;
 		color: #6b7280;
 	}
 
@@ -554,8 +543,8 @@
 	.fields-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		gap: 0.75rem;
-		padding: 1rem;
+		gap: 0.5rem;
+		padding: 0.75rem;
 	}
 
 	.field-checkbox-card {
@@ -563,7 +552,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-		padding: 0.75rem;
+		padding: 0.625rem 0.75rem;
 		background: white;
 		border: 2px solid #e5e7eb;
 		border-radius: 8px;

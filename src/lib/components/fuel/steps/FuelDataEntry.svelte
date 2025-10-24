@@ -32,7 +32,6 @@
 	let isEditingStartReading = $state(false);
 	let isEditingEndReading = $state(false);
 	let expectedStartReading = $state<number | null>(null);
-	let readingMismatchWarning = $state<string | null>(null);
 	
 	// Resync function to reset to bowser's current reading
 	function resyncStartReading() {
@@ -57,31 +56,24 @@
 		}
 	});
 	
-	// Auto-calculate end reading when fuel amount changes (only if not manually edited)
-	$effect(() => {
+	// Helper to update parent (called from event handlers, not effects)
+	function updateParent() {
+		// Auto-calculate end reading if not manually edited
 		if (!isEditingEndReading && !isEditingStartReading) {
 			const fuel = parseFloat(fuelAmount);
 			if (!isNaN(fuel) && fuel > 0 && startReading) {
-				endReading = startReading + fuel; // Bowser reading increases as fuel is dispensed (like odometer)
+				endReading = startReading + fuel;
 			}
 		}
-	});
-	
-	// Update parent when values change
-	$effect(() => {
+
 		const bowser = bowsers.find(b => b.id === selectedBowserId) || null;
 		const fuel = fuelAmount ? parseFloat(fuelAmount) : null;
-		
 		onFuelDataUpdate(bowser, startReading, endReading, fuel);
-	});
-	
-	let selectedBowserInfo = $state(null);
-	
-	// Update selected bowser when values change
-	$effect(() => {
-		selectedBowserInfo = bowsers.find(b => b.id === selectedBowserId) || null;
-	});
-	
+	}
+
+	// Derived selected bowser info
+	let selectedBowserInfo = $derived(bowsers.find(b => b.id === selectedBowserId) || null);
+
 	// Number formatting function for bowser readings (1 decimal)
 	function formatNumber(num: number | null): string {
 		if (num === null || num === undefined || isNaN(num)) return '-';
@@ -91,19 +83,16 @@
 			useGrouping: true
 		}).format(num).replace(/,/g, ' ');
 	}
-	
-	// Check for reading continuity
-	$effect(() => {
+
+	// Derived reading continuity warning
+	let readingMismatchWarning = $derived.by(() => {
 		if (expectedStartReading !== null && startReading !== expectedStartReading) {
 			const diff = Math.abs(startReading - expectedStartReading);
-			if (diff > 0.1) { // Allow small rounding differences
-				readingMismatchWarning = `Warning: Start reading (${formatNumber(startReading)}) doesn't match bowser's last reading (${formatNumber(expectedStartReading)}). This may indicate a missing entry or manual adjustment.`;
-			} else {
-				readingMismatchWarning = null;
+			if (diff > 0.1) {
+				return `Warning: Start reading (${formatNumber(startReading)}) doesn't match bowser's last reading (${formatNumber(expectedStartReading)}). This may indicate a missing entry or manual adjustment.`;
 			}
-		} else {
-			readingMismatchWarning = null;
 		}
+		return null;
 	});
 </script>
 
@@ -112,11 +101,12 @@
 	{#if selectedVehicle}
 		<!-- Main Fuel Input - Fixed Position -->
 		<div class="fuel-input-container">
-			<input 
-				type="number" 
-				inputmode="decimal" 
+			<input
+				type="number"
+				inputmode="decimal"
 				step="0.1"
 				bind:value={fuelAmount}
+				oninput={updateParent}
 				placeholder="Enter fuel"
 				class="fuel-input"
 				autocomplete="off"
@@ -140,11 +130,12 @@
 				<span class="calc-label">Start:</span>
 				<div class="calc-item-right">
 					{#if isEditingStartReading}
-						<input 
-							type="number" 
-							inputmode="decimal" 
+						<input
+							type="number"
+							inputmode="decimal"
 							step="0.1"
 							bind:value={startReading}
+							oninput={updateParent}
 							placeholder="Enter start reading"
 							class="start-reading-input"
 							onblur={() => isEditingStartReading = false}
@@ -178,11 +169,12 @@
 				<span class="calc-label">End:</span>
 				<div class="calc-item-right">
 					{#if isEditingEndReading}
-						<input 
-							type="number" 
-							inputmode="decimal" 
+						<input
+							type="number"
+							inputmode="decimal"
 							step="0.1"
 							bind:value={endReading}
+							oninput={updateParent}
 							placeholder="Enter end reading"
 							class="end-reading-input"
 							onblur={() => isEditingEndReading = false}

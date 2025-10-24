@@ -113,17 +113,6 @@
 </script>
 
 <div class="location-selection">
-	{#if errors.length > 0}
-		<div class="error-messages">
-			{#each errors as error}
-				<div class="error-message">
-					<span class="error-icon">⚠️</span>
-					{error}
-				</div>
-			{/each}
-		</div>
-	{/if}
-	
 	<!-- Skip Option -->
 	<div class="skip-option">
 		<div class="skip-message" onclick={skipLocation}>
@@ -131,7 +120,7 @@
 		</div>
 	</div>
 	
-	{#if !loading}
+	{#if !$referenceDataLoading}
 		<!-- Tab Switcher -->
 		<div class="tab-switcher">
 			<button
