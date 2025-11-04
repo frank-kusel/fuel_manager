@@ -14,32 +14,49 @@
 	
 	let { selectedVehicle, odometerStart, odometerEnd, gaugeWorking, onOdometerUpdate, errors, canProceedToNext = false, onNext }: Props = $props();
 	
-	// Current odometer display - auto-filled but editable
+	// Current odometer display - use prop if available (preserves manual overrides), otherwise vehicle's reading
 	let currentOdo = $state(
-		selectedVehicle?.current_odometer?.toString() || ''
+		odometerStart?.toString() || selectedVehicle?.current_odometer?.toString() || ''
 	);
-	let isEditingCurrentOdo = $state(false);
 	let originalCurrentOdo = $state(selectedVehicle?.current_odometer || 0);
-	
+
 	// New odometer reading - the main input
 	let newOdo = $state(odometerEnd?.toString() || '');
 	let isBrokenGauge = $state(false); // Default to working
-	
+
 	// Reset function to restore original current odometer reading
 	function resetCurrentOdo() {
 		if (selectedVehicle) {
 			currentOdo = selectedVehicle.current_odometer?.toString() || '';
-			originalCurrentOdo = selectedVehicle.current_odometer || 0;
-			isEditingCurrentOdo = false;
+			updateParent();
 		}
 	}
-	
-	// Update original reading when vehicle changes
+
+	// Track the previous vehicle to detect when vehicle changes
+	let previousVehicleId = $state(selectedVehicle?.id);
+	let hasInitialized = $state(false);
+
+	// Initialize and handle vehicle changes
 	$effect(() => {
 		if (selectedVehicle) {
-			originalCurrentOdo = selectedVehicle.current_odometer || 0;
-			if (!isEditingCurrentOdo) {
-				currentOdo = selectedVehicle.current_odometer?.toString() || '';
+			if (!hasInitialized || selectedVehicle.id !== previousVehicleId) {
+				// Initial load or vehicle changed
+				originalCurrentOdo = selectedVehicle.current_odometer || 0;
+
+				// Only reset currentOdo if vehicle actually changed (not on initial load)
+				if (hasInitialized && selectedVehicle.id !== previousVehicleId) {
+					currentOdo = selectedVehicle.current_odometer?.toString() || '';
+				} else if (!hasInitialized) {
+					// Initial load - use prop if available
+					if (odometerStart !== null && odometerStart !== undefined) {
+						currentOdo = odometerStart.toString();
+					} else {
+						currentOdo = selectedVehicle.current_odometer?.toString() || '';
+					}
+					hasInitialized = true;
+				}
+
+				previousVehicleId = selectedVehicle.id;
 			}
 		}
 	});
@@ -79,20 +96,11 @@
 		<div class="odo-section">
 			<div class="odo-card current-odo">
 				<div class="current-odo-controls">
-					{#if isEditingCurrentOdo}
-						<button class="odo-control-btn save-btn" onclick={() => isEditingCurrentOdo = false}>
-							✓
-						</button>
-						<button class="odo-control-btn reset-btn" onclick={resetCurrentOdo} title="Reset to vehicle reading">
-							🔄
-						</button>
-					{:else}
-						<button class="odo-control-btn edit-btn" onclick={() => isEditingCurrentOdo = true} title="Manual override">
-							✏️
-						</button>
-					{/if}
+					<button class="odo-control-btn reset-btn" onclick={resetCurrentOdo} title="Reset to vehicle reading">
+						🔄
+					</button>
 				</div>
-				
+
 				<input
 					type="number"
 					inputmode="decimal"
@@ -103,12 +111,10 @@
 					class="current-odo-input"
 					onfocus={(e) => e.target.select()}
 					autocomplete="off"
-					readonly={!isEditingCurrentOdo}
-					onclick={() => !isEditingCurrentOdo && selectedVehicle && (isEditingCurrentOdo = true)}
 				/>
 			</div>
-			
-			{#if isEditingCurrentOdo && parseFloat(currentOdo) !== originalCurrentOdo}
+
+			{#if parseFloat(currentOdo) !== originalCurrentOdo}
 				<div class="override-notice">Manual override active</div>
 			{/if}
 		</div>

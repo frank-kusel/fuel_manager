@@ -44,7 +44,7 @@ export interface FuelEntryData {
 	notes: string;
 	timestamp: Date;
 	entryDate: string; // YYYY-MM-DD format
-	entryTime: string; // HH:mm format
+	entryTime: string; // HH:mm:ss format (includes seconds)
 }
 
 interface WorkflowState {
@@ -137,7 +137,7 @@ const initialData: FuelEntryData = {
 	notes: '',
 	timestamp: new Date(),
 	entryDate: new Date().toISOString().split('T')[0], // Default to today
-	entryTime: new Date().toTimeString().substring(0, 5) // Default to current time
+	entryTime: new Date().toTimeString().substring(0, 8) // Default to current time with seconds (HH:mm:ss)
 };
 
 const initialState: WorkflowState = {

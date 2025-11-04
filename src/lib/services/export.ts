@@ -59,7 +59,10 @@ class ExportService {
 					activities:activity_id(code, name),
 					fields:field_id(code, name),
 					zones:zone_id(code, name),
-					bowsers:bowser_id(code, name)
+					bowsers:bowser_id(code, name),
+					fuel_entry_fields(
+						fields(code, name)
+					)
 				`)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate)
@@ -86,10 +89,26 @@ class ExportService {
 						hrsKm = entry.distance_km;
 					}
 
+					// Get field names - handle both multi-field (junction table) and single field (legacy)
+					let fieldNames = 'N/A';
+					if (entry.fuel_entry_fields && entry.fuel_entry_fields.length > 0) {
+						// Multi-field entries - join with comma
+						fieldNames = entry.fuel_entry_fields
+							.map((fef: any) => fef.fields?.name || fef.fields?.code || '')
+							.filter((name: string) => name !== '')
+							.join(', ');
+					} else if (entry.fields?.name) {
+						// Single field entry (legacy)
+						fieldNames = entry.fields.name;
+					} else if (entry.zones?.name) {
+						// Zone entry
+						fieldNames = entry.zones.name;
+					}
+
 					return {
 						date: this.formatDate(entry.entry_date),
 						vehicle: entry.vehicles.code || 'N/A',
-						field: entry.fields?.code || entry.zones?.code || 'N/A',
+						field: fieldNames,
 						activity: entry.activities?.code || 'N/A',
 						fuel: entry.litres_dispensed || 0,
 						hrsKm: hrsKm,

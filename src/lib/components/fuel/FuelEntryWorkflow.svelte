@@ -34,7 +34,7 @@
 			// Update to current date/time when user reaches review/submit step
 			const now = new Date();
 			const currentDate = now.toISOString().split('T')[0];
-			const currentTime = now.toTimeString().substring(0, 5);
+			const currentTime = now.toTimeString().substring(0, 8); // Include seconds (HH:mm:ss)
 			fuelEntryWorkflowStore.setEntryDate(currentDate);
 			fuelEntryWorkflowStore.setEntryTime(currentTime);
 		}
@@ -494,6 +494,7 @@
 							<input
 								id="entryTime"
 								type="time"
+								step="1"
 								value={$workflowData.entryTime}
 								oninput={(e) => fuelEntryWorkflowStore.setEntryTime(e.currentTarget.value)}
 								class="datetime-input"
