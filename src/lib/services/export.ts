@@ -981,9 +981,8 @@ class ExportService {
 			pdf.setFontSize(10);
 			pdf.setFont('times', 'normal');
 			
-			// Get previous month's last day for opening level
-			const prevMonthName = monthNames[prevMonth - 1];
-			const openingDate = `${lastDayOfPrevMonth} ${prevMonthName} ${prevYear}`;
+			// Show opening balance as first day of current month (value comes from previous month's closing)
+			const openingDate = `1 ${monthName} ${year}`;
 
 			pdf.setFont('times', 'bold');
 			pdf.text('Opening Balance:', labelX, reconciliationY);
