@@ -8,7 +8,7 @@
 	import { cacheActions, cacheStats } from '$lib/stores/reconciliation-cache';
 
 	// Component state
-	let selectedRange = $state('week');
+	let selectedRange = $state('prevMonth');
 	let startDate = $state('');
 	let endDate = $state('');
 	let customRange = $state(false);
@@ -24,46 +24,55 @@
 	let showReporting = $state(false);
 
 	const datePresets = [
-		{ value: 'today', label: 'Today' },
+		{ value: 'prevMonth', label: 'Previous Month' },
+		{ value: 'prevMonth2', label: 'Previous Month -1' },
 		{ value: 'week', label: 'Last 7 Days' },
-		{ value: 'thisWeek', label: 'This Week' },
-		{ value: 'month', label: 'This Month' },
 		{ value: 'custom', label: 'Custom Range' }
 	];
+
+	// Helper function to format date without timezone conversion
+	function formatDate(date: Date): string {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
 
 	function updateDateRange() {
 		const today = new Date();
 		console.log('updateDateRange called with selectedRange:', selectedRange);
-		
+
 		switch (selectedRange) {
-			case 'today':
-				startDate = endDate = today.toISOString().split('T')[0];
+			case 'prevMonth':
+				// Previous month: first day to last day
+				// If today is Nov 5, 2024 (month = 10), we want Oct 1 - Oct 31
+				const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+				const prevMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+				startDate = formatDate(prevMonthStart);
+				endDate = formatDate(prevMonthEnd);
+				customRange = false;
+				break;
+			case 'prevMonth2':
+				// Two months ago: first day to last day
+				// If today is Nov 5, 2024 (month = 10), we want Sep 1 - Sep 30
+				const prevMonth2Start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+				const prevMonth2End = new Date(today.getFullYear(), today.getMonth() - 1, 0);
+				startDate = formatDate(prevMonth2Start);
+				endDate = formatDate(prevMonth2End);
 				customRange = false;
 				break;
 			case 'week':
+				// Last 7 days
 				const weekAgo = new Date(today);
 				weekAgo.setDate(today.getDate() - 6);
-				startDate = weekAgo.toISOString().split('T')[0];
-				endDate = today.toISOString().split('T')[0];
-				customRange = false;
-				break;
-			case 'thisWeek':
-				const monday = new Date(today);
-				monday.setDate(today.getDate() - today.getDay() + 1);
-				startDate = monday.toISOString().split('T')[0];
-				endDate = today.toISOString().split('T')[0];
-				customRange = false;
-				break;
-			case 'month':
-				const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-				startDate = monthStart.toISOString().split('T')[0];
-				endDate = today.toISOString().split('T')[0];
+				startDate = formatDate(weekAgo);
+				endDate = formatDate(today);
 				customRange = false;
 				break;
 			case 'custom':
 				customRange = true;
-				if (!startDate) startDate = today.toISOString().split('T')[0];
-				if (!endDate) endDate = today.toISOString().split('T')[0];
+				if (!startDate) startDate = formatDate(today);
+				if (!endDate) endDate = formatDate(today);
 				break;
 		}
 		
@@ -99,55 +108,69 @@
 	}
 
 	async function loadReconciliationData() {
+		console.log('loadReconciliationData called', { startDate, endDate });
 		if (!startDate || !endDate) return;
-		
+
 		const cacheKey = `${startDate}_${endDate}`;
-		
+
 		// Check cache first
 		const cachedFuelData = cacheActions.getFuelData(startDate, endDate);
 		const cachedTankData = cacheActions.getTankData(endDate);
-		
+
+		console.log('Cache check:', { cachedFuelData, cachedTankData });
+
 		if (cachedFuelData && cachedTankData) {
 			// Use cached data
 			fuelData = cachedFuelData;
 			tankData = cachedTankData;
 			loading = false;
+			console.log('Using cached data:', { fuelData, tankData });
 			return;
 		}
-		
+
 		// Prevent duplicate loading
 		if (cacheActions.isLoading(cacheKey)) {
+			console.log('Already loading this date range');
 			return;
 		}
-		
+
 		loading = true;
 		error = '';
 		cacheActions.setLoading(cacheKey, true);
+		console.log('Starting data load...');
 		
 		try {
 			await supabaseService.init();
 			
 			// Load fuel reconciliation data if not cached
 			if (!cachedFuelData) {
+				console.log('Fetching fuel data from API...');
 				const fuelResult = await supabaseService.getDateRangeReconciliationData(startDate, endDate);
+				console.log('Fuel result:', fuelResult);
 				if (fuelResult.error) {
 					error = fuelResult.error;
+					console.error('Fuel data error:', fuelResult.error);
 				} else {
 					fuelData = fuelResult.data;
 					cacheActions.setFuelData(startDate, endDate, fuelResult.data);
+					console.log('Fuel data loaded:', fuelData);
 				}
 			} else {
 				fuelData = cachedFuelData;
 			}
-			
+
 			// Load tank data if not cached
 			if (!cachedTankData) {
+				console.log('Fetching tank data from API...');
 				const tankResult = await supabaseService.getTankReconciliationData(endDate);
+				console.log('Tank result:', tankResult);
 				if (tankResult.error && !error) {
 					error = tankResult.error;
+					console.error('Tank data error:', tankResult.error);
 				} else {
 					tankData = tankResult.data;
 					cacheActions.setTankData(endDate, tankResult.data);
+					console.log('Tank data loaded:', tankData);
 				}
 			} else {
 				tankData = cachedTankData;
@@ -155,15 +178,18 @@
 			
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load reconciliation data';
+			console.error('Load reconciliation data error:', err);
 		}
-		
+
 		loading = false;
 		cacheActions.setLoading(cacheKey, false);
+		console.log('Load complete. Final state:', { fuelData, tankData, error, loading });
 	}
 
 	async function performFuelReconciliation() {
+		console.log('performFuelReconciliation called', { fuelData, submitting });
 		if (!fuelData || submitting) return;
-		
+
 		submitting = true;
 		error = '';
 		
@@ -194,8 +220,9 @@
 	}
 
 	async function performTankReconciliation() {
+		console.log('performTankReconciliation called', { tankData, submitting });
 		if (!tankData || submitting) return;
-		
+
 		submitting = true;
 		error = '';
 		
@@ -296,6 +323,16 @@
 	// Confidence scoring
 	const fuelConfidence = $derived(getConfidenceScore(fuelVariance, 'fuel'));
 	const tankConfidence = $derived(getConfidenceScore(tankVariancePercentage, 'tank'));
+
+	// Debug button state
+	$effect(() => {
+		console.log('Button state check:', {
+			fuelData,
+			submitting,
+			fuelDataExists: !!fuelData,
+			isDisabled: submitting || !fuelData
+		});
+	});
 </script>
 
 <svelte:head>
@@ -413,9 +450,12 @@
 					</div>
 				{/if}
 				<div class="reconcile-actions">
-					<Button 
-						variant="primary" 
-						onclick={performFuelReconciliation}
+					<Button
+						variant="primary"
+						onclick={() => {
+							console.log('Reconcile Fuel Usage clicked', { fuelData, submitting });
+							performFuelReconciliation();
+						}}
 						disabled={submitting || !fuelData}
 					>
 						{submitting ? 'Processing...' : 'Reconcile Fuel Usage'}
@@ -490,11 +530,19 @@
 					<div class="details">
 						<span class="details-text">Difference: {Math.abs(tankVariance) < 0.1 ? '0' : (tankVariance >= 0 ? '+' : '') + tankVariance.toFixed(1)}L of 24,000L capacity</span>
 					</div>
+					{#if tankData.previousMonthMissing}
+						<div class="warning-message">
+							⚠️ Warning: Previous month ({tankData.previousMonth}) was not reconciled. Calculated level may be inaccurate.
+						</div>
+					{/if}
 				{/if}
 				<div class="reconcile-actions">
-					<Button 
-						variant="secondary" 
-						onclick={performTankReconciliation}
+					<Button
+						variant="secondary"
+						onclick={() => {
+							console.log('Reconcile Tank Levels clicked', { tankData, submitting });
+							performTankReconciliation();
+						}}
 						disabled={submitting || !tankData}
 					>
 						{submitting ? 'Processing...' : 'Reconcile Tank Levels'}
@@ -546,9 +594,6 @@
 									<tr>
 										<td>
 											{new Date(record.date).toLocaleDateString('en-ZA')}
-											{#if record.start_date && record.end_date}
-												<div class="date-range">({record.start_date} to {record.end_date})</div>
-											{/if}
 										</td>
 										<td>{formatNumber(record.fuel_dispensed)}L</td>
 										<td>{formatNumber(record.bowser_start || 0)}L</td>
@@ -930,6 +975,17 @@
 
 	.error-icon {
 		font-size: 1rem;
+	}
+
+	.warning-message {
+		margin-top: 0.75rem;
+		padding: 0.75rem;
+		background: #fef3c7;
+		border: 1px solid #fbbf24;
+		border-radius: 6px;
+		color: #92400e;
+		font-size: 0.75rem;
+		font-weight: 500;
 	}
 
 	.loading {

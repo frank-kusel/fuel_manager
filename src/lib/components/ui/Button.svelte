@@ -29,15 +29,15 @@
 		children
 	}: Props = $props();
 
-	const baseClasses = [
+	const baseClasses = $derived([
 		'btn',
 		`btn-${variant}`,
 		`btn-${size}`,
 		fullWidth && 'btn-full-width',
 		className
-	].filter(Boolean).join(' ');
+	].filter(Boolean).join(' '));
 
-	const finalDisabled = disabled || loading;
+	const finalDisabled = $derived(disabled || loading);
 </script>
 
 {#if href}

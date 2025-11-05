@@ -690,10 +690,22 @@ class ExportService {
 				return { success: false, error: vehicleResult.error || 'No vehicle data found' };
 			}
 
+			// Format month name
+			const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+				'July', 'August', 'September', 'October', 'November', 'December'];
+			const monthName = monthNames[month - 1];
+
 			// Fetch reconciliation data for the month
 			const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
 			const monthEnd = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
-			
+
+			// Calculate previous month's last day for opening level
+			const prevMonth = month === 1 ? 12 : month - 1;
+			const prevYear = month === 1 ? year - 1 : year;
+			// Use month index (0-11) for Date constructor: prevMonth is month NUMBER (1-12), so use it directly as the NEXT month's index
+			const lastDayOfPrevMonth = new Date(prevYear, prevMonth, 0).getDate();
+			const prevMonthEnd = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(lastDayOfPrevMonth).padStart(2, '0')}`;
+
 			let reconciliationData = {
 				fuelDispensed: 0,
 				bowserStart: 0,
@@ -710,13 +722,13 @@ class ExportService {
 				const [fuelReconResult, tankStartReconResult, tankEndReconResult, dipReadingResult, tankActivitiesResult] = await Promise.all([
 					// Fuel reconciliation data
 					supabaseService.getDateRangeReconciliationData(monthStart, monthEnd),
-					
-					// Tank reconciliation data for month start (opening level)
+
+					// Tank reconciliation data for opening level (previous month's closing)
 					supabaseService.query(() =>
 						supabaseService.ensureInitialized()
 							.from('tank_reconciliations')
 							.select('*')
-							.eq('reconciliation_date', monthStart)
+							.eq('reconciliation_date', prevMonthEnd)
 							.maybeSingle()
 					),
 					
@@ -811,12 +823,17 @@ class ExportService {
 			const pdf = new jsPDF('p', 'mm', 'a4');
 			const pageWidth = pdf.internal.pageSize.width;
 			const pageHeight = pdf.internal.pageSize.height;
-			
+
 			// Format month name
 			const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
 				'July', 'August', 'September', 'October', 'November', 'December'];
 			const monthName = monthNames[month - 1];
-			
+
+			// Calculate previous month's last day for opening level
+			const prevMonth = month === 1 ? 12 : month - 1;
+			const prevYear = month === 1 ? year - 1 : year;
+			const lastDayOfPrevMonth = new Date(prevYear, prevMonth, 0).getDate();
+
 			// Calculate total fuel consumption
 			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
 			const averageFuel = data.length > 0 ? totalFuel / data.length : 0;
@@ -964,11 +981,14 @@ class ExportService {
 			pdf.setFontSize(10);
 			pdf.setFont('times', 'normal');
 			
-			// Get current month date for opening level (start of month)
-			const openingDate = `1 ${monthName} ${year}`;
-			
-			pdf.text('Opening Level:', labelX, reconciliationY);
+			// Get previous month's last day for opening level
+			const prevMonthName = monthNames[prevMonth - 1];
+			const openingDate = `${lastDayOfPrevMonth} ${prevMonthName} ${prevYear}`;
+
+			pdf.setFont('times', 'bold');
+			pdf.text('Opening Balance:', labelX, reconciliationY);
 			pdf.text(`${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.setFont('times', 'normal');
 			pdf.text(`(${openingDate})`, detailsX, reconciliationY);
 			reconciliationY += 4;
 			
@@ -997,14 +1017,23 @@ class ExportService {
 				pdf.setFont('times', 'normal');
 				reconciliationY += 4;
 			}
-			
+
+			// Total Drawings (fuel dispensed)
+			pdf.setFont('times', 'bold');
+			pdf.text('Total Drawings:', labelX, reconciliationY);
+			pdf.text(`-${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.setFont('times', 'normal');
+			reconciliationY += 4;
+
 			// Expected vs Actual calculation
 			const totalTankAdditions = reconciliationData.tankActivities.reduce((sum, activity) => sum + (activity.litres_added || 0), 0);
 			const expectedLevel = reconciliationData.tankStartCalculated - reconciliationData.fuelDispensed + totalTankAdditions;
 			
 			const calculationFormula = `(${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', {minimumFractionDigits: 1})} - ${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})} + ${totalTankAdditions.toLocaleString('en-ZA', {minimumFractionDigits: 1})})`;
-			pdf.text('Expected Level:', labelX, reconciliationY);
+			pdf.setFont('times', 'bold');
+			pdf.text('Closing Balance:', labelX, reconciliationY);
 			pdf.text(`${expectedLevel.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.setFont('times', 'normal');
 			pdf.text(calculationFormula, detailsX, reconciliationY);
 			reconciliationY += 4;
 			

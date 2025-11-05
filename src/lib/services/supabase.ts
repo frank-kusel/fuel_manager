@@ -1103,18 +1103,18 @@ class SupabaseService {
 			let bowserEnd = 0;
 			
 			try {
-				// Opening reading: Get the first bowser_reading_start from the range
+				// Opening reading: Get the last bowser_reading_end from BEFORE the start date
+				// This gives us the bowser level at the end of the previous period
 				const bowserStartResult = await client
 					.from('fuel_entries')
-					.select('bowser_reading_start, entry_date, time')
-					.gte('entry_date', startDate)
-					.lte('entry_date', endDate)
-					.not('bowser_reading_start', 'is', null)
-					.order('entry_date', { ascending: true })
-					.order('time', { ascending: true })
+					.select('bowser_reading_end, entry_date, time')
+					.lt('entry_date', startDate)
+					.not('bowser_reading_end', 'is', null)
+					.order('entry_date', { ascending: false })
+					.order('time', { ascending: false })
 					.limit(1);
-				
-				// Closing reading: Get the last bowser_reading_end from the range	
+
+				// Closing reading: Get the last bowser_reading_end from the range
 				const bowserEndResult = await client
 					.from('fuel_entries')
 					.select('bowser_reading_end, entry_date, time')
@@ -1124,8 +1124,8 @@ class SupabaseService {
 					.order('entry_date', { ascending: false })
 					.order('time', { ascending: false })
 					.limit(1);
-				
-				bowserStart = parseFloat(bowserStartResult.data?.[0]?.bowser_reading_start) || 0;
+
+				bowserStart = parseFloat(bowserStartResult.data?.[0]?.bowser_reading_end) || 0;
 				bowserEnd = parseFloat(bowserEndResult.data?.[0]?.bowser_reading_end) || 0;
 				
 			} catch (bowserError) {
@@ -1153,31 +1153,105 @@ class SupabaseService {
 	async getTankReconciliationData(date: string): Promise<ApiResponse<{
 		tankCalculated: number;
 		tankMeasured: number;
+		previousMonthMissing?: boolean;
+		previousMonth?: string;
 	}>> {
 		const client = this.ensureInitialized();
-		
+
 		try {
-			// Get tank calculated level
+			// Calculate the tank level as of the specific date (end of month)
 			let tankCalculated = 0;
+			let previousMonthMissing = false;
+			let previousMonth = '';
+
 			try {
-				const tankStatusResult = await client
-					.from('tank_status')
-					.select('current_calculated_level')
+				// Determine the start and end of the current period (month)
+				const endDate = new Date(date);
+				const year = endDate.getFullYear();
+				const month = endDate.getMonth() + 1; // getMonth() is 0-indexed
+
+				// First day of the month - format without timezone conversion
+				const startDate = new Date(year, month - 1, 1);
+				const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+
+				// Get previous month in YYYY-MM format
+				const prevMonth = month === 1 ? 12 : month - 1;
+				const prevYear = month === 1 ? year - 1 : year;
+				previousMonth = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+
+				// Try to get the previous month's closing calculated level from reconciliations
+				let openingLevel = 0;
+				const prevReconciliationDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${new Date(prevYear, prevMonth, 0).getDate()}`;
+				console.log('Looking for previous reconciliation date:', prevReconciliationDate);
+
+				const prevReconciliationResult = await client
+					.from('tank_reconciliations')
+					.select('calculated_level, reconciliation_date')
+					.eq('reconciliation_date', prevReconciliationDate)
+					.order('created_at', { ascending: false })
+					.limit(1);
+
+				console.log('Previous reconciliation result:', prevReconciliationResult);
+
+				if (prevReconciliationResult.data && prevReconciliationResult.data.length > 0) {
+					// Use previous month's calculated level
+					openingLevel = prevReconciliationResult.data[0].calculated_level || 0;
+					console.log('Using previous month closing level:', openingLevel);
+				} else {
+					// Previous month wasn't reconciled - flag this
+					previousMonthMissing = true;
+					console.log('Previous month not found, using baseline');
+
+					// Fall back to baseline level
+					const tankStatusResult = await client
+						.from('tank_status')
+						.select('baseline_level')
+						.eq('tank_id', 'tank_a')
+						.single();
+					openingLevel = tankStatusResult.data?.baseline_level || 0;
+					console.log('Baseline level:', openingLevel);
+				}
+
+				// Get fuel ADDED to the tank for this month (from tank_refills)
+				console.log('Querying tank_refills from', startDateStr, 'to', date);
+				const refillsResult = await client
+					.from('tank_refills')
+					.select('litres_added, delivery_date')
 					.eq('tank_id', 'tank_a')
-					.single();
-				tankCalculated = tankStatusResult.data?.current_calculated_level || 0;
+					.gte('delivery_date', startDateStr)
+					.lte('delivery_date', date);
+
+				console.log('Tank refills result:', refillsResult);
+				const monthAdded = refillsResult.data?.reduce((sum, r) => sum + (r.litres_added || 0), 0) || 0;
+				console.log('Total litres added this month:', monthAdded);
+
+				// Get fuel DISPENSED from the tank for this month (from fuel_entries)
+				console.log('Querying fuel_entries from', startDateStr, 'to', date);
+				const dispensedResult = await client
+					.from('fuel_entries')
+					.select('litres_dispensed, entry_date')
+					.gte('entry_date', startDateStr)
+					.lte('entry_date', date);
+
+				console.log('Fuel entries result count:', dispensedResult.data?.length);
+				const monthDispensed = dispensedResult.data?.reduce((sum, e) => sum + (e.litres_dispensed || 0), 0) || 0;
+				console.log('Total litres dispensed this month:', monthDispensed);
+
+				// Calculate: opening + refills added - fuel dispensed
+				tankCalculated = openingLevel + monthAdded - monthDispensed;
+				console.log('Tank calculation:', openingLevel, '+', monthAdded, '-', monthDispensed, '=', tankCalculated);
 			} catch (tankError) {
-				console.warn('Could not fetch tank status:', tankError);
+				console.warn('Could not calculate tank level:', tankError);
 			}
-				
-			// Get latest tank reading (measured level)
+
+			// Get latest tank reading (measured level) up to the specified date
 			let tankMeasured = 0;
 			try {
 				const tankReadingResult = await client
 					.from('tank_readings')
 					.select('reading_value')
 					.eq('tank_id', 'tank_a')
-					.lte('reading_date', date) // Get readings up to the specified date
+					.lte('reading_date', date)
 					.order('reading_date', { ascending: false })
 					.limit(1);
 				tankMeasured = tankReadingResult.data?.[0]?.reading_value || 0;
@@ -1188,7 +1262,9 @@ class SupabaseService {
 			return {
 				data: {
 					tankCalculated,
-					tankMeasured
+					tankMeasured,
+					previousMonthMissing,
+					previousMonth
 				},
 				error: null
 			};
@@ -1208,24 +1284,27 @@ class SupabaseService {
 		bowserEnd: number;
 	}): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();
-		
+
 		// Calculate bowser difference (bowser reading increases, so end - start = fuel added)
 		const bowserDifference = data.bowserEnd - data.bowserStart;
 		const fuelVariance = Math.abs(data.fuelDispensed - bowserDifference);
 		const reconciliationStatus = fuelVariance <= 1 ? 'reconciled' : 'discrepancy';
-		
-		return this.query(() => 
+
+		// Convert date range to month format (YYYY-MM) for the existing schema
+		// Use the start date to determine the month
+		const month = data.startDate.substring(0, 7); // Extract YYYY-MM from YYYY-MM-DD
+
+		return this.query(() =>
 			client
 				.from('fuel_reconciliations')
 				.insert({
-					start_date: data.startDate,
-					end_date: data.endDate,
+					month: month,
 					fuel_dispensed: data.fuelDispensed,
 					fuel_received: bowserDifference,
 					discrepancy_count: fuelVariance > 1 ? 1 : 0,
 					status: reconciliationStatus,
 					reconciled_date: new Date().toISOString(),
-					notes: `Bowser: ${data.bowserStart}L → ${data.bowserEnd}L (${bowserDifference}L added).`
+					notes: `${data.startDate} to ${data.endDate}. Bowser: ${data.bowserStart}L → ${data.bowserEnd}L (${bowserDifference}L added).`
 				})
 				.select()
 				.single()
@@ -1273,14 +1352,38 @@ class SupabaseService {
 				const fuelResult = await client
 					.from('fuel_reconciliations')
 					.select('*')
-					.order('reconciled_date', { ascending: false })
+					.order('month', { ascending: false })
 					.limit(Math.floor(limit / 2));
-				
-				fuelRecords = (fuelResult.data || []).map(record => ({
-					...record,
-					type: 'fuel',
-					date: record.reconciled_date || record.created_at
-				}));
+
+				fuelRecords = (fuelResult.data || []).map(record => {
+					// Convert month (YYYY-MM) to last day of that month for display
+					let periodEndDate = record.reconciled_date || record.created_at;
+					if (record.month) {
+						// Parse month string (YYYY-MM) and get last day
+						const [year, month] = record.month.split('-').map(Number);
+						const lastDay = new Date(year, month, 0).getDate(); // Day 0 of next month = last day of current month
+						periodEndDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+					}
+
+					// Extract bowser start/end from notes if not in separate columns
+					let bowserStart = 0;
+					let bowserEnd = 0;
+					if (record.notes) {
+						const bowserMatch = record.notes.match(/Bowser:\s*([\d,\.]+)L\s*→\s*([\d,\.]+)L/);
+						if (bowserMatch) {
+							bowserStart = parseFloat(bowserMatch[1].replace(/,/g, ''));
+							bowserEnd = parseFloat(bowserMatch[2].replace(/,/g, ''));
+						}
+					}
+
+					return {
+						...record,
+						type: 'fuel',
+						date: periodEndDate,
+						bowser_start: bowserStart,
+						bowser_end: bowserEnd
+					};
+				});
 			} catch (fuelError) {
 				console.warn('Could not fetch fuel reconciliations:', fuelError);
 			}
