@@ -223,45 +223,41 @@
 			<p>No fuel entries found for this vehicle</p>
 		</div>
 	{:else if fuelEntries.length > 0}
-		<!-- Fuel Entries - Compact Card Layout -->
-		<div class="entries-container">
-			{#each fuelEntries as entry (entry.id)}
-				<div class="entry-card">
-					<!-- Row 1: Date, Fuel, Activity, Field -->
-					<div class="card-row primary-row">
-						<div class="date-badge">{formatDate(entry.entry_date)}</div>
-						<div class="fuel-badge">{formatDecimal(entry.litres_dispensed)}L</div>
-						<div class="info-text">{entry.activities?.code || '-'}</div>
-						<div class="info-text field-text">{getFieldDisplay(entry)}</div>
-					</div>
+		<!-- Fuel Entries - Compact Table -->
+		<div class="entries-table">
+			<!-- Table Header -->
+			<div class="table-header">
+				<div class="col-date">Date</div>
+				<div class="col-fuel">Fuel</div>
+				<div class="col-odo-start">Start</div>
+				<div class="col-odo-end">End</div>
+				<div class="col-usage">Usage</div>
+				<div class="col-activity">Act</div>
+				<div class="col-field">Field</div>
+			</div>
 
-					<!-- Row 2: ODO readings -->
-					<div class="card-row secondary-row">
-						<div class="data-group">
-							<span class="label">ODO Start</span>
-							<span class="value">
-								{#if entry.odometer_start !== null}
-									{formatNumber(entry.odometer_start)}
-								{:else}
-									-
-								{/if}
-							</span>
-						</div>
-						<div class="data-group">
-							<span class="label">ODO End</span>
-							<span class="value">
-								{#if entry.odometer_end !== null}
-									{formatNumber(entry.odometer_end)}
-								{:else}
-									-
-								{/if}
-							</span>
-						</div>
-						<div class="data-group">
-							<span class="label">Usage</span>
-							<span class="value">{getHoursOrDistance(entry)}</span>
-						</div>
+			<!-- Table Rows -->
+			{#each fuelEntries as entry (entry.id)}
+				<div class="table-row">
+					<div class="col-date">{formatDate(entry.entry_date).replace(' ', '-').substring(0, 5)}</div>
+					<div class="col-fuel">{formatDecimal(entry.litres_dispensed)}</div>
+					<div class="col-odo-start">
+						{#if entry.odometer_start !== null}
+							{formatNumber(entry.odometer_start)}
+						{:else}
+							-
+						{/if}
 					</div>
+					<div class="col-odo-end">
+						{#if entry.odometer_end !== null}
+							{formatNumber(entry.odometer_end)}
+						{:else}
+							-
+						{/if}
+					</div>
+					<div class="col-usage">{getHoursOrDistance(entry)}</div>
+					<div class="col-activity">{entry.activities?.code || '-'}</div>
+					<div class="col-field">{getFieldDisplay(entry)}</div>
 				</div>
 			{/each}
 
@@ -369,103 +365,96 @@
 		font-size: 0.875rem;
 	}
 
-	/* Entries Container - Card Layout */
-	.entries-container {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
+	/* Entries Table - Compact Layout */
+	.entries-table {
+		border-top: 1px solid #e5e7eb;
 	}
 
-	.entry-card {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
-		overflow: hidden;
-		transition: all 0.2s ease;
-	}
-
-	.entry-card:hover {
-		border-color: #f97316;
-		box-shadow: 0 2px 8px rgba(249, 115, 22, 0.1);
-	}
-
-	.card-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 0.75rem;
-	}
-
-	.primary-row {
+	.table-header {
+		display: grid;
+		grid-template-columns: 1fr 1fr 1.5fr 1.5fr 1fr 1fr 1fr;
 		background: #f9fafb;
 		border-bottom: 1px solid #e5e7eb;
-		justify-content: space-between;
-	}
-
-	.secondary-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr 1fr;
-		gap: 0.75rem;
-	}
-
-	/* Date Badge */
-	.date-badge {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #6b7280;
-		white-space: nowrap;
-	}
-
-	/* Fuel Badge */
-	.fuel-badge {
-		font-size: 0.875rem;
-		font-weight: 700;
-		color: #f97316;
-		background: #fff7ed;
-		padding: 0.125rem 0.5rem;
-		border-radius: 4px;
-		white-space: nowrap;
-	}
-
-	/* Info Text */
-	.info-text {
-		font-size: 0.8125rem;
-		color: #374151;
-		font-weight: 500;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.field-text {
-		flex: 1;
-		text-align: right;
-		color: #059669;
-	}
-
-	/* Data Groups */
-	.data-group {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		min-width: 0;
-	}
-
-	.data-group .label {
 		font-size: 0.625rem;
-		font-weight: 600;
-		color: #9ca3af;
+		font-weight: 700;
+		color: #6b7280;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
+		padding: 0.4rem 0.5rem;
+		gap: 0.5rem;
 	}
 
-	.data-group .value {
+	.table-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr 1.5fr 1.5fr 1fr 1fr 1fr;
+		border-bottom: 1px solid #f3f4f6;
 		font-size: 0.75rem;
+		padding: 0.4rem 0.5rem;
+		gap: 0.5rem;
+		transition: background 0.15s ease;
+		align-items: center;
+	}
+
+	.table-row:hover {
+		background: #fef3c7;
+	}
+
+	.table-row:last-child {
+		border-bottom: none;
+	}
+
+	/* Column Styles */
+	.col-date {
 		font-weight: 600;
-		color: #111827;
-		white-space: nowrap;
+		color: #6b7280;
+		text-align: left;
+	}
+
+	.col-fuel {
+		font-weight: 700;
+		color: #f97316;
+		text-align: right;
+	}
+
+	.col-odo-start,
+	.col-odo-end {
+		color: #374151;
+		text-align: right;
+	}
+
+	.col-usage {
+		color: #059669;
+		font-weight: 600;
+		text-align: right;
+	}
+
+	.col-activity {
+		color: #374151;
+		font-weight: 600;
+		text-align: center;
+	}
+
+	.col-field {
+		color: #374151;
+		font-weight: 500;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		white-space: nowrap;
+		text-align: right;
+	}
+
+	.table-header .col-date,
+	.table-header .col-activity,
+	.table-header .col-field {
+		text-align: inherit;
+	}
+
+	.table-header .col-date {
+		text-align: left;
+	}
+
+	.table-header .col-field {
+		text-align: right;
 	}
 
 	/* Table Footer */
@@ -495,16 +484,19 @@
 			max-width: 100%;
 		}
 
-		.card-row {
-			padding: 0.5rem 0.5rem;
+		.table-header,
+		.table-row {
+			grid-template-columns: 0.9fr 0.9fr 1.3fr 1.3fr 0.9fr 0.9fr 0.9fr;
+			padding: 0.35rem 0.3rem;
+			gap: 0.3rem;
 		}
 
-		.secondary-row {
-			gap: 0.5rem;
+		.table-header {
+			font-size: 0.55rem;
 		}
 
-		.data-group .value {
-			font-size: 0.8rem;
+		.table-row {
+			font-size: 0.7rem;
 		}
 	}
 </style>
