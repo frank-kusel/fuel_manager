@@ -146,22 +146,25 @@
 	
 	// Progress summary items using $state + $effect (more reliable)
 	let progressItems = $state([]);
-	
+
 	$effect(() => {
 		const items = [];
 		const data = $state.snapshot($workflowData);
-		
+
 		if (data?.vehicle) {
+			const vehicleCode = data.vehicle.code || '';
 			const vehicleName = data.vehicle.name || `${data.vehicle.make || ''} ${data.vehicle.model || ''}`.trim() || 'Vehicle';
-			items.push(vehicleName);
+			items.push(vehicleCode ? `${vehicleCode} ${vehicleName}` : vehicleName);
 		}
 		if (data?.driver) {
-			items.push(data.driver.name);
+			const driverCode = data.driver.code || '';
+			const driverName = data.driver.name || '';
+			items.push(driverCode ? `${driverCode} ${driverName}` : driverName);
 		}
 		if (data?.activity) {
 			items.push(data.activity.code);
 		}
-		
+
 		// Handle field display in progress
 		if (data?.fieldSelectionMode === 'multiple' && data?.selectedFields?.length > 0) {
 			items.push(`${data.selectedFields.length} Field${data.selectedFields.length !== 1 ? 's' : ''}`);
@@ -170,7 +173,7 @@
 		} else if (data?.zone) {
 			items.push(data.zone.name);
 		}
-		
+
 		progressItems = items;
 	});
 	

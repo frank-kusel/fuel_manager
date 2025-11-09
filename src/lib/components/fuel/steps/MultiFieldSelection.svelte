@@ -14,10 +14,27 @@
 
 	let searchTerm = $state('');
 
+	// Track collapsed state for each crop group
+	let collapsedGroups = $state<Record<string, boolean>>({});
+
 	// Derived states
 	let selectedFieldIds = $derived(selectionState.selectedFields.map(f => f.id));
 	let hasSelections = $derived(selectedFieldIds.length > 0);
 	let isMaxReached = $derived(selectedFieldIds.length >= maxSelections);
+
+	// Toggle group collapse state
+	function toggleGroupCollapse(cropType: string) {
+		collapsedGroups[cropType] = !collapsedGroups[cropType];
+	}
+
+	// Check if a group is collapsed (default is true unless searching)
+	function isGroupCollapsed(cropType: string): boolean {
+		// If there's a search term, auto-expand all groups
+		if (searchTerm) {
+			return false;
+		}
+		return collapsedGroups[cropType] !== false; // Collapsed by default
+	}
 
 	// Group fields by crop type
 	let groupedFields = $derived.by(() => {
@@ -132,36 +149,6 @@
 </script>
 
 <div class="multi-field-selection">
-	<!-- Selection Summary -->
-	{#if hasSelections}
-		<div class="selection-summary">
-			<div class="summary-header">
-				<div class="summary-info">
-					<span class="selection-count">{selectedFieldIds.length}</span>
-					<span class="selection-label">field{selectedFieldIds.length !== 1 ? 's' : ''} selected</span>
-				</div>
-				<button class="clear-all" onclick={clearAllSelections}>
-					Clear All
-				</button>
-			</div>
-			<div class="selected-fields-list">
-				{#each selectionState.selectedFields as field (field.id)}
-					<div class="selected-field-chip">
-						<span class="field-icon">{getFieldIcon(field.crop_type)}</span>
-						<span class="field-name">{field.name}</span>
-						<button 
-							class="remove-field" 
-							onclick={() => toggleFieldSelection(field)}
-							aria-label="Remove {field.name}"
-						>
-							×
-						</button>
-					</div>
-				{/each}
-			</div>
-		</div>
-	{/if}
-
 	{#if !$referenceDataLoading && $fields.length > 0}
 		<!-- Search -->
 		<div class="search-container">
@@ -213,57 +200,46 @@
 	{:else}
 		<div class="fields-container">
 			{#each Object.entries(groupedFields) as [cropType, fieldList]}
+				{@const isCollapsed = isGroupCollapsed(cropType)}
 				<div class="crop-group">
 					<!-- Group Header -->
-					<div class="group-header">
+					<button class="group-header" onclick={() => toggleGroupCollapse(cropType)}>
 						<div class="group-info">
+							<span class="expand-icon {isCollapsed ? '' : 'expanded'}">▶</span>
 							<span class="group-icon">{getFieldIcon(cropType)}</span>
 							<h3 class="group-title">{cropType}</h3>
 							<span class="group-count">({fieldList.length} field{fieldList.length !== 1 ? 's' : ''})</span>
 						</div>
-						<div class="group-actions">
-							<button 
-								class="group-action-btn"
-								onclick={() => selectAllInGroup(fieldList)}
-								disabled={isMaxReached}
-							>
-								Select All
-							</button>
-							<button 
-								class="group-action-btn"
-								onclick={() => deselectAllInGroup(fieldList)}
-							>
-								Clear
-							</button>
-						</div>
-					</div>
+					</button>
 
 					<!-- Fields in Group -->
-					<div class="fields-grid">
-						{#each fieldList as field (field.id)}
-							{@const isSelected = selectedFieldIds.includes(field.id)}
-							{@const isDisabled = !isSelected && isMaxReached}
-							
-							<label
-								class="field-checkbox-card {isSelected ? 'selected' : ''} {isDisabled ? 'disabled' : ''}"
-								for="field-{field.id}"
-							>
-								<input
-									id="field-{field.id}"
-									type="checkbox"
-									checked={isSelected}
-									disabled={isDisabled}
-									onchange={() => toggleFieldSelection(field)}
-								/>
-								<div class="field-content">
-									<div class="field-info-row">
-										<span class="field-name">{field.name}</span>
-										<span class="field-area">{formatArea(field.area)}</span>
+					{#if !isCollapsed}
+						<div class="fields-grid">
+							{#each fieldList as field (field.id)}
+								{@const isSelected = selectedFieldIds.includes(field.id)}
+								{@const isDisabled = !isSelected && isMaxReached}
+
+								<label
+									class="field-checkbox-card {isSelected ? 'selected' : ''} {isDisabled ? 'disabled' : ''}"
+									for="field-{field.id}"
+								>
+									<input
+										id="field-{field.id}"
+										type="checkbox"
+										checked={isSelected}
+										disabled={isDisabled}
+										onchange={() => toggleFieldSelection(field)}
+									/>
+									<div class="field-content">
+										<div class="field-info-row">
+											<span class="field-name">{field.name}</span>
+											<span class="field-area">{formatArea(field.area)}</span>
+										</div>
 									</div>
-								</div>
-							</label>
-						{/each}
-					</div>
+								</label>
+							{/each}
+						</div>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -294,107 +270,6 @@
 		border-radius: 6px;
 		color: #dc2626;
 		font-size: 0.875rem;
-	}
-
-	/* Selection Summary */
-	.selection-summary {
-		background: #f0fdf4;
-		border: 2px solid #10b981;
-		border-radius: 12px;
-		padding: 1rem;
-	}
-
-	.summary-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 0.75rem;
-	}
-
-	.summary-info {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.selection-count {
-		background: #10b981;
-		color: white;
-		font-weight: 700;
-		font-size: 1.25rem;
-		padding: 0.25rem 0.75rem;
-		border-radius: 20px;
-		min-width: 2rem;
-		text-align: center;
-	}
-
-	.selection-label {
-		font-weight: 600;
-		color: #065f46;
-	}
-
-	.clear-all {
-		background: none;
-		border: 1px solid #10b981;
-		color: #10b981;
-		padding: 0.375rem 0.75rem;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.clear-all:hover {
-		background: #10b981;
-		color: white;
-	}
-
-	.selected-fields-list {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-	}
-
-	.selected-field-chip {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		background: white;
-		border: 1px solid #10b981;
-		border-radius: 20px;
-		padding: 0.375rem 0.75rem;
-		font-size: 0.875rem;
-	}
-
-	.field-icon {
-		font-size: 1rem;
-	}
-
-	.field-name {
-		font-weight: 500;
-		color: #065f46;
-	}
-
-	.remove-field {
-		background: none;
-		border: none;
-		color: #10b981;
-		font-size: 1.125rem;
-		cursor: pointer;
-		padding: 0;
-		width: 1.25rem;
-		height: 1.25rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 50%;
-		transition: all 0.2s;
-	}
-
-	.remove-field:hover {
-		background: #ef4444;
-		color: white;
 	}
 
 	/* Search */
@@ -482,18 +357,44 @@
 	}
 
 	.group-header {
+		width: 100%;
 		display: flex;
-		justify-content: space-between;
 		align-items: center;
 		padding: 0.5rem 0.75rem;
 		background: #f9fafb;
+		border: none;
 		border-bottom: 1px solid #e5e7eb;
+		cursor: pointer;
+		transition: background 0.2s;
+		text-align: left;
+		-webkit-tap-highlight-color: transparent;
+		user-select: none;
+	}
+
+	.group-header:hover {
+		background: #f3f4f6;
+	}
+
+	.group-header:active {
+		background: #e5e7eb;
 	}
 
 	.group-info {
 		display: flex;
 		align-items: center;
 		gap: 0.375rem;
+	}
+
+	.expand-icon {
+		font-size: 0.75rem;
+		color: #6b7280;
+		transition: transform 0.2s;
+		display: inline-block;
+		width: 1rem;
+	}
+
+	.expand-icon.expanded {
+		transform: rotate(90deg);
 	}
 
 	.group-icon {
@@ -510,33 +411,6 @@
 	.group-count {
 		font-size: 0.75rem;
 		color: #6b7280;
-	}
-
-	.group-actions {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.group-action-btn {
-		background: none;
-		border: 1px solid #d1d5db;
-		color: #374151;
-		padding: 0.375rem 0.75rem;
-		border-radius: 6px;
-		font-size: 0.75rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.group-action-btn:hover:not(:disabled) {
-		background: #f3f4f6;
-		border-color: #9ca3af;
-	}
-
-	.group-action-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
 	}
 
 	/* Field Cards */
@@ -673,31 +547,6 @@
 		.fields-grid {
 			grid-template-columns: 1fr;
 			gap: 0.5rem;
-		}
-
-		.group-header {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.75rem;
-		}
-
-		.group-actions {
-			width: 100%;
-			justify-content: flex-end;
-		}
-
-		.summary-header {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.75rem;
-		}
-
-		.selected-fields-list {
-			gap: 0.375rem;
-		}
-
-		.selected-field-chip {
-			font-size: 0.8125rem;
 		}
 	}
 </style>

@@ -115,9 +115,9 @@
 <div class="location-selection">
 	<!-- Skip Option -->
 	<div class="skip-option">
-		<div class="skip-message" onclick={skipLocation}>
+		<button class="skip-button" onclick={skipLocation}>
 			Skip Location
-		</div>
+		</button>
 	</div>
 	
 	{#if !$referenceDataLoading}
@@ -277,23 +277,35 @@
 
 	/* Skip Option */
 	.skip-option {
-		padding: 0.75rem;
-		border: 1px solid #bae6fd;
-		border-radius: 6px;
 		display: flex;
 		justify-content: center;
 	}
 
-	.skip-message {
+	.skip-button {
+		width: 100%;
+		padding: 0.75rem 1rem;
+		border: 1px solid #bae6fd;
+		border-radius: 6px;
+		background: white;
 		color: #0284c7;
 		font-size: 0.875rem;
 		font-weight: 500;
 		cursor: pointer;
-		transition: color 0.2s;
+		transition: all 0.2s;
+		-webkit-tap-highlight-color: transparent;
+		user-select: none;
+		-webkit-user-select: none;
 	}
 
-	.skip-message:hover {
+	.skip-button:hover {
+		background: #f0f9ff;
+		border-color: #0284c7;
 		color: #0369a1;
+	}
+
+	.skip-button:active {
+		background: #e0f2fe;
+		transform: scale(0.98);
 	}
 
 	/* Search */
