@@ -715,7 +715,8 @@ class SupabaseService {
 						drivers!left(employee_code, name),
 						activities!left(name, category),
 						fields!left(name, code),
-						zones!left(name, code)
+						zones!left(name, code),
+						fuel_entry_fields!left(field_id, fields!inner(name, code))
 					`)
 					.order('entry_date', { ascending: false })
 					.order('time', { ascending: false })
@@ -736,7 +737,7 @@ class SupabaseService {
 				// Tank status for calculated level
 				client
 					.from('tank_config')
-					.select('current_calculated_level, capacity')
+					.select('current_calculated_level, capacity, last_dipstick_level')
 					.eq('tank_id', 'tank_a')
 					.single()
 			]);
@@ -807,7 +808,8 @@ class SupabaseService {
 					tankLevel: Math.round(calculatedTankLevel * 100) / 100,
 					tankCapacity: tankCapacity,
 					tankPercentage: Math.round(tankPercentage * 100) / 100,
-					
+					lastDipReading: Math.round((tankStatus.data?.last_dipstick_level || 0) * 100) / 100,
+
 					// Fleet status
 					activeVehicles,
 					vehiclesWithOdometer,

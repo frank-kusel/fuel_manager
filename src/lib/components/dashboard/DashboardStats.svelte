@@ -1,70 +1,137 @@
 <script lang="ts">
 	import Card from '$lib/components/ui/Card.svelte';
-	import { onMount } from 'svelte';
-	
+
 	interface Props {
 		stats: any | null;
 		loading?: boolean;
 	}
-	
+
 	let { stats, loading = false }: Props = $props();
-	
+
 	function formatNumber(num: number): string {
 		return new Intl.NumberFormat('en-ZA').format(num);
 	}
-	
+
 	function formatDecimal(num: number, decimals: number = 1): string {
 		return num.toFixed(decimals);
 	}
-	
+
+	// Count today's entries
+	let todaysEntries = $derived.by(() => {
+		if (!stats?.recentEntries) return 0;
+		const today = new Date().toISOString().split('T')[0];
+		return stats.recentEntries.filter((entry: any) => {
+			return entry.entry_date === today;
+		}).length;
+	});
+
+	// Calculate today's fuel usage
+	let todaysFuel = $derived.by(() => {
+		if (!stats?.recentEntries) return 0;
+		const today = new Date().toISOString().split('T')[0];
+		return stats.recentEntries
+			.filter((entry: any) => entry.entry_date === today)
+			.reduce((sum: number, entry: any) => sum + (entry.litres_dispensed || 0), 0);
+	});
+
+	// Get today's activities and fields
+	let todaysActivities = $derived.by(() => {
+		if (!stats?.recentEntries) return [];
+		const today = new Date().toISOString().split('T')[0];
+		const todayEntries = stats.recentEntries.filter((entry: any) => entry.entry_date === today);
+
+		// Create unique activity-field combinations
+		const activities = new Map<string, Set<string>>();
+
+		todayEntries.forEach((entry: any) => {
+			const activityName = entry.activities?.name || entry.activities?.code || 'Unknown';
+
+			// Get field names from various sources
+			let fieldNames: string[] = [];
+
+			// Check for multiple fields via fuel_entry_fields junction table
+			if (entry.fuel_entry_fields && entry.fuel_entry_fields.length > 0) {
+				fieldNames = entry.fuel_entry_fields.map((fef: any) => fef.fields?.name).filter(Boolean);
+			}
+			// Check for single field (legacy)
+			else if (entry.fields?.name) {
+				fieldNames = [entry.fields.name];
+			}
+			// Check for zone
+			else if (entry.zones?.name) {
+				fieldNames = [entry.zones.name];
+			}
+
+			// Default to 'No location' if no fields found
+			if (fieldNames.length === 0) {
+				fieldNames = ['No location'];
+			}
+
+			if (!activities.has(activityName)) {
+				activities.set(activityName, new Set());
+			}
+
+			// Add all field names for this activity
+			fieldNames.forEach(fieldName => {
+				activities.get(activityName)?.add(fieldName);
+			});
+		});
+
+		return Array.from(activities.entries()).map(([activity, fields]) => ({
+			activity,
+			fields: Array.from(fields)
+		}));
+	});
+
 </script>
 
 <div class="dashboard-overview">
-
-	<!-- Secondary Metrics Grid -->
-	<div class="secondary-metrics">
-		<!-- Weekly Summary -->
-		<div class="metric-card compact">
-			<div class="compact-header">Past 7 Days</div>
-			{#if loading}
-				<div class="compact-skeleton"></div>
-			{:else}
-				<div class="compact-value">{formatDecimal(stats?.weeklyFuel || 0)}L</div>
-				<div class="compact-subtitle">{stats?.entriesThisWeek || 0} entries</div>
-			{/if}
+	<!-- Key Metrics Grid -->
+	<div class="key-metrics">
+		<!-- Today's Fuel Usage -->
+		<div class="metric-card">
+			<div class="metric-content">
+				<div class="metric-header">Today's Fuel</div>
+				{#if loading}
+					<div class="metric-skeleton"></div>
+				{:else}
+					<div class="metric-value">{formatDecimal(todaysFuel)} L</div>
+					<div class="metric-subtitle">{todaysEntries} {todaysEntries === 1 ? 'entry' : 'entries'}</div>
+				{/if}
+			</div>
 		</div>
 
-		<!-- Monthly Summary -->
-		<div class="metric-card compact">
-			<div class="compact-header">This Month</div>
-			{#if loading}
-				<div class="compact-skeleton"></div>
-			{:else}
-				<div class="compact-value">{formatDecimal(stats?.monthlyFuel || 0)}L</div>
-				<div class="compact-subtitle">{formatNumber(stats?.monthlyDistance || 0)} km</div>
-			{/if}
+		<!-- Tank Level -->
+		<div class="metric-card">
+			<div class="metric-content">
+				<div class="metric-header">Tank Level</div>
+				{#if loading}
+					<div class="metric-skeleton"></div>
+				{:else}
+					<div class="metric-value">{formatDecimal(stats?.tankLevel || 0)} L</div>
+					<div class="metric-subtitle">Last dip: {formatDecimal(stats?.lastDipReading || 0)} L</div>
+				{/if}
+			</div>
 		</div>
 
-		<!-- Previous Month -->
-		<div class="metric-card compact">
-			<div class="compact-header">Previous Month</div>
-			{#if loading}
-				<div class="compact-skeleton"></div>
-			{:else}
-				<div class="compact-value">{formatDecimal(stats?.previousMonthFuel || 0)}L</div>
-				<div class="compact-subtitle">fuel used</div>
-			{/if}
-		</div>
-
-		<!-- Bowser Reading -->
-		<div class="metric-card compact">
-			<div class="compact-header">Bowser Reading</div>
-			{#if loading}
-				<div class="compact-skeleton"></div>
-			{:else}
-				<div class="compact-value">{formatDecimal(stats?.bowserReading || 0)}</div>
-				<div class="compact-subtitle">litres</div>
-			{/if}
+		<!-- Today's Activities -->
+		<div class="metric-card activity-card">
+			<div class="metric-content">
+				<div class="metric-header">Today's Activities</div>
+				{#if loading}
+					<div class="metric-skeleton"></div>
+				{:else if todaysActivities.length === 0}
+					<div class="no-activities">No entries today</div>
+				{:else}
+					<div class="compact-list">
+						{#each todaysActivities as { activity, fields }, i}
+							{#each fields as field, j}
+								<span class="compact-item">{field}-{activity}{i < todaysActivities.length - 1 || j < fields.length - 1 ? ', ' : ''}</span>
+							{/each}
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 </div>
@@ -72,60 +139,62 @@
 <style>
 	.dashboard-overview {
 		width: 100%;
-		margin-bottom: 2rem;
+		margin-bottom: 1.5rem;
 	}
 
-
-
-	/* Secondary Metrics - Compact Cards */
-	.secondary-metrics {
+	/* Key Metrics Grid */
+	.key-metrics {
 		display: grid;
-		grid-template-columns: repeat(4, 1fr);
+		grid-template-columns: 1fr 1fr 2fr;
 		gap: 1rem;
 	}
 
-	.metric-card.compact {
-		border-radius: 12px;
-		padding: 1em;
-		text-align: left;
-		background: var(--gray-50);
-		border: 1px solid transparent;
+	.metric-card {
+		border-radius: 8px;
+		padding: 1rem;
+		background: white;
+		border: 1px solid #e5e7eb;
 		transition: all 0.2s ease;
 	}
 
-	.metric-card.compact:hover {
-		border-color: #f97316;
-		transform: translateY(-1px);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	.metric-card:hover {
+		border-color: #d1d5db;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 	}
 
-	.compact-header {
-		font-size: 1rem;
+	.metric-content {
+		width: 100%;
+	}
+
+	.metric-header {
+		font-size: 0.75rem;
 		font-weight: 600;
-		letter-spacing: 0.025em;
-		color: var(--gray-500);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #6b7280;
+		margin-bottom: 0.5rem;
 	}
 
-	.compact-value {
-		font-size: 1.5rem;
+	.metric-value {
+		font-size: 1.75rem;
 		font-weight: 700;
 		color: #111827;
 		line-height: 1;
 		margin-bottom: 0.25rem;
 	}
 
-	.compact-subtitle {
-		font-size: 1rem;
-		color: var(--gray-400);
-		font-weight: 600;
+	.metric-subtitle {
+		font-size: 0.8125rem;
+		color: #9ca3af;
+		font-weight: 500;
 	}
 
-	.compact-skeleton {
-		height: 1.5rem;
+	.metric-skeleton {
+		height: 1.75rem;
 		background: linear-gradient(90deg, #f9fafb 25%, #f3f4f6 50%, #f9fafb 75%);
 		background-size: 200% 100%;
 		animation: loading 1.5s infinite;
-		border-radius: 6px;
+		border-radius: 4px;
 		margin-bottom: 0.25rem;
 	}
 
@@ -134,60 +203,95 @@
 		100% { background-position: -200% 0; }
 	}
 
+	/* Activity Card */
+	.activity-card {
+		grid-column: span 1;
+	}
+
+	.no-activities {
+		font-size: 0.875rem;
+		color: #9ca3af;
+		font-style: italic;
+		padding: 0.5rem 0;
+	}
+
+	.compact-list {
+		font-size: 0.8125rem;
+		color: #374151;
+		line-height: 1.6;
+		margin-top: 0.25rem;
+	}
+
+	.compact-item {
+		white-space: nowrap;
+	}
+
 	/* Mobile Responsiveness */
 	@media (max-width: 1024px) {
-		.secondary-metrics {
-			grid-template-columns: repeat(2, 1fr);
+		.key-metrics {
+			grid-template-columns: 1fr 1fr;
+		}
+
+		.activity-card {
+			grid-column: span 2;
 		}
 	}
 
 	@media (max-width: 768px) {
-		.secondary-metrics {
-			grid-template-columns: repeat(2, 1fr);
+		.key-metrics {
+			grid-template-columns: 1fr 1fr;
 			gap: 0.75rem;
 		}
 
-		.metric-card.compact {
+		.activity-card {
+			grid-column: span 2;
+		}
+
+		.metric-card {
 			padding: 0.875rem;
-			background: var(--primary-light);
-			border-radius: 10px;
 		}
 
-		.compact-header {
-			font-size: 0.875rem;
-			margin-bottom: 0.5rem;
-		}
-
-		.compact-value {
-			font-size: 1.75rem;
+		.metric-header {
+			font-size: 0.6875rem;
 			margin-bottom: 0.375rem;
 		}
 
-		.compact-subtitle {
-			font-size: 0.875rem;
+		.metric-value {
+			font-size: 1.5rem;
+		}
+
+		.metric-subtitle {
+			font-size: 0.75rem;
+		}
+
+		.compact-list {
+			font-size: 0.75rem;
 		}
 	}
 
 	@media (max-width: 480px) {
-		.secondary-metrics {
+		.key-metrics {
 			gap: 0.5rem;
 		}
 
-		.metric-card.compact {
+		.metric-card {
 			padding: 0.75rem;
 		}
 
-		.compact-header {
-			font-size: 0.8rem;
+		.metric-header {
+			font-size: 0.625rem;
 		}
 
-		.compact-value {
-			font-size: 1.5rem;
+		.metric-value {
+			font-size: 1.25rem;
 		}
 
-		.compact-subtitle {
-			font-size: 0.8rem;
+		.metric-subtitle {
+			font-size: 0.6875rem;
+		}
+
+		.compact-list {
+			font-size: 0.6875rem;
 		}
 	}
-
 </style>

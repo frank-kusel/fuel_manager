@@ -603,7 +603,18 @@ function createFuelEntryWorkflowStore() {
 		reset: () => {
 			set({ ...initialState, steps: [...defaultSteps], data: { ...initialData } });
 		},
-		
+
+		// Restore workflow state (for draft continuation)
+		restoreState: (step: number, data: FuelEntryData) => {
+			update(state => ({
+				...state,
+				currentStep: step,
+				data: { ...data }
+			}));
+			// Update all step validations based on restored data
+			updateStepValidation();
+		},
+
 		// Manual validation trigger
 		validateCurrentStep: () => {
 			updateStepValidation();

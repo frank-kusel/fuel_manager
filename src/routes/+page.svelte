@@ -2,9 +2,9 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
-	// Redirect to fuel management on load
+	// Redirect to summary page on load
 	onMount(() => {
-		goto('/fuel', { replaceState: true });
+		goto('/summary', { replaceState: true });
 	});
 </script>
 
@@ -16,7 +16,7 @@
 	<div class="loading-spinner">
 		<div class="brand-icon">🚜</div>
 		<h2>Loading FarmTrack...</h2>
-		<p>Redirecting to fuel management...</p>
+		<p>Redirecting to summary...</p>
 	</div>
 </div>
 

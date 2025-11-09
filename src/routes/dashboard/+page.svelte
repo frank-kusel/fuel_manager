@@ -5,7 +5,6 @@
 	import TankManagement from '$lib/components/dashboard/TankManagement.svelte';
 	import TankStatus from '$lib/components/dashboard/TankStatus.svelte';
 	import FuelChart from '$lib/components/dashboard/FuelChart.svelte';
-	import DataExport from '$lib/components/dashboard/DataExport.svelte';
 	import VehicleHistory from '$lib/components/dashboard/VehicleHistory.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import dashboardStore, { 
@@ -52,13 +51,10 @@
 	{/if}
 
 	<!-- Key Statistics Overview -->
-	<DashboardStats 
-		stats={$dashboardStats} 
-		loading={$dashboardLoading === 'loading'} 
+	<DashboardStats
+		stats={$dashboardStats}
+		loading={$dashboardLoading === 'loading'}
 	/>
-
-	<!-- Tank Status -->
-	<TankStatus />
 
 	<!-- Fuel Usage Chart -->
 	<FuelChart />
@@ -67,18 +63,12 @@
 	<div class="dashboard-content">
 		<!-- Recent Activity Feed -->
 		<div class="dashboard-section activity-section">
-			<RecentActivity 
-				entries={$dashboardStats?.recentEntries || []} 
-				loading={$dashboardLoading === 'loading'} 
+			<RecentActivity
+				entries={$dashboardStats?.recentEntries || []}
+				loading={$dashboardLoading === 'loading'}
 			/>
 		</div>
 	</div>
-
-	<!-- Tank Management -->
-	<TankManagement />
-
-	<!-- Data Export -->
-	<DataExport />
 
 	<!-- Vehicle History -->
 	<VehicleHistory />
