@@ -5,7 +5,6 @@
 	import TankManagement from '$lib/components/dashboard/TankManagement.svelte';
 	import TankStatus from '$lib/components/dashboard/TankStatus.svelte';
 	import FuelChart from '$lib/components/dashboard/FuelChart.svelte';
-	import VehicleHistory from '$lib/components/dashboard/VehicleHistory.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import dashboardStore, { 
 		dashboardStats, 
@@ -69,9 +68,6 @@
 			/>
 		</div>
 	</div>
-
-	<!-- Vehicle History -->
-	<VehicleHistory />
 
 </div>
 

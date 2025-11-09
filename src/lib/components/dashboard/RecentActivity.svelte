@@ -535,7 +535,7 @@
 	.entries-container {
 		flex: 1;
 		overflow-y: auto;
-		max-height: 600px;
+		max-height: 900px;
 		padding: 0 0.5rem;
 	}
 

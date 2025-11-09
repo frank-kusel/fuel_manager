@@ -1046,13 +1046,39 @@ class SupabaseService {
 	// Get fuel records for a specific vehicle
 	async getVehicleFuelRecords(vehicleId: string, startDate: string, endDate: string): Promise<ApiResponse<any[]>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('fuel_entries')
 				.select('id, entry_date, litres_dispensed, litres_used, time, vehicle_id')
 				.eq('vehicle_id', vehicleId)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate)
+				.order('entry_date', { ascending: false })
+				.order('time', { ascending: false })
+		);
+	}
+
+	// Get detailed fuel records for a specific vehicle (for reports)
+	async getDetailedVehicleFuelRecords(vehicleId: string): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() =>
+			client
+				.from('fuel_entries')
+				.select(`
+					id,
+					entry_date,
+					time,
+					litres_dispensed,
+					odometer_start,
+					odometer_end,
+					gauge_working,
+					bowser_reading_start,
+					bowser_reading_end,
+					activities!left (code, name),
+					fields!left (code, name),
+					vehicles!left (odometer_unit)
+				`)
+				.eq('vehicle_id', vehicleId)
 				.order('entry_date', { ascending: false })
 				.order('time', { ascending: false })
 		);

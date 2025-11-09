@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DataExport from '$lib/components/dashboard/DataExport.svelte';
+	import VehicleFuelHistory from '$lib/components/reports/VehicleFuelHistory.svelte';
 </script>
 
 <svelte:head>
@@ -14,6 +15,10 @@
 
 	<!-- Data Export Component -->
 	<DataExport />
+
+	<!-- Vehicle Fuel History -->
+	<div class="section-divider"></div>
+	<VehicleFuelHistory />
 </div>
 
 <style>
@@ -38,6 +43,10 @@
 		margin: 0.5rem 0 0;
 		color: #6b7280;
 		font-size: 1rem;
+	}
+
+	.section-divider {
+		height: 2rem;
 	}
 
 	@media (max-width: 768px) {

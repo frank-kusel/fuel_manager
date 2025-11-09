@@ -307,6 +307,7 @@
 		height: 4rem;
 		box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
 		backdrop-filter: blur(10px);
+		z-index: 100;
 	}
 
 	.mobile-nav-btn {

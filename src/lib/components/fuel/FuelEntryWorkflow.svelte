@@ -232,28 +232,13 @@
 				onAutoAdvance={handleAutoAdvance}
 				errors={getCurrentStepErrors()}
 			/>
-			
-			<!-- Continue Button -->
-			<div class="step-actions">
-				<button
-					class="continue-button"
-					onclick={() => {
-						if ($canProceedToNext) {
-							handleNext();
-						}
-					}}
-					disabled={!$canProceedToNext}
-				>
-					Continue →
-				</button>
-			</div>
 		{:else if $currentStep === 1}
 			<!-- Driver Selection -->
 			<DriverSelection
 				selectedDriver={$workflowData.driver}
 				onDriverSelect={(driver) => {
 					fuelEntryWorkflowStore.setDriver(driver);
-					
+
 					// Auto-select driver's default vehicle if available and no vehicle selected yet
 					if (driver?.default_vehicle && !$workflowData.vehicle) {
 						fuelEntryWorkflowStore.setVehicle(driver.default_vehicle);
@@ -262,21 +247,6 @@
 				onAutoAdvance={handleAutoAdvance}
 				errors={getCurrentStepErrors()}
 			/>
-			
-			<!-- Continue Button -->
-			<div class="step-actions">
-				<button
-					class="continue-button"
-					onclick={() => {
-						if ($canProceedToNext) {
-							handleNext();
-						}
-					}}
-					disabled={!$canProceedToNext}
-				>
-					Continue →
-				</button>
-			</div>
 		{:else if $currentStep === 2}
 			<!-- Activity Selection -->
 			<ActivitySelection
@@ -287,21 +257,6 @@
 				onAutoAdvance={handleAutoAdvance}
 				errors={getCurrentStepErrors()}
 			/>
-			
-			<!-- Continue Button -->
-			<div class="step-actions">
-				<button
-					class="continue-button"
-					onclick={() => {
-						if ($canProceedToNext) {
-							handleNext();
-						}
-					}}
-					disabled={!$canProceedToNext}
-				>
-					Continue →
-				</button>
-			</div>
 		{:else if $currentStep === 3}
 			<!-- Location Selection (Field, Zone, or Multiple Fields - Optional) -->
 			<LocationSelection
@@ -316,21 +271,6 @@
 				errors={getCurrentStepErrors()}
 				allowModeToggle={true}
 			/>
-			
-			<!-- Continue Button -->
-			<div class="step-actions">
-				<button
-					class="continue-button"
-					onclick={() => {
-						if ($canProceedToNext) {
-							handleNext();
-						}
-					}}
-					disabled={!$canProceedToNext}
-				>
-					Continue →
-				</button>
-			</div>
 		{:else if $currentStep === 4}
 			<!-- Odometer Reading -->
 			<OdometerReading
@@ -505,23 +445,6 @@
 						</div>
 					</div>
 				</div>
-
-				<!-- Submit Button -->
-				<button
-					class="submit-btn"
-					onclick={() => {
-						if ($canProceedToNext && !$isSubmittingEntry) {
-							handleSubmit();
-						}
-					}}
-					disabled={!$canProceedToNext || $isSubmittingEntry}
-				>
-					{#if $isSubmittingEntry}
-						Submitting...
-					{:else}
-						Submit
-					{/if}
-				</button>
 			</div>
 		{/if}
 	</div>
@@ -531,29 +454,52 @@
 		<small>💡 Keyboard shortcuts: <kbd>→</kbd> or <kbd>Enter</kbd> to continue • <kbd>←</kbd> to go back • <kbd>Esc</kbd> to restart</small>
 	</div>
 
-	<!-- Fixed Position Back Button -->
-	<button
-		class="back-button-fixed {$canGoBackToPrevious ? 'visible' : 'hidden'}"
-		onclick={handlePrevious}
-		disabled={!$canGoBackToPrevious}
-		aria-label="Previous step"
-	>
-		<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-			<path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-		</svg>
-	</button>
+	<!-- Fixed Bottom Navigation Bar -->
+	<div class="bottom-nav-bar">
+		<!-- Back Button -->
+		<button
+			class="nav-action-btn back-btn"
+			class:visible={$canGoBackToPrevious}
+			onclick={handlePrevious}
+			disabled={!$canGoBackToPrevious}
+			aria-label="Previous step"
+		>
+			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M19 12H5M12 19l-7-7 7-7"/>
+			</svg>
+			<span>Back</span>
+		</button>
 
-	<!-- Fixed Position Next Button -->
-	<button
-		class="next-button-fixed {$canProceedToNext && $currentStep < $fuelEntryWorkflowStore.steps.length - 1 ? 'visible' : 'hidden'}"
-		onclick={handleNext}
-		disabled={!$canProceedToNext}
-		aria-label="Next step"
-	>
-		<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-			<path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
-		</svg>
-	</button>
+		<!-- Continue/Submit Button -->
+		{#if isLastStep()}
+			<button
+				class="nav-action-btn primary-btn"
+				onclick={handleSubmit}
+				disabled={!$canProceedToNext || $isSubmittingEntry}
+			>
+				{#if $isSubmittingEntry}
+					<span>Submitting...</span>
+				{:else}
+					<span>Submit Entry</span>
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M5 12h14M12 5l7 7-7 7"/>
+					</svg>
+				{/if}
+			</button>
+		{:else}
+			<button
+				class="nav-action-btn primary-btn"
+				class:visible={$canProceedToNext}
+				onclick={handleNext}
+				disabled={!$canProceedToNext}
+			>
+				<span>Continue</span>
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M5 12h14M12 5l7 7-7 7"/>
+				</svg>
+			</button>
+		{/if}
+	</div>
 </div>
 
 <!-- Success Modal -->
@@ -614,93 +560,86 @@
 		line-height: 1.2;
 	}
 	
-	/* Fixed Position Back Button - Above Bottom Nav Bar */
-	.back-button-fixed {
+	/* Bottom Navigation Bar - Native App Style */
+	.bottom-nav-bar {
 		position: fixed;
-		bottom: 5rem;
-		left: 1rem;
+		bottom: 0;
+		left: 0;
+		right: 0;
 		z-index: 200;
-		width: 56px;
-		height: 56px;
-		border-radius: 28px;
-		border: none;
-		background: rgba(255, 255, 255, 0.95);
-		color: #64748b;
+		background: white;
+		border-top: 1px solid #e5e7eb;
+		padding: 0.75rem 1rem;
+		display: flex;
+		gap: 0.75rem;
+		box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+		backdrop-filter: blur(10px);
+	}
+
+	.nav-action-btn {
+		flex: 1;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		gap: 0.5rem;
+		padding: 1rem;
+		border-radius: 12px;
+		font-size: 1rem;
+		font-weight: 600;
 		cursor: pointer;
-		transition: all 0.3s ease;
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-		backdrop-filter: blur(12px);
+		transition: all 0.2s ease;
+		border: none;
+		min-height: 56px;
+		touch-action: manipulation;
 	}
-	
-	.back-button-fixed.visible {
-		opacity: 1;
-		transform: translateX(0);
+
+	.nav-action-btn span {
+		white-space: nowrap;
 	}
-	
-	.back-button-fixed.hidden {
+
+	/* Back Button */
+	.nav-action-btn.back-btn {
+		background: #f3f4f6;
+		color: #6b7280;
 		opacity: 0;
-		transform: translateX(-100%);
-		pointer-events: none;
-	}
-	
-	.back-button-fixed:hover:not(:disabled) {
-		background: rgba(248, 250, 252, 0.98);
-		color: #475569;
-		transform: scale(1.05);
-		box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-	}
-	
-	.back-button-fixed:disabled {
-		opacity: 0;
-		transform: translateX(-100%);
+		transform: scale(0.95);
 		pointer-events: none;
 	}
 
-	/* Fixed Position Next Button - Above Bottom Nav Bar (Right Side) */
-	.next-button-fixed {
-		position: fixed;
-		bottom: 5rem;
-		right: 1rem;
-		z-index: 200;
-		width: 56px;
-		height: 56px;
-		border-radius: 28px;
-		border: none;
-		background: rgba(37, 99, 235, 0.95);
+	.nav-action-btn.back-btn.visible {
+		opacity: 1;
+		transform: scale(1);
+		pointer-events: auto;
+	}
+
+	.nav-action-btn.back-btn:hover:not(:disabled) {
+		background: #e5e7eb;
+		color: #374151;
+	}
+
+	.nav-action-btn.back-btn:disabled {
+		opacity: 0;
+		transform: scale(0.95);
+		pointer-events: none;
+	}
+
+	/* Primary Button (Continue/Submit) */
+	.nav-action-btn.primary-btn {
+		background: linear-gradient(135deg, #2563eb, #1d4ed8);
 		color: white;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
-		backdrop-filter: blur(12px);
+		flex: 2;
 	}
 
-	.next-button-fixed.visible {
-		opacity: 1;
-		transform: translateX(0);
+	.nav-action-btn.primary-btn:hover:not(:disabled) {
+		background: linear-gradient(135deg, #1d4ed8, #1e40af);
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 	}
 
-	.next-button-fixed.hidden {
-		opacity: 0;
-		transform: translateX(100%);
-		pointer-events: none;
-	}
-
-	.next-button-fixed:hover:not(:disabled) {
-		background: rgba(29, 78, 216, 0.98);
-		transform: scale(1.05);
-		box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
-	}
-
-	.next-button-fixed:disabled {
-		opacity: 0;
-		transform: translateX(100%);
-		pointer-events: none;
+	.nav-action-btn.primary-btn:disabled {
+		background: #9ca3af;
+		cursor: not-allowed;
+		transform: none;
 	}
 	
 	
@@ -743,67 +682,11 @@
 	}
 	
 	
-	/* Step Actions */
-	.step-actions {
-		padding: 1.5rem 0;
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		gap: 1rem;
-	}
-	
-	/* Step Container - removed since step-content handles this */
-	
-	
-	/* Navigation */
-	.step-nav {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 1rem;
-	}
-	
-	:global(.nav-button) {
-		padding: 0.75rem 1.5rem !important;
-		border-radius: 8px !important;
-		font-weight: 500 !important;
-		border: 1px solid #e5e7eb !important;
-		background: white !important;
-		color: #6b7280 !important;
-		transition: all 0.2s ease !important;
-	}
-	
-	:global(.nav-button:hover) {
-		border-color: #d1d5db !important;
-		color: #374151 !important;
-		background: #f9fafb !important;
-	}
-	
-	.continue-button {
-		background: #1f2937;
-		color: white;
-		border: none;
-		padding: 0.75rem 1.5rem;
-		border-radius: 8px;
-		font-weight: 600;
-		font-size: 0.875rem;
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-	
-	.continue-button:hover:not(:disabled) {
-		background: #374151;
-	}
-	
-	.continue-button:disabled {
-		background: #9ca3af;
-		cursor: not-allowed;
-	}
 
 	/* Step Content */
 	.step-content {
 		flex: 1;
-		padding: 1.5rem 1rem 6rem 1rem;
+		padding: 1.5rem 1rem 5.5rem 1rem; /* Bottom padding accounts for fixed nav bar */
 		max-width: 900px;
 		margin: 0 auto;
 		width: 100%;
@@ -955,29 +838,6 @@
 		}
 	}
 
-	/* Submit Button */
-	.submit-btn {
-		width: 100%;
-		background: #1f2937;
-		color: white;
-		border: none;
-		padding: 1rem;
-		border-radius: 0.5rem;
-		font-size: 1rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: background 0.2s ease;
-		margin-top: 1rem;
-	}
-
-	.submit-btn:hover:not(:disabled) {
-		background: #374151;
-	}
-
-	.submit-btn:disabled {
-		background: #9ca3af;
-		cursor: not-allowed;
-	}
 	/* Error Message */
 	.error-message {
 		background: #fef2f2;
@@ -1089,7 +949,7 @@
 		
 		/* Content area */
 		.step-content {
-			padding: 1.25rem 0 6rem 0;
+			padding: 1.25rem 0 5.5rem 0; /* Bottom padding accounts for fixed nav bar */
 		}
 		
 		/* Progress summary mobile */
@@ -1182,7 +1042,7 @@
 		}
 		
 		.step-content {
-			padding: 1rem 0 6rem 0;
+			padding: 1rem 0 5.5rem 0; /* Bottom padding accounts for fixed nav bar */
 		}
 		
 		.progress-summary {

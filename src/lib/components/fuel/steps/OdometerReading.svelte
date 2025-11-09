@@ -168,18 +168,6 @@
 	{:else}
 		<div class="no-vehicle">Select a vehicle first</div>
 	{/if}
-	
-	<!-- Continue Button - Fixed Position -->
-	{#if canProceedToNext && onNext}
-		<button 
-			class="continue-button-fixed"
-			onclick={onNext}
-		>
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-				<path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
-			</svg>
-		</button>
-	{/if}
 </div>
 
 <style>
@@ -442,32 +430,5 @@
 			-webkit-appearance: none;
 			-moz-appearance: textfield;
 		}
-	}
-	
-	/* Continue Button - Fixed Position (mirroring back button style) */
-	.continue-button-fixed {
-		position: fixed;
-		bottom: 5rem;
-		right: 1rem;
-		z-index: 200;
-		width: 56px;
-		height: 56px;
-		border-radius: 28px;
-		border: none;
-		background: rgba(16, 185, 129, 0.95);
-		color: white;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		box-shadow: 0 6px 20px rgba(16, 185, 129, 0.25);
-		backdrop-filter: blur(12px);
-	}
-	
-	.continue-button-fixed:hover {
-		background: rgba(5, 150, 105, 0.98);
-		transform: scale(1.05);
-		box-shadow: 0 8px 25px rgba(16, 185, 129, 0.35);
 	}
 </style>
