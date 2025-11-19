@@ -275,17 +275,14 @@
 			return [];
 		}
 
-		// Filter to show only today and yesterday
-		const today = new Date();
-		today.setHours(0, 0, 0, 0);
-		const yesterday = new Date(today);
-		yesterday.setDate(today.getDate() - 1);
+		// First, filter by date range (weeks)
+		const weeksAgo = new Date();
+		weeksAgo.setDate(weeksAgo.getDate() - (weeksToShow * 7));
 
 		let filtered = allEntries.filter(entry => {
 			if (!entry.entry_date) return false;
 			const entryDate = new Date(entry.entry_date);
-			entryDate.setHours(0, 0, 0, 0);
-			return entryDate >= yesterday;
+			return entryDate >= weeksAgo;
 		});
 
 
@@ -352,7 +349,7 @@
 
 <div class="fuel-activity">
 	<div class="activity-header">
-		<h3>Today & Yesterday</h3>
+		<h3>Recent Fuel Activity</h3>
 		<div class="filter-buttons">
 			<button 
 				class="filter-btn" 
@@ -438,6 +435,17 @@
 					</div>
 				</div>
 			{/each}
+
+			<!-- Load More Button -->
+			<div class="load-more-container">
+				<button class="load-more-btn" onclick={loadMoreWeeks} disabled={isLoadingMore}>
+					{#if isLoadingMore}
+						Loading...
+					{:else}
+						Load More ({weeksToShow} week{weeksToShow > 1 ? 's' : ''})
+					{/if}
+				</button>
+			</div>
 		</div>
 	{/if}
 </div>

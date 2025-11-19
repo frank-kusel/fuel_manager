@@ -34,11 +34,19 @@
 			.reduce((sum: number, entry: any) => sum + (entry.litres_dispensed || 0), 0);
 	});
 
-	// Get today's activities and fields
+	// Get today and yesterday's activities and fields
 	let todaysActivities = $derived.by(() => {
 		if (!stats?.recentEntries) return [];
-		const today = new Date().toISOString().split('T')[0];
-		const todayEntries = stats.recentEntries.filter((entry: any) => entry.entry_date === today);
+		const today = new Date();
+		const yesterday = new Date(today);
+		yesterday.setDate(today.getDate() - 1);
+
+		const todayStr = today.toISOString().split('T')[0];
+		const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+		const todayEntries = stats.recentEntries.filter((entry: any) =>
+			entry.entry_date === todayStr || entry.entry_date === yesterdayStr
+		);
 
 		// Create unique activity-field combinations
 		const activities = new Map<string, Set<string>>();
@@ -114,10 +122,10 @@
 			</div>
 		</div>
 
-		<!-- Today's Activities -->
+		<!-- Today & Yesterday's Activities -->
 		<div class="metric-card activity-card">
 			<div class="metric-content">
-				<div class="metric-header">Today's Activities</div>
+				<div class="metric-header">Today & Yesterday</div>
 				{#if loading}
 					<div class="metric-skeleton"></div>
 				{:else if todaysActivities.length === 0}
@@ -220,10 +228,13 @@
 		color: #374151;
 		line-height: 1.6;
 		margin-top: 0.25rem;
+		white-space: normal;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
 	}
 
 	.compact-item {
-		white-space: nowrap;
+		display: inline;
 	}
 
 	/* Mobile Responsiveness */
