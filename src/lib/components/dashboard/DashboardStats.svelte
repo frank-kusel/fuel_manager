@@ -129,12 +129,16 @@
 				{#if loading}
 					<div class="metric-skeleton"></div>
 				{:else if todaysActivities.length === 0}
-					<div class="no-activities">No entries today</div>
+					<div class="no-activities">No entries</div>
 				{:else}
-					<div class="compact-list">
-						{#each todaysActivities as { activity, fields }, i}
-							{#each fields as field, j}
-								<span class="compact-item">{field}-{activity}{i < todaysActivities.length - 1 || j < fields.length - 1 ? ', ' : ''}</span>
+					<div class="activity-chips">
+						{#each todaysActivities as { activity, fields }}
+							{#each fields as field}
+								<div class="activity-chip">
+									<span class="chip-field">{field}</span>
+									<span class="chip-separator">•</span>
+									<span class="chip-activity">{activity}</span>
+								</div>
 							{/each}
 						{/each}
 					</div>
@@ -223,18 +227,49 @@
 		padding: 0.5rem 0;
 	}
 
-	.compact-list {
-		font-size: 0.8125rem;
-		color: #374151;
-		line-height: 1.6;
-		margin-top: 0.25rem;
-		white-space: normal;
-		word-wrap: break-word;
-		overflow-wrap: break-word;
+	/* Activity Chips - Modern Card Design */
+	.activity-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
 	}
 
-	.compact-item {
-		display: inline;
+	.activity-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.375rem 0.625rem;
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 6px;
+		font-size: 0.75rem;
+		transition: all 0.2s ease;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+	}
+
+	.activity-chip:hover {
+		border-color: #d1d5db;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+		transform: translateY(-1px);
+	}
+
+	.chip-field {
+		font-weight: 600;
+		color: #1f2937;
+		font-size: 0.75rem;
+	}
+
+	.chip-separator {
+		color: #9ca3af;
+		font-weight: 400;
+		font-size: 0.875rem;
+	}
+
+	.chip-activity {
+		color: #6b7280;
+		font-weight: 500;
+		font-size: 0.75rem;
 	}
 
 	/* Mobile Responsiveness */
@@ -275,7 +310,21 @@
 			font-size: 0.75rem;
 		}
 
-		.compact-list {
+		.activity-chips {
+			gap: 0.375rem;
+		}
+
+		.activity-chip {
+			padding: 0.3125rem 0.5rem;
+			font-size: 0.6875rem;
+		}
+
+		.chip-field,
+		.chip-activity {
+			font-size: 0.6875rem;
+		}
+
+		.chip-separator {
 			font-size: 0.75rem;
 		}
 	}
@@ -301,7 +350,21 @@
 			font-size: 0.6875rem;
 		}
 
-		.compact-list {
+		.activity-chips {
+			gap: 0.25rem;
+		}
+
+		.activity-chip {
+			padding: 0.25rem 0.4375rem;
+			font-size: 0.625rem;
+		}
+
+		.chip-field,
+		.chip-activity {
+			font-size: 0.625rem;
+		}
+
+		.chip-separator {
 			font-size: 0.6875rem;
 		}
 	}
