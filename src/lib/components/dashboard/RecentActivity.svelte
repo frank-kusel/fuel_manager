@@ -1,13 +1,18 @@
 <script lang="ts">
 	import Card from '$lib/components/ui/Card.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	
+	import FuelEntryEditModal from '$lib/components/fuel/FuelEntryEditModal.svelte';
+
 	interface Props {
 		entries: any[];
 		loading?: boolean;
 	}
-	
+
 	let { entries: initialEntries, loading = false }: Props = $props();
+
+	// Edit modal state
+	let isEditModalOpen = $state(false);
+	let selectedEntry = $state<any>(null);
 	
 	// Local state for expanded entries
 	let allEntries = $state<any[]>([]);
@@ -330,20 +335,38 @@
 		// First, check if we need more data from the database
 		const currentWeeksAgo = new Date();
 		currentWeeksAgo.setDate(currentWeeksAgo.getDate() - ((weeksToShow + 1) * 7));
-		
+
 		const hasOlderEntriesInMemory = allEntries.some(entry => {
 			if (!entry.entry_date) return false;
 			const entryDate = new Date(entry.entry_date);
 			return entryDate < currentWeeksAgo;
 		});
-		
+
 		// If we don't have older entries in memory, try to load more from the database
 		if (!hasOlderEntriesInMemory) {
 			await loadMoreEntries();
 		}
-		
+
 		// Then increase the weeks to show
 		weeksToShow += 1;
+	}
+
+	// Edit modal functions
+	function openEditModal(entry: any) {
+		selectedEntry = entry;
+		isEditModalOpen = true;
+	}
+
+	function closeEditModal() {
+		isEditModalOpen = false;
+		selectedEntry = null;
+	}
+
+	async function handleEntrySaved() {
+		// Reload entries to reflect changes
+		closeEditModal();
+		// Trigger a refresh by reloading the first page of entries
+		window.location.reload(); // Simple approach - you could optimize this
 	}
 </script>
 
@@ -412,7 +435,7 @@
 						{#each groupedEntries[dateGroup] as entry (entry.id)}
 							{@const consumption = getFuelConsumptionWithAverage(entry)}
 							{@const hasWarning = !hasLocationData(entry) || !entry.activities?.name}
-							<div class="fuel-card" class:warning={hasWarning}>
+							<div class="fuel-card" class:warning={hasWarning} onclick={() => openEditModal(entry)}>
 								<div class="card-row">
 									<div class="vehicle-info">
 										<span class="vehicle-name">{entry.vehicles?.name || 'Unknown Vehicle'}</span>
@@ -429,6 +452,9 @@
 									<div class="consumption-info">
 										<span class="{consumption.colorClass}">{consumption.current}</span><span class="consumption-unit">{consumption.unit}</span>
 									</div>
+								</div>
+								<div class="edit-indicator">
+									<span>✏️ Tap to edit</span>
 								</div>
 							</div>
 						{/each}
@@ -449,6 +475,14 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Edit Modal -->
+<FuelEntryEditModal
+	entry={selectedEntry}
+	isOpen={isEditModalOpen}
+	on:close={closeEditModal}
+	on:saved={handleEntrySaved}
+/>
 
 <style>
 	.fuel-activity {
@@ -572,11 +606,15 @@
 		padding: 1rem;
 		transition: all 0.3s ease;
 		border: none;
+		cursor: pointer;
+		position: relative;
+		overflow: hidden;
 	}
 
 	.fuel-card:hover {
 		background: #e2e8f0;
-		transform: translateY(-1px);
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 	}
 
 	.fuel-card.warning {
@@ -586,6 +624,24 @@
 	.fuel-card.warning:hover {
 		background: #fde68a;
 		border-color: #d97706;
+	}
+
+	.edit-indicator {
+		position: absolute;
+		top: 0.5rem;
+		right: 0.5rem;
+		font-size: 0.75rem;
+		color: #6b7280;
+		opacity: 0;
+		transition: opacity 0.2s ease;
+		background: rgba(255, 255, 255, 0.9);
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.375rem;
+		pointer-events: none;
+	}
+
+	.fuel-card:hover .edit-indicator {
+		opacity: 1;
 	}
 
 	/* Card Rows */

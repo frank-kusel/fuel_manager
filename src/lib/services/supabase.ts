@@ -158,6 +158,72 @@ class SupabaseService {
 		});
 	}
 
+	// Cascade bowser reading changes to subsequent entries
+	async cascadeBowserReadings(
+		fuelEntryId: string,
+		newBowserReadingEnd: number
+	): Promise<ApiResponse<{ updated_count: number; entries_updated: string[] }>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('cascade_bowser_readings', {
+				p_fuel_entry_id: fuelEntryId,
+				p_new_bowser_reading_end: newBowserReadingEnd
+			});
+
+			if (result.error) {
+				return { data: null, error: result.error };
+			}
+
+			// Extract the first row result (function returns TABLE)
+			const data = result.data?.[0] || { updated_count: 0, entries_updated: [] };
+			return { data, error: null };
+		});
+	}
+
+	// Recalculate all bowser readings (fixes discontinuities)
+	async recalculateAllBowserReadings(
+		bowserId?: string
+	): Promise<ApiResponse<Array<{
+		bowser_id: string;
+		bowser_name: string;
+		entries_processed: number;
+		discontinuities_found: number;
+	}>>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('recalculate_all_bowser_readings', {
+				p_bowser_id: bowserId || null
+			});
+
+			return { data: result.data || [], error: result.error };
+		});
+	}
+
+	// Find bowser reading discontinuities (diagnostic)
+	async findBowserDiscontinuities(
+		bowserId?: string,
+		threshold: number = 0.1
+	): Promise<ApiResponse<Array<{
+		bowser_name: string;
+		entry_id: string;
+		entry_date: string;
+		entry_time: string;
+		expected_start: number;
+		actual_start: number;
+		difference: number;
+		litres_dispensed: number;
+	}>>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('find_bowser_discontinuities', {
+				p_bowser_id: bowserId || null,
+				p_threshold: threshold
+			});
+
+			return { data: result.data || [], error: result.error };
+		});
+	}
+
 	async deleteVehicle(id: string): Promise<ApiResponse<null>> {
 		const client = this.ensureInitialized();
 		return this.query(() => 
