@@ -1,8 +1,9 @@
 // Complex 7-step fuel entry workflow store
 // Manages the complete fuel entry process with validation and state persistence
 
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { FuelEntry, Vehicle, Driver, Activity, Field, Zone, Bowser, LoadingState, FieldSelectionState } from '$lib/types';
+import supabaseService from '$lib/services/supabase';
 
 export interface FuelEntryWorkflowStep {
 	id: string;
@@ -154,7 +155,8 @@ const initialState: WorkflowState = {
 };
 
 function createFuelEntryWorkflowStore() {
-	const { subscribe, set, update } = writable<WorkflowState>(initialState);
+	const store = writable<WorkflowState>(initialState);
+	const { subscribe, set, update } = store;
 
 	// Validation functions
 	const validateStep = (stepId: string, data: FuelEntryData): { valid: boolean; errors: string[] } => {
@@ -304,9 +306,24 @@ function createFuelEntryWorkflowStore() {
 		setVehicle: (vehicle: Vehicle | null) => {
 			update(state => ({
 				...state,
-				data: { ...state.data, vehicle, odometerStart: vehicle?.current_odometer || null }
+				data: { ...state.data, vehicle }
 			}));
 			updateStepValidation();
+		},
+
+		// Fetch and set current odometer for selected vehicle
+		async fetchAndSetOdometer() {
+			const currentState = get(store);
+			if (!currentState.data.vehicle?.id) return;
+
+			const result = await supabaseService.getCurrentOdometer(currentState.data.vehicle.id);
+			if (result.data !== null) {
+				update(state => ({
+					...state,
+					data: { ...state.data, odometerStart: result.data }
+				}));
+				updateStepValidation();
+			}
 		},
 		
 		setDriver: (driver: Driver | null) => {
@@ -399,12 +416,25 @@ function createFuelEntryWorkflowStore() {
 				...state,
 				data: {
 					...state.data,
-					bowser,
-					// Pre-populate start reading with bowser's current reading
-					bowserReadingStart: bowser?.current_reading || state.data.bowserReadingStart
+					bowser
 				}
 			}));
 			updateStepValidation();
+		},
+
+		// Fetch and set current bowser reading for selected bowser
+		async fetchAndSetBowserReading() {
+			const currentState = get(store);
+			if (!currentState.data.bowser?.id) return;
+
+			const result = await supabaseService.getCurrentBowserReading(currentState.data.bowser.id);
+			if (result.data !== null) {
+				update(state => ({
+					...state,
+					data: { ...state.data, bowserReadingStart: result.data }
+				}));
+				updateStepValidation();
+			}
 		},
 		
 		setFuelData: (bowser: Bowser | null, startReading: number | null, endReading: number | null, litres: number | null) => {
@@ -541,41 +571,10 @@ function createFuelEntryWorkflowStore() {
 						throw error;
 					}
 				}
-				
-				// Update vehicle's current odometer (online only for now)
-				if (!isOffline && currentData!.odometerEnd && currentData!.gaugeWorking) {
-					try {
-						await supabaseService.updateVehicleOdometer(
-							currentData!.vehicle!.id, 
-							currentData!.odometerEnd
-						);
-					} catch (error) {
-						console.warn('Failed to update vehicle odometer:', error);
-					}
-				}
-				
-				// Update bowser's current reading
-				if (currentData!.bowserReadingEnd !== null && currentData!.bowser) {
-					if (isOffline) {
-						// Store bowser reading update for later sync
-						await offlineSyncService.storeOfflineEntry('bowser_reading', {
-							bowser_id: currentData!.bowser.id,
-							new_reading: currentData!.bowserReadingEnd,
-							fuel_entry_id: result.data?.id
-						});
-					} else {
-						try {
-							await supabaseService.updateBowserReading(
-								currentData!.bowser.id,
-								currentData!.bowserReadingEnd,
-								result.data?.id
-							);
-						} catch (error) {
-							console.warn('Failed to update bowser reading:', error);
-						}
-					}
-				}
-				
+
+				// No need to update bowser reading or vehicle odometer separately
+				// These are now automatically derived from the fuel_entries table via views
+
 				update(state => ({ 
 					...state, 
 					isSubmitting: false, 

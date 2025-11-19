@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { bowsers as allBowsers, referenceDataLoading } from '$lib/stores/reference-data';
+	import supabaseService from '$lib/services/supabase';
 	import type { Bowser, Vehicle } from '$lib/types';
 
 	interface Props {
@@ -21,38 +22,48 @@
 	let bowsers = $derived($allBowsers.filter(bowser =>
 		selectedVehicle ? bowser.fuel_type === selectedVehicle.fuel_type : true
 	));
-	
+
 	// Main fuel input
 	let fuelAmount = $state(litresDispensed?.toString() || '');
 	let selectedBowserId = $state(selectedBowser?.id || '');
-	
+
 	// Bowser readings
 	let startReading = $state(bowserReadingStart || 0);
 	let endReading = $state(bowserReadingEnd || 0);
 	let isEditingStartReading = $state(false);
 	let isEditingEndReading = $state(false);
 	let expectedStartReading = $state<number | null>(null);
-	
+
+	// Fetch current bowser reading from latest fuel entry
+	async function fetchCurrentBowserReading(bowserId: string): Promise<number> {
+		const result = await supabaseService.getCurrentBowserReading(bowserId);
+		return result.data ?? 0;
+	}
+
 	// Resync function to reset to bowser's current reading
-	function resyncStartReading() {
+	async function resyncStartReading() {
 		const bowser = bowsers.find(b => b.id === selectedBowserId);
 		if (bowser) {
-			startReading = bowser.current_reading || 0;
-			expectedStartReading = bowser.current_reading || 0;
+			const currentReading = await fetchCurrentBowserReading(bowser.id);
+			startReading = currentReading;
+			expectedStartReading = currentReading;
 			isEditingStartReading = false;
+			// Recalculate end reading and update parent store
+			updateParent();
 		}
 	}
-	
-	onMount(() => {
+
+	onMount(async () => {
 		// Auto-select first bowser and pre-populate its current reading
 		if (bowsers.length > 0 && !selectedBowserId) {
 			const firstBowser = bowsers[0];
 			selectedBowserId = firstBowser.id;
-			// Pre-populate start reading with bowser's current reading
-			expectedStartReading = firstBowser.current_reading || 0;
-			startReading = firstBowser.current_reading || 0;
+			// Fetch and pre-populate start reading with bowser's current reading from latest fuel entry
+			const currentReading = await fetchCurrentBowserReading(firstBowser.id);
+			expectedStartReading = currentReading;
+			startReading = currentReading;
 			// Update parent immediately with bowser selection
-			onFuelDataUpdate(firstBowser, firstBowser.current_reading || 0, endReading, null);
+			onFuelDataUpdate(firstBowser, currentReading, endReading, null);
 		}
 	});
 	

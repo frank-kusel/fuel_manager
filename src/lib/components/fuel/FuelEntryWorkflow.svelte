@@ -226,8 +226,10 @@
 			<!-- Vehicle Selection -->
 			<VehicleSelection
 				selectedVehicle={$workflowData.vehicle}
-				onVehicleSelect={(vehicle) => {
+				onVehicleSelect={async (vehicle) => {
 					fuelEntryWorkflowStore.setVehicle(vehicle);
+					// Fetch current odometer reading from latest fuel entry
+					await fuelEntryWorkflowStore.fetchAndSetOdometer();
 				}}
 				onAutoAdvance={handleAutoAdvance}
 				errors={getCurrentStepErrors()}
@@ -236,12 +238,14 @@
 			<!-- Driver Selection -->
 			<DriverSelection
 				selectedDriver={$workflowData.driver}
-				onDriverSelect={(driver) => {
+				onDriverSelect={async (driver) => {
 					fuelEntryWorkflowStore.setDriver(driver);
 
 					// Auto-select driver's default vehicle if available and no vehicle selected yet
 					if (driver?.default_vehicle && !$workflowData.vehicle) {
 						fuelEntryWorkflowStore.setVehicle(driver.default_vehicle);
+						// Fetch current odometer reading from latest fuel entry
+						await fuelEntryWorkflowStore.fetchAndSetOdometer();
 					}
 				}}
 				onAutoAdvance={handleAutoAdvance}
@@ -686,7 +690,7 @@
 	/* Step Content */
 	.step-content {
 		flex: 1;
-		padding: 1.5rem 1rem 5.5rem 1rem; /* Bottom padding accounts for fixed nav bar */
+		padding: 1.5rem 1.5rem 5.5rem 1.5rem; /* Bottom padding accounts for fixed nav bar */
 		max-width: 900px;
 		margin: 0 auto;
 		width: 100%;
@@ -949,7 +953,7 @@
 		
 		/* Content area */
 		.step-content {
-			padding: 1.25rem 0 5.5rem 0; /* Bottom padding accounts for fixed nav bar */
+			padding: 1.25rem 1rem 5.5rem 1rem; /* Bottom padding accounts for fixed nav bar */
 		}
 		
 		/* Progress summary mobile */
@@ -1042,7 +1046,7 @@
 		}
 		
 		.step-content {
-			padding: 1rem 0 5.5rem 0; /* Bottom padding accounts for fixed nav bar */
+			padding: 1rem 0.75rem 5.5rem 0.75rem; /* Bottom padding accounts for fixed nav bar */
 		}
 		
 		.progress-summary {

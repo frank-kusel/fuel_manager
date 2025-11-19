@@ -12,7 +12,6 @@ export interface Vehicle {
 	year?: number;
 	fuel_type?: string;
 	tank_capacity?: number;
-	current_odometer?: number;
 	odometer_unit?: string;
 	// Fuel consumption tracking
 	average_consumption_l_per_100km?: number | null;
@@ -22,6 +21,15 @@ export interface Vehicle {
 	active: boolean;
 	created_at: string;
 	updated_at: string;
+}
+
+// View-based current odometer reading (from latest fuel entry)
+export interface CurrentVehicleOdometer {
+	vehicle_id: string;
+	current_odometer: number;
+	last_entry_date: string;
+	last_entry_time: string;
+	last_fuel_entry_id: string;
 }
 
 export type VehicleType = 'tractor' | 'bakkie' | 'truck' | 'loader' | 'harvester' | 'sprayer' | 'other';
@@ -103,12 +111,20 @@ export interface Bowser {
 	registration: string;
 	fuel_type: 'diesel' | 'petrol';
 	capacity: number; // litres
-	current_reading: number;
 	location?: string;
 	notes?: string;
 	active: boolean;
 	created_at: string;
 	updated_at: string;
+}
+
+// View-based current bowser reading (from latest fuel entry)
+export interface CurrentBowserReading {
+	bowser_id: string;
+	current_reading: number;
+	last_entry_date: string;
+	last_entry_time: string;
+	last_fuel_entry_id: string;
 }
 
 export interface FuelEntry {

@@ -13,21 +13,27 @@
 	}
 	
 	let { selectedVehicle, odometerStart, odometerEnd, gaugeWorking, onOdometerUpdate, errors, canProceedToNext = false, onNext }: Props = $props();
-	
+
+	// Track the ORIGINAL fetched odometer value (never updated by manual edits)
+	let originalFetchedOdometer = $state<number | null>(null);
+
 	// Current odometer display - use prop if available (preserves manual overrides), otherwise vehicle's reading
 	let currentOdo = $state(
-		odometerStart?.toString() || selectedVehicle?.current_odometer?.toString() || ''
+		odometerStart?.toString() || ''
 	);
-	let originalCurrentOdo = $state(selectedVehicle?.current_odometer || 0);
+
+	// Track whether user has manually edited the current odometer
+	let isManuallyEdited = $state(false);
 
 	// New odometer reading - the main input
 	let newOdo = $state(odometerEnd?.toString() || '');
 	let isBrokenGauge = $state(false); // Default to working
 
-	// Reset function to restore original current odometer reading
+	// Reset function to restore original FETCHED odometer reading
 	function resetCurrentOdo() {
-		if (selectedVehicle) {
-			currentOdo = selectedVehicle.current_odometer?.toString() || '';
+		if (originalFetchedOdometer !== null && originalFetchedOdometer !== undefined) {
+			currentOdo = originalFetchedOdometer.toString();
+			isManuallyEdited = false;
 			updateParent();
 		}
 	}
@@ -36,28 +42,39 @@
 	let previousVehicleId = $state(selectedVehicle?.id);
 	let hasInitialized = $state(false);
 
-	// Initialize and handle vehicle changes
+	// Initialize and handle vehicle changes or odometerStart updates
 	$effect(() => {
 		if (selectedVehicle) {
 			if (!hasInitialized || selectedVehicle.id !== previousVehicleId) {
 				// Initial load or vehicle changed
-				originalCurrentOdo = selectedVehicle.current_odometer || 0;
+				originalFetchedOdometer = odometerStart || 0;
 
 				// Only reset currentOdo if vehicle actually changed (not on initial load)
 				if (hasInitialized && selectedVehicle.id !== previousVehicleId) {
-					currentOdo = selectedVehicle.current_odometer?.toString() || '';
+					currentOdo = odometerStart?.toString() || '';
+					isManuallyEdited = false; // Reset manual edit flag when vehicle changes
+					originalFetchedOdometer = odometerStart || 0; // Store the original fetched value
 				} else if (!hasInitialized) {
 					// Initial load - use prop if available
 					if (odometerStart !== null && odometerStart !== undefined) {
 						currentOdo = odometerStart.toString();
-					} else {
-						currentOdo = selectedVehicle.current_odometer?.toString() || '';
+						originalFetchedOdometer = odometerStart; // Store the original fetched value
 					}
 					hasInitialized = true;
 				}
 
 				previousVehicleId = selectedVehicle.id;
 			}
+		}
+	});
+
+	// Track odometerStart prop changes (e.g., when fetched from database)
+	// Only update if it's the first time being set (not a manual edit propagating back)
+	$effect(() => {
+		if (odometerStart !== null && odometerStart !== undefined && !isManuallyEdited && originalFetchedOdometer === null) {
+			// Only update if this is the initial fetch (originalFetchedOdometer not yet set)
+			currentOdo = odometerStart.toString();
+			originalFetchedOdometer = odometerStart;
 		}
 	});
 	
@@ -79,6 +96,12 @@
 		const start = currentOdo ? parseFloat(currentOdo) : null;
 		const end = isBrokenGauge ? start : (newOdo ? parseFloat(newOdo) : null);
 		onOdometerUpdate(start, end, !isBrokenGauge);
+	}
+
+	// Handle user input on current odometer (mark as manually edited)
+	function handleCurrentOdoInput() {
+		isManuallyEdited = true;
+		updateParent();
 	}
 
 	// Number formatting function - spaces for thousands, period for decimal
@@ -106,7 +129,7 @@
 					inputmode="decimal"
 					step="0.1"
 					bind:value={currentOdo}
-					oninput={updateParent}
+					oninput={handleCurrentOdoInput}
 					placeholder="Old"
 					class="current-odo-input"
 					onfocus={(e) => e.target.select()}
@@ -114,7 +137,7 @@
 				/>
 			</div>
 
-			{#if parseFloat(currentOdo) !== originalCurrentOdo}
+			{#if isManuallyEdited && originalFetchedOdometer !== null && parseFloat(currentOdo) !== originalFetchedOdometer}
 				<div class="override-notice">Manual override active</div>
 			{/if}
 		</div>

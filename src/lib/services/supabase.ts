@@ -130,66 +130,32 @@ class SupabaseService {
 		);
 	}
 
-	async updateVehicleOdometer(id: string, newOdometer: number): Promise<ApiResponse<Vehicle>> {
+	// Get current odometer reading for a vehicle from latest fuel entry
+	async getCurrentOdometer(vehicleId: string): Promise<ApiResponse<number | null>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('vehicles')
-				.update({ 
-					current_odometer: newOdometer, 
-					updated_at: new Date().toISOString() 
-				})
-				.eq('id', id)
-				.select()
-				.single()
-		);
+		return this.query(async () => {
+			const result = await client
+				.from('current_vehicle_odometers')
+				.select('current_odometer')
+				.eq('vehicle_id', vehicleId)
+				.single();
+
+			return { data: result.data?.current_odometer ?? null, error: result.error };
+		});
 	}
 
-	async updateBowserReading(id: string, newReading: number, fuelEntryId?: string): Promise<ApiResponse<Bowser>> {
+	// Get current bowser reading from latest fuel entry
+	async getCurrentBowserReading(bowserId: string): Promise<ApiResponse<number | null>> {
 		const client = this.ensureInitialized();
-		
-		try {
-			// First get the current reading for history
-			const currentBowser = await client
-				.from('bowsers')
+		return this.query(async () => {
+			const result = await client
+				.from('current_bowser_readings')
 				.select('current_reading')
-				.eq('id', id)
+				.eq('bowser_id', bowserId)
 				.single();
-			
-			const previousReading = currentBowser.data?.current_reading || null;
-			
-			// Update bowser reading with last_updated timestamp
-			const updateResult = await client
-				.from('bowsers')
-				.update({ 
-					current_reading: newReading, 
-					last_updated: new Date().toISOString(),
-					updated_at: new Date().toISOString() 
-				})
-				.eq('id', id)
-				.select()
-				.single();
-			
-			// Create history record (if table exists)
-			try {
-				await client
-					.from('bowser_reading_history')
-					.insert({
-						bowser_id: id,
-						fuel_entry_id: fuelEntryId || null,
-						previous_reading: previousReading,
-						new_reading: newReading,
-						created_by: null
-					});
-			} catch (historyError) {
-				// History table might not exist yet, log but don't fail the main operation
-				console.warn('Could not create bowser reading history:', historyError);
-			}
-			
-			return { data: updateResult.data, error: updateResult.error?.message };
-		} catch (error) {
-			return { data: null, error: error instanceof Error ? error.message : 'Failed to update bowser reading' };
-		}
+
+			return { data: result.data?.current_reading ?? null, error: result.error };
+		});
 	}
 
 	async deleteVehicle(id: string): Promise<ApiResponse<null>> {
@@ -284,7 +250,7 @@ class SupabaseService {
 
 	async updateFuelEntry(id: string, updates: Partial<FuelEntry>): Promise<ApiResponse<FuelEntry>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('fuel_entries')
 				.update({ ...updates, updated_at: new Date().toISOString() })
@@ -292,6 +258,89 @@ class SupabaseService {
 				.select()
 				.single()
 		);
+	}
+
+	/**
+	 * Update a fuel entry and automatically cascade corrections to all subsequent entries.
+	 * This maintains data integrity by recalculating bowser readings for all entries that come after.
+	 */
+	async updateFuelEntryWithCascade(id: string, updates: Partial<FuelEntry>): Promise<ApiResponse<FuelEntry>> {
+		const client = this.ensureInitialized();
+
+		try {
+			// Step 1: Get the original entry to know its position and bowser
+			const originalResult = await client
+				.from('fuel_entries')
+				.select('*')
+				.eq('id', id)
+				.single();
+
+			if (originalResult.error || !originalResult.data) {
+				return { data: null, error: 'Fuel entry not found' };
+			}
+
+			const original = originalResult.data;
+			const bowserId = updates.bowser_id ?? original.bowser_id;
+
+			// Step 2: Update the fuel entry
+			const updateResult = await client
+				.from('fuel_entries')
+				.update({ ...updates, updated_at: new Date().toISOString() })
+				.eq('id', id)
+				.select()
+				.single();
+
+			if (updateResult.error) {
+				return { data: null, error: updateResult.error.message };
+			}
+
+			const updatedEntry = updateResult.data;
+
+			// Step 3: If bowser readings changed, cascade corrections to subsequent entries
+			if (bowserId && (
+				updates.bowser_reading_end !== undefined ||
+				updates.litres_dispensed !== undefined
+			)) {
+				// Get all subsequent entries for this bowser, ordered by date and time
+				const subsequentResult = await client
+					.from('fuel_entries')
+					.select('*')
+					.eq('bowser_id', bowserId)
+					.or(`entry_date.gt.${updatedEntry.entry_date},and(entry_date.eq.${updatedEntry.entry_date},time.gt.${updatedEntry.time})`)
+					.order('entry_date', { ascending: true })
+					.order('time', { ascending: true });
+
+				if (subsequentResult.data && subsequentResult.data.length > 0) {
+					// Step 4: Recalculate all subsequent entries
+					let runningReading = updatedEntry.bowser_reading_end;
+
+					for (const entry of subsequentResult.data) {
+						// Calculate new readings based on litres dispensed
+						const newStart = runningReading;
+						const newEnd = runningReading - (entry.litres_dispensed || 0);
+
+						// Update the entry with corrected readings
+						await client
+							.from('fuel_entries')
+							.update({
+								bowser_reading_start: newStart,
+								bowser_reading_end: newEnd,
+								updated_at: new Date().toISOString()
+							})
+							.eq('id', entry.id);
+
+						runningReading = newEnd;
+					}
+				}
+			}
+
+			return { data: updateResult.data, error: null };
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to update fuel entry with cascade'
+			};
+		}
 	}
 
 	// Multi-field fuel entry operations
@@ -645,10 +694,10 @@ class SupabaseService {
 		);
 	}
 
-	// Get fuel entries with location data for summary
-	async getFuelEntriesWithLocation(date: string): Promise<ApiResponse<any[]>> {
+	// Get fuel entries for a specific date with related data
+	async getFuelEntriesByDate(date: string): Promise<ApiResponse<any[]>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('fuel_entries')
 				.select(`
@@ -722,16 +771,25 @@ class SupabaseService {
 					.order('time', { ascending: false })
 					.limit(10),
 				
-				// Bowser levels
+				// Bowser levels with current readings from view
 				client
 					.from('bowsers')
-					.select('name, current_reading, capacity, fuel_type')
+					.select(`
+						name,
+						capacity,
+						fuel_type,
+						id,
+						current_bowser_readings!left(current_reading)
+					`)
 					.eq('active', true),
-				
-				// Active vehicles count
+
+				// Active vehicles count with odometer data from view
 				client
 					.from('vehicles')
-					.select('id, current_odometer')
+					.select(`
+						id,
+						current_vehicle_odometers!left(current_odometer)
+					`)
 					.eq('active', true),
 				
 				// Tank status for calculated level
@@ -774,7 +832,10 @@ class SupabaseService {
 			
 			// Active vehicles with odometer data
 			const activeVehicles = vehicles.data?.length || 0;
-			const vehiclesWithOdometer = vehicles.data?.filter(v => v.current_odometer && v.current_odometer > 0).length || 0;
+			const vehiclesWithOdometer = vehicles.data?.filter(v =>
+				v.current_vehicle_odometers?.[0]?.current_odometer &&
+				v.current_vehicle_odometers[0].current_odometer > 0
+			).length || 0;
 
 			// Calculate consumption statistics
 			const validConsumptionEntries = consumptionEntries.length;
@@ -814,9 +875,9 @@ class SupabaseService {
 					activeVehicles,
 					vehiclesWithOdometer,
 					totalBowsers: bowsers.data?.length || 0,
-					
+
 					// Bowser reading (Tank A - first bowser)
-					bowserReading: bowsers.data?.[0]?.current_reading || 0,
+					bowserReading: bowsers.data?.[0]?.current_bowser_readings?.[0]?.current_reading || 0,
 					
 					// Recent activity
 					recentEntries: recentEntries.data || [],
