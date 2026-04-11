@@ -60,6 +60,7 @@
 
 		try {
 			await supabaseService.init();
+			const client = supabaseService.getClient();
 
 			// Load reference data in parallel
 			const [vehiclesRes, driversRes, bowsersRes, activitiesRes, fieldsRes] = await Promise.all([
@@ -77,7 +78,7 @@
 			fields = fieldsRes.data || [];
 
 			// Load selected field IDs for this entry
-			const { data: fieldData } = await supabaseService.client
+			const { data: fieldData } = await client
 				.from('fuel_entry_fields')
 				.select('field_id')
 				.eq('fuel_entry_id', entry.id);
@@ -134,6 +135,8 @@
 		isSaving = true;
 
 		try {
+			const client = supabaseService.getClient();
+
 			// Build updates object with only changed fields
 			const updates: any = {};
 			let hasChanges = false;
@@ -187,7 +190,7 @@
 				);
 
 				if (result.error) {
-					throw new Error(result.error.message || 'Cascade update failed');
+					throw new Error(result.error || 'Cascade update failed');
 				}
 
 				cascadeResult = result.data;
@@ -196,10 +199,11 @@
 
 			// Apply other updates if there are any (and litres didn't change, or as additional updates)
 			if (hasChanges && Object.keys(updates).length > 0) {
-				const { error } = await supabaseService.client
+				const { error } = await client
 					.from('fuel_entries')
 					.update(updates)
-					.eq('id', entry.id);
+					.eq('id', entry.id)
+					.is('deleted_at', null);
 
 				if (error) throw error;
 			}
@@ -209,7 +213,7 @@
 
 			if (fieldsChanged) {
 				// Delete existing field associations
-				await supabaseService.client
+				await client
 					.from('fuel_entry_fields')
 					.delete()
 					.eq('fuel_entry_id', entry.id);
@@ -221,7 +225,7 @@
 						field_id: fieldId
 					}));
 
-					await supabaseService.client
+					await client
 						.from('fuel_entry_fields')
 						.insert(fieldAssociations);
 				}

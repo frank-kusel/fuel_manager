@@ -64,6 +64,7 @@ class ExportService {
 						fields(code, name)
 					)
 				`)
+				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate)
 				.order('entry_date', { ascending: true })
@@ -241,6 +242,7 @@ class ExportService {
 					*,
 					vehicles:vehicle_id(id, code, name, type, odometer_unit, registration)
 				`)
+				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate)
 				.order('entry_date', { ascending: true })

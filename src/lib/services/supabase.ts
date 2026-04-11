@@ -14,6 +14,9 @@ import type {
 	Field,
 	Zone, 
 	RefillRecord,
+	MoveFuelEntryDirection,
+	MoveFuelEntryResult,
+	SoftDeleteFuelEntryResult,
 	ApiResponse 
 } from '$lib/types';
 
@@ -291,6 +294,7 @@ class SupabaseService {
 				fields!left (code, name),
 				bowsers!left (name)
 			`)
+			.is('deleted_at', null)
 			.order('entry_date', { ascending: false });
 
 		if (startDate) {
@@ -321,9 +325,42 @@ class SupabaseService {
 				.from('fuel_entries')
 				.update({ ...updates, updated_at: new Date().toISOString() })
 				.eq('id', id)
+				.is('deleted_at', null)
 				.select()
 				.single()
 		);
+	}
+
+	async softDeleteFuelEntry(id: string): Promise<ApiResponse<SoftDeleteFuelEntryResult>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('void_fuel_entry', {
+				p_entry_id: id
+			});
+
+			return {
+				data: result.data?.[0] ?? null,
+				error: result.error
+			};
+		});
+	}
+
+	async moveFuelEntryWithinDay(
+		id: string,
+		direction: MoveFuelEntryDirection
+	): Promise<ApiResponse<MoveFuelEntryResult>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('move_fuel_entry_within_day', {
+				p_entry_id: id,
+				p_direction: direction
+			});
+
+			return {
+				data: result.data?.[0] ?? null,
+				error: result.error
+			};
+		});
 	}
 
 	/**
@@ -339,6 +376,7 @@ class SupabaseService {
 				.from('fuel_entries')
 				.select('*')
 				.eq('id', id)
+				.is('deleted_at', null)
 				.single();
 
 			if (originalResult.error || !originalResult.data) {
@@ -353,6 +391,7 @@ class SupabaseService {
 				.from('fuel_entries')
 				.update({ ...updates, updated_at: new Date().toISOString() })
 				.eq('id', id)
+				.is('deleted_at', null)
 				.select()
 				.single();
 
@@ -372,6 +411,7 @@ class SupabaseService {
 					.from('fuel_entries')
 					.select('*')
 					.eq('bowser_id', bowserId)
+					.is('deleted_at', null)
 					.or(`entry_date.gt.${updatedEntry.entry_date},and(entry_date.eq.${updatedEntry.entry_date},time.gt.${updatedEntry.time})`)
 					.order('entry_date', { ascending: true })
 					.order('time', { ascending: true });
@@ -775,6 +815,7 @@ class SupabaseService {
 					zones:zone_id(code, name)
 				`)
 				.eq('entry_date', date)
+				.is('deleted_at', null)
 				.order('time', { ascending: false })
 		);
 	}
@@ -800,24 +841,28 @@ class SupabaseService {
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed')
+					.is('deleted_at', null)
 					.gte('entry_date', today),
 				
 				// Past 7 days fuel usage
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed, odometer_start, odometer_end')
+					.is('deleted_at', null)
 					.gte('entry_date', past7DaysStart),
 				
 				// This month's fuel usage
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed, odometer_start, odometer_end, vehicle_id, fuel_consumption_l_per_100km, gauge_working')
+					.is('deleted_at', null)
 					.gte('entry_date', monthStart),
 				
 				// Previous month's fuel usage
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed')
+					.is('deleted_at', null)
 					.gte('entry_date', prevMonthStart)
 					.lte('entry_date', prevMonthEnd),
 				
@@ -833,6 +878,7 @@ class SupabaseService {
 						zones!left(name, code),
 						fuel_entry_fields!left(field_id, fields!inner(name, code))
 					`)
+					.is('deleted_at', null)
 					.order('entry_date', { ascending: false })
 					.order('time', { ascending: false })
 					.limit(10),
@@ -973,6 +1019,7 @@ class SupabaseService {
 					activities!left(name, category)
 				`)
 				.gte('entry_date', startDate)
+				.is('deleted_at', null)
 				.order('entry_date', { ascending: true });
 			
 			if (vehicleId) {
@@ -1178,6 +1225,7 @@ class SupabaseService {
 				.from('fuel_entries')
 				.select('id, entry_date, litres_dispensed, litres_used, time, vehicle_id')
 				.eq('vehicle_id', vehicleId)
+				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate)
 				.order('entry_date', { ascending: false })
@@ -1206,6 +1254,7 @@ class SupabaseService {
 					vehicles!left (odometer_unit)
 				`)
 				.eq('vehicle_id', vehicleId)
+				.is('deleted_at', null)
 				.order('entry_date', { ascending: false })
 				.order('time', { ascending: false })
 		);
@@ -1248,6 +1297,7 @@ class SupabaseService {
 			const fuelResult = await client
 				.from('fuel_entries')
 				.select('litres_dispensed')
+				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate);
 				
@@ -1263,6 +1313,7 @@ class SupabaseService {
 				const bowserStartResult = await client
 					.from('fuel_entries')
 					.select('bowser_reading_end, entry_date, time')
+					.is('deleted_at', null)
 					.lt('entry_date', startDate)
 					.not('bowser_reading_end', 'is', null)
 					.order('entry_date', { ascending: false })
@@ -1273,6 +1324,7 @@ class SupabaseService {
 				const bowserEndResult = await client
 					.from('fuel_entries')
 					.select('bowser_reading_end, entry_date, time')
+					.is('deleted_at', null)
 					.gte('entry_date', startDate)
 					.lte('entry_date', endDate)
 					.not('bowser_reading_end', 'is', null)
@@ -1385,6 +1437,7 @@ class SupabaseService {
 				const dispensedResult = await client
 					.from('fuel_entries')
 					.select('litres_dispensed, entry_date')
+					.is('deleted_at', null)
 					.gte('entry_date', startDateStr)
 					.lte('entry_date', date);
 
@@ -1590,6 +1643,7 @@ class SupabaseService {
 					fields:field_id(id, code, name),
 					zones:zone_id(id, code, name)
 				`)
+				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate)
 				.order('entry_date', { ascending: false })

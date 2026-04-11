@@ -27,6 +27,9 @@
 	let error = $state<string | null>(null);
 	let expandedEntry = $state<string | null>(null);
 	let fieldNamesMap = $state<Record<string, string>>({}); // entryId -> comma-separated field names
+	let actionMessage = $state<string | null>(null);
+	let actionError = $state<string | null>(null);
+	let actingEntryId = $state<string | null>(null);
 
 	onMount(() => {
 		if (browser) {
@@ -44,6 +47,30 @@
 		}
 	});
 
+	function getLocalDateKey(date = new Date()): string {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+
+	function isToday(entryDate: string): boolean {
+		return entryDate === getLocalDateKey();
+	}
+
+	function setActionStatus(message: string | null, errorMessage: string | null = null) {
+		actionMessage = message;
+		actionError = errorMessage;
+
+		if (message && !errorMessage) {
+			setTimeout(() => {
+				if (actionMessage === message) {
+					actionMessage = null;
+				}
+			}, 3000);
+		}
+	}
+
 	// Helper function to fetch field names for ALL entries (field_id is deprecated, all fields now in junction table)
 	// OPTIMIZED: Single batched query instead of N queries (fixes N+1 problem)
 	async function fetchFieldNamesForEntries(entries: FuelSummaryEntry[]) {
@@ -52,8 +79,10 @@
 		if (entryIds.length === 0) return;
 
 		try {
+			const client = supabaseService.getClient();
+
 			// Single query for all entries using IN clause
-			const result = await supabaseService['client']
+			const result = await client
 				.from('fuel_entry_fields')
 				.select(`
 					fuel_entry_id,
@@ -91,6 +120,7 @@
 			loading = true;
 			summaryCacheStore.setLoading(true);
 			await supabaseService.init();
+			const client = supabaseService.getClient();
 
 			// Get date range for last 30 days
 			const endDate = new Date().toISOString().split('T')[0];
@@ -99,7 +129,7 @@
 			// OPTIMIZED: Fetch entries and field names in parallel
 			const [entriesResult, fieldNamesResult] = await Promise.all([
 				// Query 1: Fetch entries
-				supabaseService['client']
+				client
 					.from('fuel_entries')
 					.select(
 						`
@@ -111,22 +141,24 @@
 						zones!left(code, name)
 					`
 					)
+					.is('deleted_at', null)
 					.gte('entry_date', startDate)
 					.lte('entry_date', endDate)
 					.order('entry_date', { ascending: false })
 					.order('time', { ascending: false }),
 
 				// Query 2: Fetch field names for all entries in date range (parallel)
-				supabaseService['client']
+				client
 					.from('fuel_entry_fields')
 					.select(`
 						fuel_entry_id,
 						field_id,
 						fields!inner(name, code),
-						fuel_entries!inner(entry_date)
+						fuel_entries!inner(entry_date, deleted_at)
 					`)
 					.gte('fuel_entries.entry_date', startDate)
 					.lte('fuel_entries.entry_date', endDate)
+					.is('fuel_entries.deleted_at', null)
 			]);
 
 			if (entriesResult.error) throw entriesResult.error;
@@ -259,12 +291,67 @@
 		summaryCacheStore.invalidate();
 		await loadEntries();
 	}
+
+	async function handleMoveEntry(entryId: string, direction: 'up' | 'down') {
+		try {
+			setActionStatus(null, null);
+			actingEntryId = entryId;
+			await supabaseService.init();
+
+			const result = await supabaseService.moveFuelEntryWithinDay(entryId, direction);
+			if (result.error) {
+				throw new Error(result.error);
+			}
+
+			summaryCacheStore.invalidate();
+			await loadEntries();
+			setActionStatus(`Entry moved ${direction}.`);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to move entry';
+			setActionStatus(null, message);
+		} finally {
+			actingEntryId = null;
+		}
+	}
+
+	async function handleDeleteEntry(entry: FuelSummaryEntry) {
+		const vehicleLabel = entry.vehicles?.code || entry.vehicles?.name || 'this entry';
+		const confirmed = window.confirm(`Delete ${vehicleLabel}? This will remove it from Summary but keep it for audit history.`);
+
+		if (!confirmed) {
+			return;
+		}
+
+		try {
+			setActionStatus(null, null);
+			actingEntryId = entry.id;
+			await supabaseService.init();
+
+			const result = await supabaseService.softDeleteFuelEntry(entry.id);
+			if (result.error) {
+				throw new Error(result.error);
+			}
+
+			if (expandedEntry === entry.id) {
+				expandedEntry = null;
+			}
+
+			summaryCacheStore.invalidate();
+			await loadEntries();
+			setActionStatus('Entry deleted.');
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to delete entry';
+			setActionStatus(null, message);
+		} finally {
+			actingEntryId = null;
+		}
+	}
 </script>
 
 <svelte:head>
 	<title>Fuel Summary</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </svelte:head>
 
@@ -273,12 +360,18 @@
 		<div class="header-content">
 			<h1>Summary</h1>
 		</div>
-		<button class="refresh-btn" onclick={handleRefresh} disabled={loading} title="Refresh data">
+		<button class="refresh-btn" onclick={handleRefresh} disabled={loading} title="Refresh data" aria-label="Refresh summary">
 			<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 				<path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
 			</svg>
 		</button>
 	</div>
+
+	{#if actionMessage}
+		<div class="action-feedback success">{actionMessage}</div>
+	{:else if actionError}
+		<div class="action-feedback error">{actionError}</div>
+	{/if}
 
 	{#if loading}
 		<div class="state-container">
@@ -376,6 +469,40 @@
 										</div>
 										<div class="entry-time-expanded">{entry.time}</div>
 									</div>
+									{#if isToday(daySummary.date)}
+										<div class="entry-actions">
+											<button
+												class="entry-action-btn"
+												disabled={index === 0 || actingEntryId === entry.id}
+												onclick={(e) => {
+													e.stopPropagation();
+													handleMoveEntry(entry.id, 'up');
+												}}
+											>
+												Move Up
+											</button>
+											<button
+												class="entry-action-btn"
+												disabled={index === daySummary.entries.length - 1 || actingEntryId === entry.id}
+												onclick={(e) => {
+													e.stopPropagation();
+													handleMoveEntry(entry.id, 'down');
+												}}
+											>
+												Move Down
+											</button>
+											<button
+												class="entry-action-btn danger"
+												disabled={actingEntryId === entry.id}
+												onclick={(e) => {
+													e.stopPropagation();
+													handleDeleteEntry(entry);
+												}}
+											>
+												Delete
+											</button>
+										</div>
+									{/if}
 								</div>
 							</div>
 						{/each}
@@ -454,6 +581,25 @@
 		padding: 2rem;
 		text-align: center;
 		color: #6b7280;
+	}
+
+	.action-feedback {
+		padding: 0.875rem 1rem;
+		border-radius: 0.75rem;
+		font-size: 0.95rem;
+		font-weight: 500;
+	}
+
+	.action-feedback.success {
+		background: #ecfdf3;
+		color: #166534;
+		border: 1px solid #86efac;
+	}
+
+	.action-feedback.error {
+		background: #fef2f2;
+		color: #b91c1c;
+		border: 1px solid #fca5a5;
 	}
 
 	.error-message {
@@ -643,6 +789,40 @@
 		opacity: 0.8;
 	}
 
+	.entry-actions {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.875rem;
+		flex-wrap: wrap;
+	}
+
+	.entry-action-btn {
+		border: 1px solid #d1d5db;
+		background: white;
+		color: #374151;
+		border-radius: 999px;
+		padding: 0.45rem 0.8rem;
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.entry-action-btn:hover:not(:disabled) {
+		border-color: #f97316;
+		color: #ea580c;
+	}
+
+	.entry-action-btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+
+	.entry-action-btn.danger:hover:not(:disabled) {
+		border-color: #ef4444;
+		color: #dc2626;
+	}
+
 	.entry-header-right {
 		display: flex;
 		align-items: center;
@@ -676,7 +856,7 @@
 	}
 
 	.entry-card.expanded .entry-card-details {
-		max-height: 400px;
+		max-height: 520px;
 		padding: 1rem;
 		border-top: 1px solid #e5e7eb;
 	}
@@ -796,6 +976,15 @@
 		.daily-summary {
 			padding: 1rem;
 			margin-bottom: 1rem;
+		}
+
+		.entry-actions {
+			width: 100%;
+		}
+
+		.entry-action-btn {
+			flex: 1 1 calc(33.33% - 0.35rem);
+			text-align: center;
 		}
 	}
 </style>

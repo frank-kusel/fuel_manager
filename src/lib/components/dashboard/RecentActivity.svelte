@@ -61,7 +61,7 @@
 
 				// Convert to comma-separated strings
 				const newMap: Record<string, string> = {};
-				for (const [entryId, fields] of Object.entries(grouped)) {
+				for (const [entryId, fields] of Object.entries(grouped) as Array<[string, string[]]>) {
 					newMap[entryId] = fields.join(', ');
 				}
 
@@ -106,6 +106,7 @@
 					fields!left(name, code),
 					zones!left(name, code)
 				`)
+				.is('deleted_at', null)
 				.order('entry_date', { ascending: false })
 				.order('time', { ascending: false })
 				.range(offset, offset + limit - 1);

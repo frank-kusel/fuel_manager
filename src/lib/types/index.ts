@@ -160,10 +160,29 @@ export interface FuelEntry {
 	
 	// Status and notes
 	notes?: string;
+	deleted_at?: string | null;
+	deleted_reason?: string | null;
 	
 	// System fields
 	created_at: string;
 	updated_at: string;
+}
+
+export type MoveFuelEntryDirection = 'up' | 'down';
+
+export interface SoftDeleteFuelEntryResult {
+	voided_entry_id: string;
+	affected_bowser_ids: string[];
+	entries_processed: number;
+	discontinuities_fixed: number;
+}
+
+export interface MoveFuelEntryResult {
+	moved_entry_id: string;
+	swapped_entry_id: string;
+	moved_entry_time: string;
+	swapped_entry_time: string;
+	recalculated_bowser_ids: string[];
 }
 
 // Junction table interface for fuel entry to field relationships
