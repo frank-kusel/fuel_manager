@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "FarmTrack - Comprehensive Farm Management Platform built with SvelteKit",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "svelte-kit sync && vite build",
