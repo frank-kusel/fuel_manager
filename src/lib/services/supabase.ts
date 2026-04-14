@@ -820,6 +820,28 @@ class SupabaseService {
 		);
 	}
 
+	// Get fuel activity entries for a selected date range with related data
+	async getRecentActivityEntries(startDate: string, endDate: string): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() =>
+			client
+				.from('fuel_entries')
+				.select(`
+					*,
+					vehicles!left(code, name, type, odometer_unit, average_consumption_l_per_100km),
+					drivers!left(employee_code, name),
+					activities!left(name, category),
+					fields!left(name, code),
+					zones!left(name, code)
+				`)
+				.is('deleted_at', null)
+				.gte('entry_date', startDate)
+				.lte('entry_date', endDate)
+				.order('entry_date', { ascending: false })
+				.order('time', { ascending: false })
+		);
+	}
+
 	// Dashboard statistics
 	async getDashboardStats(): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();

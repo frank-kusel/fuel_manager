@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import FuelEntryEditModal from '$lib/components/fuel/FuelEntryEditModal.svelte';
@@ -10,20 +11,61 @@
 
 	let { entries: initialEntries, loading = false }: Props = $props();
 
+	const DEFAULT_RANGE_DAYS = 30;
+	const RANGE_PRESETS = [
+		{ label: '7D', days: 7 },
+		{ label: '30D', days: 30 },
+		{ label: '90D', days: 90 }
+	] as const;
+
+	function formatDateInputValue(date: Date): string {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+
+	function getDateDaysAgo(daysAgo: number): string {
+		const date = new Date();
+		date.setHours(0, 0, 0, 0);
+		date.setDate(date.getDate() - daysAgo);
+		return formatDateInputValue(date);
+	}
+
+	function getDefaultDateRange() {
+		return {
+			start: getDateDaysAgo(DEFAULT_RANGE_DAYS - 1),
+			end: getDateDaysAgo(0)
+		};
+	}
+
+	function formatRangeDate(dateString: string): string {
+		const [year, month, day] = dateString.split('-').map(Number);
+		return new Date(year, month - 1, day).toLocaleDateString('en-ZA', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		});
+	}
+
+	const initialRange = getDefaultDateRange();
+
 	// Edit modal state
 	let isEditModalOpen = $state(false);
 	let selectedEntry = $state<any>(null);
 	
 	// Local state for expanded entries
 	let allEntries = $state<any[]>([]);
-	let isLoadingMore = $state(false);
+	let isRangeLoading = $state(false);
+	let rangeError = $state<string | null>(null);
+	let hasLoadedRange = $state(false);
+	let startDate = $state(initialRange.start);
+	let endDate = $state(initialRange.end);
+	let appliedRange = $state({ ...initialRange });
 
 	// Filter states
 	let showMissingData = $state(false);
 	let showOutsideRange = $state(false);
-
-	// Load more functionality - start with 4 weeks (1 month)
-	let weeksToShow = $state(4);
 
 	// Store field names for multi-field entries
 	let fieldNamesMap = $state<Record<string, string>>({}); // entryId -> comma-separated field names
@@ -32,7 +74,7 @@
 	// OPTIMIZED: Single batched query instead of N queries (fixes N+1 problem)
 	async function fetchFieldNamesForEntries(entries: any[]) {
 		const { default: supabaseService } = await import('$lib/services/supabase');
-		const client = (supabaseService as any).client;
+		const client = supabaseService.getClient();
 
 		// Only fetch for entries we don't have cached
 		const entryIds = entries.map(e => e.id).filter(id => !fieldNamesMap[id]);
@@ -75,52 +117,73 @@
 
 	// Initialize allEntries when initialEntries change
 	$effect(() => {
-		if (initialEntries && initialEntries.length > 0) {
+		if (!hasLoadedRange && initialEntries && initialEntries.length > 0) {
 			allEntries = [...initialEntries];
-			fetchFieldNamesForEntries(initialEntries);
+			void fetchFieldNamesForEntries(initialEntries);
 		}
 	});
-	
-	// Function to load more entries from the database
-	async function loadMoreEntries() {
-		if (isLoadingMore) return;
 
-		isLoadingMore = true;
+	onMount(async () => {
+		await applyDateRange(initialRange.start, initialRange.end);
+	});
+
+	async function applyDateRange(nextStart = startDate, nextEnd = endDate) {
+		if (!nextStart || !nextEnd) {
+			rangeError = 'Select both a start and end date.';
+			return;
+		}
+
+		if (nextStart > nextEnd) {
+			rangeError = 'The start date must be before the end date.';
+			return;
+		}
+
+		isRangeLoading = true;
+		rangeError = null;
+
 		try {
 			const { default: supabaseService } = await import('$lib/services/supabase');
 			await supabaseService.init();
 
-			// Calculate the offset and limit
-			const offset = allEntries.length;
-			const limit = 10;
-
-			const client = (supabaseService as any).client;
-
-			const result = await client
-				.from('fuel_entries')
-				.select(`
-					*,
-					vehicles!left(code, name, type, odometer_unit, average_consumption_l_per_100km),
-					drivers!left(employee_code, name),
-					activities!left(name, category),
-					fields!left(name, code),
-					zones!left(name, code)
-				`)
-				.is('deleted_at', null)
-				.order('entry_date', { ascending: false })
-				.order('time', { ascending: false })
-				.range(offset, offset + limit - 1);
-
-			if (result.data && result.data.length > 0) {
-				allEntries = [...allEntries, ...result.data];
-				// Fetch field names for multi-field entries
-				await fetchFieldNamesForEntries(result.data);
+			const result = await supabaseService.getRecentActivityEntries(nextStart, nextEnd);
+			if (result.error) {
+				rangeError = result.error;
+				return;
 			}
+
+			allEntries = result.data || [];
+			appliedRange = { start: nextStart, end: nextEnd };
+			hasLoadedRange = true;
+			await fetchFieldNamesForEntries(allEntries);
 		} catch (error) {
-			console.error('Failed to load more entries:', error);
+			rangeError = error instanceof Error ? error.message : 'Failed to load activity for the selected date range.';
 		} finally {
-			isLoadingMore = false;
+			isRangeLoading = false;
 		}
+	}
+
+	async function applyPreset(days: number) {
+		const nextRange = {
+			start: getDateDaysAgo(days - 1),
+			end: getDateDaysAgo(0)
+		};
+
+		startDate = nextRange.start;
+		endDate = nextRange.end;
+		await applyDateRange(nextRange.start, nextRange.end);
+	}
+
+	async function resetDateRange() {
+		const nextRange = getDefaultDateRange();
+		startDate = nextRange.start;
+		endDate = nextRange.end;
+		await applyDateRange(nextRange.start, nextRange.end);
+	}
+
+	async function clearAllFilters() {
+		showMissingData = false;
+		showOutsideRange = false;
+		await resetDateRange();
 	}
 	
 	// Group entries by date
@@ -281,15 +344,7 @@
 			return [];
 		}
 
-		// First, filter by date range (weeks)
-		const weeksAgo = new Date();
-		weeksAgo.setDate(weeksAgo.getDate() - (weeksToShow * 7));
-
-		let filtered = allEntries.filter(entry => {
-			if (!entry.entry_date) return false;
-			const entryDate = new Date(entry.entry_date);
-			return entryDate >= weeksAgo;
-		});
+		let filtered = [...allEntries];
 
 
 		// Apply quality filters only when active
@@ -316,41 +371,6 @@
 	
 	const groupedEntries = $derived(groupEntriesByDate(filteredEntries));
 	const dateGroups = $derived(Object.keys(groupedEntries));
-	
-	// Check if there are more entries beyond current week range
-	const hasMoreEntries = $derived.by(() => {
-		if (!Array.isArray(allEntries)) return false;
-		
-		const currentWeeksAgo = new Date();
-		currentWeeksAgo.setDate(currentWeeksAgo.getDate() - (weeksToShow * 7));
-		
-		return allEntries.some(entry => {
-			if (!entry.entry_date) return false;
-			const entryDate = new Date(entry.entry_date);
-			return entryDate < currentWeeksAgo;
-		});
-	});
-	
-	// Function to load more weeks
-	async function loadMoreWeeks() {
-		// First, check if we need more data from the database
-		const currentWeeksAgo = new Date();
-		currentWeeksAgo.setDate(currentWeeksAgo.getDate() - ((weeksToShow + 1) * 7));
-
-		const hasOlderEntriesInMemory = allEntries.some(entry => {
-			if (!entry.entry_date) return false;
-			const entryDate = new Date(entry.entry_date);
-			return entryDate < currentWeeksAgo;
-		});
-
-		// If we don't have older entries in memory, try to load more from the database
-		if (!hasOlderEntriesInMemory) {
-			await loadMoreEntries();
-		}
-
-		// Then increase the weeks to show
-		weeksToShow += 1;
-	}
 
 	// Edit modal functions
 	function openEditModal(entry: any) {
@@ -374,25 +394,69 @@
 <div class="fuel-activity">
 	<div class="activity-header">
 		<h3>Recent Fuel Activity</h3>
-		<div class="filter-buttons">
-			<button 
-				class="filter-btn" 
-				class:active={showMissingData}
-				onclick={() => showMissingData = !showMissingData}
-			>
-				Missing Data
-			</button>
-			<button 
-				class="filter-btn" 
-				class:active={showOutsideRange}
-				onclick={() => showOutsideRange = !showOutsideRange}
-			>
-				Outside Range
-			</button>
+		<div class="activity-controls">
+			<div class="date-range-panel">
+				<div class="date-range-fields">
+					<label class="date-field">
+						<span>From</span>
+						<input type="date" bind:value={startDate} max={endDate} />
+					</label>
+					<label class="date-field">
+						<span>To</span>
+						<input type="date" bind:value={endDate} min={startDate} max={getDateDaysAgo(0)} />
+					</label>
+				</div>
+
+				<div class="date-range-actions">
+					<div class="preset-buttons">
+						{#each RANGE_PRESETS as preset}
+							<button class="preset-btn" onclick={() => applyPreset(preset.days)} disabled={isRangeLoading}>
+								{preset.label}
+							</button>
+						{/each}
+					</div>
+
+					<div class="range-action-buttons">
+						<button class="secondary-btn" onclick={resetDateRange} disabled={isRangeLoading}>
+							Reset
+						</button>
+						<button class="primary-btn" onclick={() => applyDateRange()} disabled={isRangeLoading}>
+							Apply Range
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<div class="filter-buttons">
+				<button 
+					class="filter-btn" 
+					class:active={showMissingData}
+					onclick={() => showMissingData = !showMissingData}
+				>
+					Missing Data
+				</button>
+				<button 
+					class="filter-btn" 
+					class:active={showOutsideRange}
+					onclick={() => showOutsideRange = !showOutsideRange}
+				>
+					Outside Range
+				</button>
+			</div>
 		</div>
 	</div>
+
+	<div class="range-summary">
+		<span>
+			Showing {filteredEntries.length} of {allEntries.length} entries from {formatRangeDate(appliedRange.start)} to {formatRangeDate(appliedRange.end)}
+		</span>
+	</div>
+
+	{#if rangeError}
+		<div class="range-error">{rangeError}</div>
+	{/if}
 	
-	{#if loading}
+	{#if (loading && !hasLoadedRange) || isRangeLoading}
 		<div class="loading-grid">
 			{#each Array(6) as _}
 				<div class="entry-skeleton">
@@ -409,8 +473,11 @@
 			<div class="empty-visual">
 				<div class="fuel-drop"></div>
 			</div>
-			<h4>No recent activity</h4>
-			<p>Fuel entries will appear here once vehicles start logging usage</p>
+			<h4>No activity in this range</h4>
+			<p>No fuel entries were found between {formatRangeDate(appliedRange.start)} and {formatRangeDate(appliedRange.end)}</p>
+			<button class="clear-filters-btn" onclick={resetDateRange}>
+				Reset to Last 30 Days
+			</button>
 		</div>
 	{:else if filteredEntries.length === 0}
 		<div class="empty-state">
@@ -418,8 +485,8 @@
 				<div class="fuel-drop"></div>
 			</div>
 			<h4>No entries match filters</h4>
-			<p>Try adjusting your filter settings or clear all filters to see entries</p>
-			<button class="clear-filters-btn" onclick={() => { showMissingData = false; showOutsideRange = false; }}>
+			<p>Try adjusting the date range or clear the active filters to see entries</p>
+			<button class="clear-filters-btn" onclick={clearAllFilters}>
 				Clear Filters
 			</button>
 		</div>
@@ -462,17 +529,6 @@
 					</div>
 				</div>
 			{/each}
-
-			<!-- Load More Button -->
-			<div class="load-more-container">
-				<button class="load-more-btn" onclick={loadMoreWeeks} disabled={isLoadingMore}>
-					{#if isLoadingMore}
-						Loading...
-					{:else}
-						Load More ({weeksToShow} week{weeksToShow > 1 ? 's' : ''})
-					{/if}
-				</button>
-			</div>
 		</div>
 	{/if}
 </div>
@@ -500,8 +556,9 @@
 
 	.activity-header {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 1rem;
 		margin-bottom: 1.5rem;
 		padding: 1rem 0.5rem;
 		position: sticky;
@@ -518,11 +575,106 @@
 		margin: 0;
 	}
 
+	.activity-controls {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		align-items: flex-end;
+		justify-content: space-between;
+	}
+
+	.date-range-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		flex: 1 1 520px;
+	}
+
+	.date-range-fields {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem;
+	}
+
+	.date-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #4b5563;
+	}
+
+	.date-field input {
+		padding: 0.625rem 0.75rem;
+		font-size: 0.875rem;
+		border: 1px solid #d1d5db;
+		border-radius: 0.5rem;
+		background: white;
+		color: #111827;
+	}
+
+	.date-field input:focus {
+		outline: none;
+		border-color: #f97316;
+		box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+	}
+
+	.date-range-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.preset-buttons,
+	.range-action-buttons {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.preset-btn,
+	.secondary-btn,
+	.primary-btn {
+		padding: 0.55rem 0.85rem;
+		font-size: 0.8rem;
+		font-weight: 600;
+		border-radius: 0.5rem;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.preset-btn,
+	.secondary-btn {
+		background: white;
+		border: 1px solid #d1d5db;
+		color: #4b5563;
+	}
+
+	.primary-btn {
+		background: #f97316;
+		border: 1px solid #f97316;
+		color: white;
+	}
+
+	.preset-btn:hover:not(:disabled),
+	.secondary-btn:hover:not(:disabled) {
+		border-color: #f97316;
+		color: #f97316;
+	}
+
+	.primary-btn:hover:not(:disabled) {
+		background: #ea580c;
+		border-color: #ea580c;
+	}
+
 	.filter-buttons {
 		display: flex;
 		gap: 0.5rem;
-		flex: 1;
-		max-width: 400px;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 	}
 
 	.filter-btn {
@@ -548,6 +700,23 @@
 		background: #f97316;
 		border-color: #f97316;
 		color: white;
+	}
+
+	.range-summary {
+		padding: 0 0.5rem 1rem;
+		font-size: 0.85rem;
+		color: #6b7280;
+	}
+
+	.range-error {
+		margin: 0 0.5rem 1rem;
+		padding: 0.75rem 1rem;
+		background: #fef2f2;
+		color: #b91c1c;
+		border: 1px solid #fecaca;
+		border-radius: 0.75rem;
+		font-size: 0.875rem;
+		font-weight: 500;
 	}
 
 	.clear-filters-btn {
@@ -868,15 +1037,31 @@
 
 	/* Mobile Responsiveness */
 	@media (max-width: 768px) {
-		.activity-header {
-			flex-direction: column;
-			align-items: stretch;
-			gap: 0.75rem;
-			margin-bottom: 1rem;
-		}
-
 		.activity-header h3 {
 			text-align: center;
+		}
+
+		.activity-controls,
+		.date-range-actions {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.date-range-fields {
+			grid-template-columns: 1fr;
+		}
+
+		.preset-buttons,
+		.range-action-buttons,
+		.filter-buttons {
+			width: 100%;
+		}
+
+		.preset-btn,
+		.secondary-btn,
+		.primary-btn,
+		.filter-btn {
+			flex: 1;
 		}
 
 		.entries-container {
@@ -914,33 +1099,10 @@
 		}
 	}
 
-	/* Load More Button */
-	.load-more-container {
-		display: flex;
-		justify-content: center;
-	}
-
-	.load-more-btn {
-		padding: 0.75rem 1.5rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--secondary);
-		background: white;
-		border: 1px solid var(--secondary);
-		border-radius: 0.5rem;
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-
-	.load-more-btn:hover:not(:disabled) {
-		background: #f97316;
-		color: white;
-		transform: translateY(-1px);
-	}
-
-	.load-more-btn:disabled {
+	.preset-btn:disabled,
+	.secondary-btn:disabled,
+	.primary-btn:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
-		transform: none;
 	}
 </style>
