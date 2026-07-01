@@ -1,6 +1,4 @@
 <script lang="ts">
-	import Card from '$lib/components/ui/Card.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
 	import { vehicles, referenceDataLoading, referenceDataError } from '$lib/stores/reference-data';
 	import type { Vehicle } from '$lib/types';
 
@@ -12,6 +10,15 @@
 	}
 
 	let { selectedVehicle, onVehicleSelect, onAutoAdvance, errors }: Props = $props();
+
+	let searchQuery = $state('');
+
+	function matchesSearch(vehicle: Vehicle, query: string): boolean {
+		if (!query.trim()) return true;
+		const q = query.toLowerCase();
+		return [vehicle.code, vehicle.name, vehicle.make, vehicle.model, vehicle.registration]
+			.some((f) => (f || '').toLowerCase().includes(q));
+	}
 
 	function handleVehicleSelect(vehicle: Vehicle) {
 		onVehicleSelect(vehicle);
@@ -27,8 +34,8 @@
 	let groupedVehicles = $derived.by(() => {
 		const groups: Record<string, Vehicle[]> = {};
 
-		// Filter for active vehicles only, then sort
-		const activeVehicles = $vehicles.filter(v => v.is_active !== false);
+		// Filter for active vehicles only (and matching the search query), then sort
+		const activeVehicles = $vehicles.filter(v => v.is_active !== false && matchesSearch(v, searchQuery));
 		const sorted = [...activeVehicles].sort((a, b) => {
 			const typeA = a.type || 'Other';
 			const typeB = b.type || 'Other';
@@ -125,6 +132,29 @@
 			<small>Add vehicles to your fleet to begin fuel entries</small>
 		</div>
 	{:else}
+		<div class="search-bar">
+			<svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+			</svg>
+			<input
+				type="search"
+				class="search-input"
+				placeholder="Search vehicles…"
+				bind:value={searchQuery}
+				aria-label="Search vehicles"
+			/>
+			{#if searchQuery}
+				<button class="search-clear" onclick={() => (searchQuery = '')} aria-label="Clear search">×</button>
+			{/if}
+		</div>
+
+		{#if Object.keys(groupedVehicles).length === 0}
+			<div class="empty-state">
+				<div class="empty-icon">🔍</div>
+				<p>No matches for "{searchQuery}"</p>
+				<small>Try a different code, name, or registration</small>
+			</div>
+		{:else}
 		<div class="vehicle-table-container">
 			<table class="vehicle-table">
 				<colgroup>
@@ -156,8 +186,9 @@
 				</tbody>
 			</table>
 		</div>
+		{/if}
 	{/if}
-	
+
 	{#if selectedVehicle}
 		<div class="selected-summary">
 			<div class="selected-item">
@@ -174,6 +205,73 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+	}
+
+	/* Search bar */
+	.search-bar {
+		position: relative;
+		display: flex;
+		align-items: center;
+	}
+
+	.search-icon {
+		position: absolute;
+		left: 0.875rem;
+		color: var(--gray-400);
+		pointer-events: none;
+	}
+
+	.search-input {
+		width: 100%;
+		min-height: 2.75rem;
+		padding: 0.625rem 2.5rem;
+		border: 1px solid var(--gray-300);
+		border-radius: var(--radius-lg);
+		font-size: var(--text-base);
+		color: var(--gray-900);
+		background: var(--white);
+		box-sizing: border-box;
+		transition: border-color 0.15s ease, box-shadow 0.15s ease;
+		-webkit-appearance: none;
+		appearance: none;
+	}
+
+	.search-input::placeholder {
+		color: var(--gray-400);
+	}
+
+	.search-input:focus {
+		outline: none;
+		border-color: var(--brand);
+		box-shadow: var(--focus-ring);
+	}
+
+	.search-clear {
+		position: absolute;
+		right: 0.5rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		border: none;
+		background: var(--gray-100);
+		color: var(--gray-600);
+		border-radius: var(--radius-full);
+		font-size: 1.25rem;
+		line-height: 1;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+
+	.search-clear:hover {
+		background: var(--gray-200);
+	}
+
+	@media (max-width: 768px) {
+		.search-input {
+			font-size: 16px; /* prevents iOS zoom on focus */
+		}
 	}
 
 	/* Step Header */

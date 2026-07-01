@@ -1,8 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import Button from '$lib/components/ui/Button.svelte';
-	import Card from '$lib/components/ui/Card.svelte';
-	import WorkflowStepper from './WorkflowStepper.svelte';
 	import VehicleSelection from './steps/VehicleSelection.svelte';
 	import DriverSelection from './steps/DriverSelection.svelte';
 	import ActivitySelection from './steps/ActivitySelection.svelte';
@@ -195,6 +192,7 @@
 			<div class="header-content">
 				<h1>{getStepTitle($currentStep)}</h1>
 			</div>
+			<div class="step-counter">Step {$currentStep + 1} <span>of 7</span></div>
 		</div>
 		
 		
@@ -515,12 +513,6 @@
 	</div>
 {/if}
 
-<svelte:head>
-	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-</svelte:head>
-
 <style>
 	.fuel-entry-workflow {
 		width: 100%;
@@ -555,9 +547,29 @@
 	.header-content h1 {
 		font-size: 2.25rem;
 		font-weight: 700;
-		color: var(--color-text-primary);
+		color: var(--gray-900);
 		margin: 0 0 0.5rem 0;
 		line-height: 1.2;
+	}
+
+	/* Step counter chip */
+	.step-counter {
+		flex-shrink: 0;
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.25rem;
+		padding: 0.375rem 0.75rem;
+		border-radius: var(--radius-full);
+		background: var(--brand-tint);
+		color: var(--brand-hover);
+		font-size: var(--text-sm);
+		font-weight: 700;
+		white-space: nowrap;
+	}
+
+	.step-counter span {
+		font-weight: 500;
+		opacity: 0.75;
 	}
 	
 	/* Bottom Navigation Bar - Native App Style */
@@ -570,6 +582,7 @@
 		background: white;
 		border-top: 1px solid #e5e7eb;
 		padding: 0.75rem 1rem;
+		padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
 		display: flex;
 		gap: 0.75rem;
 		box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
@@ -625,15 +638,15 @@
 
 	/* Primary Button (Continue/Submit) */
 	.nav-action-btn.primary-btn {
-		background: linear-gradient(135deg, var(--brand-hover), var(--brand-active));
+		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
 		color: white;
 		flex: 2;
 	}
 
 	.nav-action-btn.primary-btn:hover:not(:disabled) {
-		background: linear-gradient(135deg, var(--brand-active), var(--brand-active));
+		background: linear-gradient(135deg, var(--brand-hover), var(--brand-active));
 		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+		box-shadow: 0 4px 12px var(--brand-ring);
 	}
 
 	.nav-action-btn.primary-btn:disabled {
@@ -655,9 +668,9 @@
 	
 	.progress-indicator {
 		height: 100%;
-		background: linear-gradient(90deg, #10b981, #059669);
+		background: linear-gradient(90deg, var(--brand), var(--brand-hover));
 		transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-		box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+		box-shadow: 0 0 8px var(--brand-glow);
 		border-radius: 2px;
 	}
 	
@@ -933,11 +946,13 @@
 		
 		/* Match Summary/Dashboard Mobile Header Exactly */
 		.dashboard-header {
-			flex-direction: column;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
 			gap: 0.75rem;
 			padding: 0.5rem;
 		}
-		
+
 		.header-content h1 {
 			font-size: 1.75rem;
 		}

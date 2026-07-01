@@ -1,6 +1,4 @@
 <script lang="ts">
-	import Card from '$lib/components/ui/Card.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
 	import { drivers, referenceDataLoading, referenceDataError } from '$lib/stores/reference-data';
 	import type { Driver } from '$lib/types';
 
@@ -13,6 +11,7 @@
 
 	let { selectedDriver, onDriverSelect, onAutoAdvance, errors }: Props = $props();
 
+	let searchQuery = $state('');
 
 	function handleDriverSelect(driver: Driver) {
 		onDriverSelect(driver);
@@ -24,11 +23,22 @@
 		}
 	}
 
-	let filteredDrivers = $derived([...$drivers].sort((a, b) => {
-		const codeA = a.employee_code || 'ZZZ';
-		const codeB = b.employee_code || 'ZZZ';
-		return codeA.localeCompare(codeB);
-	}));
+	function matchesSearch(driver: Driver, query: string): boolean {
+		if (!query.trim()) return true;
+		const q = query.toLowerCase();
+		return [driver.name, driver.employee_code]
+			.some((f) => (f || '').toLowerCase().includes(q));
+	}
+
+	let filteredDrivers = $derived(
+		[...$drivers]
+			.filter((d) => matchesSearch(d, searchQuery))
+			.sort((a, b) => {
+				const codeA = a.employee_code || 'ZZZ';
+				const codeB = b.employee_code || 'ZZZ';
+				return codeA.localeCompare(codeB);
+			})
+	);
 </script>
 
 <div class="driver-selection">
@@ -62,9 +72,30 @@
 		</div>
 	{:else if $drivers.length === 0}
 		<div class="empty-state">No drivers available</div>
-	{:else if filteredDrivers.length === 0}
-		<div class="empty-state">No drivers found</div>
 	{:else}
+		<div class="search-bar">
+			<svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+			</svg>
+			<input
+				type="search"
+				class="search-input"
+				placeholder="Search drivers…"
+				bind:value={searchQuery}
+				aria-label="Search drivers"
+			/>
+			{#if searchQuery}
+				<button class="search-clear" onclick={() => (searchQuery = '')} aria-label="Clear search">×</button>
+			{/if}
+		</div>
+
+		{#if filteredDrivers.length === 0}
+			<div class="empty-state">
+				<div class="empty-icon">🔍</div>
+				<p>No matches for "{searchQuery}"</p>
+				<small>Try a different name or employee code</small>
+			</div>
+		{:else}
 		<div class="driver-table-container">
 			<table class="driver-table">
 				<colgroup>
@@ -84,8 +115,9 @@
 				</tbody>
 			</table>
 		</div>
+		{/if}
 	{/if}
-	
+
 	{#if selectedDriver}
 		<div class="selected-summary">
 			<div class="selected-item">
@@ -104,6 +136,74 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+	}
+
+	/* Search bar */
+	.search-bar {
+		position: relative;
+		display: flex;
+		align-items: center;
+		margin-bottom: 0.5rem;
+	}
+
+	.search-icon {
+		position: absolute;
+		left: 0.875rem;
+		color: var(--gray-400);
+		pointer-events: none;
+	}
+
+	.search-input {
+		width: 100%;
+		min-height: 2.75rem;
+		padding: 0.625rem 2.5rem;
+		border: 1px solid var(--gray-300);
+		border-radius: var(--radius-lg);
+		font-size: var(--text-base);
+		color: var(--gray-900);
+		background: var(--white);
+		box-sizing: border-box;
+		transition: border-color 0.15s ease, box-shadow 0.15s ease;
+		-webkit-appearance: none;
+		appearance: none;
+	}
+
+	.search-input::placeholder {
+		color: var(--gray-400);
+	}
+
+	.search-input:focus {
+		outline: none;
+		border-color: var(--brand);
+		box-shadow: var(--focus-ring);
+	}
+
+	.search-clear {
+		position: absolute;
+		right: 0.5rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		border: none;
+		background: var(--gray-100);
+		color: var(--gray-600);
+		border-radius: var(--radius-full);
+		font-size: 1.25rem;
+		line-height: 1;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+
+	.search-clear:hover {
+		background: var(--gray-200);
+	}
+
+	@media (max-width: 768px) {
+		.search-input {
+			font-size: 16px; /* prevents iOS zoom on focus */
+		}
 	}
 
 	/* Step Header - Following original design */
