@@ -2,8 +2,8 @@
 	import type { Snippet } from 'svelte';
 
 	interface Props {
-		variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error';
-		size?: 'small' | 'medium' | 'large';
+		variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'outline' | 'ghost' | 'danger';
+		size?: 'small' | 'medium' | 'large' | 'sm' | 'md' | 'lg';
 		disabled?: boolean;
 		loading?: boolean;
 		type?: 'button' | 'submit' | 'reset';
@@ -150,31 +150,60 @@
 		border-color: var(--warning-dark);
 	}
 
-	.btn-error {
+	.btn-error,
+	.btn-danger {
 		background: var(--error);
 		color: white;
 		border-color: var(--error);
 	}
 
-	.btn-error:hover:not(:disabled) {
+	.btn-error:hover:not(:disabled),
+	.btn-danger:hover:not(:disabled) {
 		background: var(--error-dark);
 		border-color: var(--error-dark);
 	}
 
+	/* Outline: bordered, transparent fill */
+	.btn-outline {
+		background: transparent;
+		color: var(--gray-700);
+		border-color: var(--gray-300);
+	}
+
+	.btn-outline:hover:not(:disabled) {
+		background: var(--gray-50);
+		border-color: var(--gray-400);
+	}
+
+	/* Ghost: no border, subtle hover */
+	.btn-ghost {
+		background: transparent;
+		color: var(--gray-600);
+		border-color: transparent;
+	}
+
+	.btn-ghost:hover:not(:disabled) {
+		background: var(--gray-100);
+		color: var(--gray-800);
+	}
+
 	/* Sizes */
-	.btn-small {
+	.btn-small,
+	.btn-sm {
 		min-height: 2rem;
 		padding: 0.375rem 0.75rem;
 		font-size: var(--text-xs);
 	}
 
-	.btn-medium {
+	.btn-medium,
+	.btn-md {
 		min-height: 2.5rem;
 		padding: 0.5rem 1rem;
 		font-size: var(--text-sm);
 	}
 
-	.btn-large {
+	.btn-large,
+	.btn-lg {
 		min-height: 3rem;
 		padding: 0.75rem 1.5rem;
 		font-size: var(--text-base);
