@@ -476,7 +476,7 @@
 	.reading-input:focus {
 		outline: none;
 		border-color: var(--color-primary);
-		box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.1);
+		box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.1);
 	}
 	
 	.reading-input:disabled {

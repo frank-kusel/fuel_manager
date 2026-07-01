@@ -505,20 +505,20 @@
 	}
 
 	.filter-btn:hover {
-		border-color: #f97316;
-		color: #f97316;
+		border-color: var(--brand);
+		color: var(--brand);
 	}
 
 	.filter-btn.active {
-		background: #f97316;
-		border-color: #f97316;
+		background: var(--brand);
+		border-color: var(--brand);
 		color: white;
 	}
 
 	.clear-filters-btn {
 		margin-top: 1rem;
 		padding: 0.5rem 1rem;
-		background: #f97316;
+		background: var(--brand);
 		color: white;
 		border: none;
 		border-radius: 0.375rem;
@@ -528,7 +528,7 @@
 	}
 
 	.clear-filters-btn:hover {
-		background: #ea580c;
+		background: var(--brand-hover);
 	}
 
 	/* Entries Container */
@@ -635,7 +635,7 @@
 	.fuel-amount {
 		font-size: 1.125rem;
 		font-weight: 700;
-		color: #2563eb;
+		color: var(--brand-hover);
 		font-family: inherit; /* Use same font as rest of card */
 	}
 
@@ -674,7 +674,7 @@
 
 	/* Consumption Color Classes */
 	.consumption-good {
-		color: #059669; /* Green - good efficiency */
+		color: var(--success); /* Green - good efficiency */
 	}
 
 	.consumption-bad {
@@ -768,7 +768,7 @@
 	.fuel-drop {
 		width: 60px;
 		height: 80px;
-		background: linear-gradient(135deg, #f97316, #ea580c);
+		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
 		border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
 		position: relative;
 		opacity: 0.6;
@@ -873,7 +873,7 @@
 	}
 
 	.load-more-btn:hover:not(:disabled) {
-		background: #f97316;
+		background: var(--brand);
 		color: white;
 		transform: translateY(-1px);
 	}

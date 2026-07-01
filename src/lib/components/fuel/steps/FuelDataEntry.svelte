@@ -258,8 +258,8 @@
 
 	.bowser-select:focus {
 		outline: none;
-		border-color: #2563eb;
-		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+		border-color: var(--brand-hover);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	/* Main Fuel Input - Large and Touch-Friendly */
@@ -383,7 +383,7 @@
 	}
 	
 	.calc-value.editable:hover {
-		border-bottom-color: #f97316;
+		border-bottom-color: var(--brand);
 	}
 
 	.start-reading-input,
@@ -406,8 +406,8 @@
 	.start-reading-input:focus,
 	.end-reading-input:focus {
 		outline: none;
-		border-color: #f97316;
-		box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+		border-color: var(--brand);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 		background: white;
 	}
 
@@ -437,19 +437,19 @@
 	.edit-btn:hover,
 	.resync-btn:hover {
 		background: #f9fafb;
-		border-color: #f97316;
-		color: #f97316;
+		border-color: var(--brand);
+		color: var(--brand);
 	}
-	
+
 	.edit-btn:active,
 	.resync-btn:active {
-		background: #fef3e2;
+		background: #ccfbf1;
 	}
-	
+
 	.resync-btn {
-		background: #fef3e2;
-		border-color: #f97316;
-		color: #ea580c;
+		background: #ccfbf1;
+		border-color: var(--brand);
+		color: var(--brand-hover);
 	}
 
 	/* Warning message */

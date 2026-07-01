@@ -284,10 +284,10 @@
 	.skip-button {
 		width: 100%;
 		padding: 0.75rem 1rem;
-		border: 1px solid #bae6fd;
+		border: 1px solid #99f6e4;
 		border-radius: 6px;
 		background: white;
-		color: #0284c7;
+		color: var(--brand);
 		font-size: 0.875rem;
 		font-weight: 500;
 		cursor: pointer;
@@ -298,13 +298,13 @@
 	}
 
 	.skip-button:hover {
-		background: #f0f9ff;
-		border-color: #0284c7;
-		color: #0369a1;
+		background: #f0fdfa;
+		border-color: var(--brand);
+		color: var(--brand-hover);
 	}
 
 	.skip-button:active {
-		background: #e0f2fe;
+		background: #ccfbf1;
 		transform: scale(0.98);
 	}
 
@@ -331,8 +331,8 @@
 
 	.search-input input:focus {
 		outline: none;
-		border-color: #2563eb;
-		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+		border-color: var(--brand-hover);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	.search-icon {
@@ -387,18 +387,18 @@
 	}
 
 	.field-card:hover {
-		border-color: #2563eb;
-		background: #eff6ff;
+		border-color: var(--brand);
+		background: #f0fdfa;
 		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
 	}
 
 	.field-card.selected {
-		border-color: #2563eb;
-		background: #2563eb;
+		border-color: var(--brand);
+		background: var(--brand);
 		color: var(--gray-900, #0f172a);
 		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
 	}
 
 	.field-header {
@@ -512,18 +512,18 @@
 	}
 
 	.zone-card:hover {
-		border-color: #2563eb;
-		background: #eff6ff;
+		border-color: var(--brand);
+		background: #f0fdfa;
 		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
 	}
 
 	.zone-card.selected {
-		border-color: #2563eb;
-		background: #2563eb;
+		border-color: var(--brand);
+		background: var(--brand);
 		color: var(--gray-900, #0f172a);
 		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
 	}
 
 	.zone-header {

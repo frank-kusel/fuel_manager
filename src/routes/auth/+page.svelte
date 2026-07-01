@@ -258,7 +258,7 @@
 	.form-group input:focus {
 		outline: none;
 		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+		box-shadow: var(--focus-ring);
 	}
 
 	.form-group input:disabled {

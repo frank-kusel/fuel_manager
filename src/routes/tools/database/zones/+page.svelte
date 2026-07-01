@@ -330,8 +330,8 @@
 	.form-group select:focus,
 	.form-group textarea:focus {
 		outline: none;
-		border-color: var(--blue-500, #3b82f6);
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+		border-color: var(--brand);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	.color-input {
@@ -442,7 +442,7 @@
 		width: 3rem;
 		height: 3rem;
 		border: 3px solid var(--gray-200, #e5e7eb);
-		border-top-color: var(--blue-500, #3b82f6);
+		border-top-color: var(--brand);
 		border-radius: 50%;
 		animation: spin 1s linear infinite;
 		margin-bottom: 1rem;

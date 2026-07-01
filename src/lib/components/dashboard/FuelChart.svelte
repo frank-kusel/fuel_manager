@@ -223,24 +223,24 @@
 	}
 
 	.dot.low {
-		background: #dbeafe;
-		border: 2px solid #93c5fd;
+		background: #ccfbf1;
+		border: 2px solid #5eead4;
 	}
 
 	.dot.medium {
-		background: #bfdbfe;
-		border: 2px solid #60a5fa;
+		background: #99f6e4;
+		border: 2px solid #5eead4;
 	}
 
 	.dot.high {
-		background: #3b82f6;
-		border: 2px solid #2563eb;
+		background: var(--brand);
+		border: 2px solid var(--brand-hover);
 	}
 
 	.dot.very-high {
-		background: #1d4ed8;
+		background: var(--brand-active);
 		border: 2px solid #1e40af;
-		box-shadow: 0 0 8px rgba(29, 78, 216, 0.4);
+		box-shadow: 0 0 8px rgba(13, 148, 136, 0.4);
 	}
 
 	.dot:not(.skeleton):hover {

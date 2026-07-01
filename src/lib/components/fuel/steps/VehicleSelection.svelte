@@ -285,12 +285,12 @@
 
 	/* Selected vehicle row */
 	.vehicle-table tbody tr.vehicle-row.selected {
-		background: rgba(37, 99, 235, 0.08);
+		background: rgba(13, 148, 136, 0.08);
 		border-radius: 0.5rem;
 	}
 
 	.vehicle-table tbody tr.vehicle-row.selected .vehicle-code {
-		color: #2563eb;
+		color: var(--brand-hover);
 		font-weight: 600;
 	}
 

@@ -103,12 +103,13 @@
 
 	.input {
 		width: 100%;
-		padding: 0.75rem;
+		min-height: 2.75rem;
+		padding: 0.625rem 0.75rem;
 		border: 1px solid var(--gray-300);
 		border-radius: var(--border-radius);
-		font-size: 1rem;
+		font-size: var(--text-base);
 		line-height: 1.5;
-		transition: all 0.2s ease;
+		transition: border-color 0.15s ease, box-shadow 0.15s ease;
 		background: white;
 		color: var(--gray-900);
 		box-sizing: border-box;
@@ -117,7 +118,7 @@
 	.input:focus {
 		outline: none;
 		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+		box-shadow: var(--focus-ring);
 	}
 
 	.input:hover:not(:disabled):not(:readonly) {
@@ -129,7 +130,7 @@
 	}
 
 	.input-error:focus {
-		box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+		box-shadow: var(--focus-ring-error);
 	}
 
 	.input-disabled {

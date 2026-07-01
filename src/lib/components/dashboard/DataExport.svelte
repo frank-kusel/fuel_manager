@@ -426,7 +426,7 @@
 	.date-field input:focus {
 		outline: none;
 		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	.date-field input:disabled {
@@ -515,7 +515,7 @@
 	.month-field select:focus {
 		outline: none;
 		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	.month-field select:disabled {
@@ -602,6 +602,6 @@
 		--green-50: #f0fdf4;
 		--green-200: #bbf7d0;
 		--green-800: #166534;
-		--primary: #16a34a;
+		--primary: #0d9488;
 	}
 </style>

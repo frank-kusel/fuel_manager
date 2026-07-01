@@ -264,9 +264,9 @@
 	}
 	
 	.odo-control-btn.save-btn {
-		background: #f0f9ff;
-		border-color: #3b82f6;
-		color: #2563eb;
+		background: #f0fdfa;
+		border-color: var(--brand);
+		color: var(--brand-hover);
 	}
 	
 	.current-odo-input {
@@ -302,13 +302,13 @@
 
 	.new-odo {
 		background: white;
-		border: 3px solid #2563eb;
+		border: 3px solid var(--brand);
 		border-radius: 0.75rem;
 	}
-	
+
 	.new-odo:focus-within {
-		border-color: #1d4ed8;
-		box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+		border-color: var(--brand-hover);
+		box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.1);
 	}
 
 	
@@ -328,7 +328,7 @@
 	}
 	
 	.new-odo .odo-value:hover {
-		background: rgba(37, 99, 235, 0.05);
+		background: rgba(13, 148, 136, 0.05);
 	}
 
 	.new-odo-input {

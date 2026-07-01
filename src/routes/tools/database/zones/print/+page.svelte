@@ -338,13 +338,13 @@
 	}
 
 	.print-button {
-		background: #2563eb;
+		background: var(--brand-hover);
 		color: white;
 		border: none;
 	}
 
 	.print-button:hover {
-		background: #1d4ed8;
+		background: var(--brand-active);
 	}
 
 	.close-button {

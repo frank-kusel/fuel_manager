@@ -743,13 +743,13 @@
 	}
 
 	.preset-btn:hover {
-		border-color: #f97316;
-		color: #f97316;
+		border-color: var(--brand);
+		color: var(--brand);
 	}
 
 	.preset-btn.active {
-		background: #f97316;
-		border-color: #f97316;
+		background: var(--brand);
+		border-color: var(--brand);
 		color: white;
 	}
 
@@ -838,7 +838,7 @@
 
 	.status-badge.good {
 		background: #dcfce7;
-		color: #166534;
+		color: var(--success-dark);
 	}
 
 	.status-badge.warning {
@@ -896,12 +896,12 @@
 	}
 
 	.reconcile-btn.fuel {
-		background: #3b82f6;
+		background: var(--brand);
 		color: white;
 	}
 
 	.reconcile-btn.fuel:hover {
-		background: #2563eb;
+		background: var(--brand-hover);
 	}
 
 	.reconcile-btn.tank {
@@ -921,7 +921,7 @@
 
 
 	.variance.good {
-		color: #166534;
+		color: var(--success-dark);
 	}
 
 	.variance.warning {
@@ -933,7 +933,7 @@
 	}
 
 	.confidence.confidence-very-high {
-		color: #166534;
+		color: var(--success-dark);
 	}
 
 	.confidence.confidence-high {

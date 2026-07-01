@@ -216,8 +216,8 @@
 
 	.form-group input:focus {
 		outline: none;
-		border-color: #f97316;
-		box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+		border-color: var(--brand);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	.modal-footer {

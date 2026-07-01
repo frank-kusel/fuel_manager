@@ -156,7 +156,7 @@
 	}
 
 	.tank-fill.high {
-		background: linear-gradient(180deg, #86efac 0%, #16a34a 100%);
+		background: linear-gradient(180deg, #86efac 0%, var(--success) 100%);
 	}
 
 	.tank-fill.medium {

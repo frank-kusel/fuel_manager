@@ -295,8 +295,8 @@
 
 	.search-input input:focus {
 		outline: none;
-		border-color: #2563eb;
-		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+		border-color: var(--brand-hover);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	.search-icon {
@@ -435,13 +435,13 @@
 	}
 
 	.field-checkbox-card:hover:not(.disabled) {
-		border-color: #3b82f6;
-		background: #eff6ff;
+		border-color: var(--brand);
+		background: #f0fdfa;
 	}
 
 	.field-checkbox-card.selected {
-		border-color: #10b981;
-		background: #f0fdf4;
+		border-color: var(--brand);
+		background: #f0fdfa;
 	}
 
 	.field-checkbox-card.disabled {
@@ -454,7 +454,7 @@
 		margin: 0;
 		width: 1.25rem;
 		height: 1.25rem;
-		accent-color: #10b981;
+		accent-color: var(--brand);
 		cursor: pointer;
 	}
 
@@ -510,7 +510,7 @@
 		width: 2rem;
 		height: 2rem;
 		border: 3px solid #e5e7eb;
-		border-top: 3px solid #3b82f6;
+		border-top: 3px solid var(--brand);
 		border-radius: 50%;
 		animation: spin 1s linear infinite;
 		margin-bottom: 1rem;

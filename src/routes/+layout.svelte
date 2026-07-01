@@ -67,7 +67,12 @@
 	<!-- Desktop Header -->
 	<header class="header desktop-only">
 		<div class="header-brand">
-			<div class="brand-icon">🚜</div>
+			<div class="brand-icon">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+					<path d="M12 2.5C12 2.5 5.5 9.8 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 9.8 12 2.5 12 2.5Z" fill="currentColor"/>
+					<path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" opacity="0.85"/>
+				</svg>
+			</div>
 			<h1>FarmTrack</h1>
 		</div>
 		<nav class="nav">
@@ -232,15 +237,23 @@
 	}
 
 	.brand-icon {
-		font-size: 1.5rem;
-		color: #f97316;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: var(--radius-lg);
+		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
+		color: #ffffff;
+		box-shadow: 0 2px 8px var(--brand-glow);
 	}
 
 	.header h1 {
 		margin: 0;
-		font-size: 1.5rem;
+		font-size: 1.35rem;
 		font-weight: 700;
-		color: #111827;
+		letter-spacing: -0.01em;
+		color: var(--gray-900);
 	}
 
 	.nav {
@@ -260,31 +273,31 @@
 	}
 
 	.nav-btn:hover {
-		background: rgba(249, 115, 22, 0.05);
-		color: #f97316;
-		border-color: rgba(249, 115, 22, 0.2);
+		background: var(--brand-tint-weak);
+		color: var(--brand);
+		border-color: rgba(13, 148, 136, 0.2);
 	}
 
 	.nav-btn.active {
-		background: rgba(249, 115, 22, 0.1);
-		color: #f97316;
-		border-color: rgba(249, 115, 22, 0.3);
+		background: var(--brand-tint);
+		color: var(--brand);
+		border-color: var(--brand-ring);
 		font-weight: 600;
 	}
 
 	.action-btn {
-		background: linear-gradient(135deg, #f97316, #ea580c);
+		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
 		color: white;
 		border: none;
 		font-weight: 600;
 	}
 
 	.action-btn:hover {
-		background: linear-gradient(135deg, #ea580c, #dc2626);
+		background: linear-gradient(135deg, var(--brand-hover), var(--brand-active));
 		color: white;
 		border-color: transparent;
 		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+		box-shadow: 0 4px 12px var(--brand-ring);
 	}
 
 
@@ -327,13 +340,13 @@
 	}
 
 	.mobile-nav-btn:hover {
-		color: #f97316;
-		background: rgba(249, 115, 22, 0.05);
+		color: var(--brand);
+		background: var(--brand-tint-weak);
 	}
 
 	.mobile-nav-btn.active {
-		color: #f97316;
-		background: rgba(249, 115, 22, 0.1);
+		color: var(--brand);
+		background: var(--brand-tint);
 		font-weight: 600;
 	}
 
@@ -345,7 +358,7 @@
 		transform: translateX(-50%);
 		width: 24px;
 		height: 3px;
-		background: linear-gradient(135deg, #f97316, #ea580c);
+		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
 		border-radius: 0 0 6px 6px;
 	}
 
@@ -370,7 +383,7 @@
 	.central-action {
 		position: relative;
 		margin: 0;
-		background: linear-gradient(135deg, #f97316, #ea580c);
+		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
 		color: white;
 		border-radius: 50%;
 		width: 56px;
@@ -379,36 +392,36 @@
 		min-height: 56px;
 		flex: 0 0 auto;
 		bottom: 0.75rem;
-		box-shadow: 0 4px 16px rgba(249, 115, 22, 0.4);
+		box-shadow: 0 4px 16px var(--brand-glow);
 		border: none;
 		padding: 0;
 		transition: all 0.3s ease;
 	}
 
 	.central-action:hover {
-		background: linear-gradient(135deg, #ea580c, #dc2626);
+		background: linear-gradient(135deg, var(--brand-hover), var(--brand-active));
 		transform: scale(1.05);
-		box-shadow: 0 6px 20px rgba(249, 115, 22, 0.5);
+		box-shadow: 0 6px 20px var(--brand-glow-strong);
 	}
 
 	/* Draft in progress state */
 	.central-action.has-draft {
-		background: linear-gradient(135deg, #3b82f6, #2563eb);
-		box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+		background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+		box-shadow: 0 4px 16px var(--accent-glow);
 		animation: pulse-button 2s ease-in-out infinite;
 	}
 
 	.central-action.has-draft:hover {
-		background: linear-gradient(135deg, #2563eb, #1d4ed8);
-		box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+		background: linear-gradient(135deg, var(--accent-hover), var(--accent-active));
+		box-shadow: 0 6px 20px var(--accent-glow-strong);
 	}
 
 	@keyframes pulse-button {
 		0%, 100% {
-			box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+			box-shadow: 0 4px 16px var(--accent-glow);
 		}
 		50% {
-			box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);
+			box-shadow: 0 6px 24px var(--accent-glow-max);
 		}
 	}
 
@@ -494,18 +507,18 @@
 	}
 
 	.action-menu-item:hover {
-		background: #fef3f2;
+		background: #f0fdfa;
 	}
 
 	.action-menu-item:active {
-		background: #fee2e2;
+		background: #ccfbf1;
 	}
 
 	.action-menu-icon {
 		width: 48px;
 		height: 48px;
 		border-radius: 12px;
-		background: linear-gradient(135deg, #fff7ed, #ffedd5);
+		background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -513,7 +526,7 @@
 	}
 
 	.action-menu-icon svg {
-		color: #f97316;
+		color: var(--brand);
 		width: 24px;
 		height: 24px;
 	}

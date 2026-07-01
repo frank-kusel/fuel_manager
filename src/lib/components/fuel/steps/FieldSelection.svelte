@@ -293,9 +293,9 @@
 
 	/* Clean selected state */
 	:global(#field-table tbody tr.selected) {
-		background: rgba(37, 99, 235, 0.08);
+		background: rgba(13, 148, 136, 0.08);
 		border-radius: 0.5rem;
-		border-bottom-color: rgba(37, 99, 235, 0.2);
+		border-bottom-color: rgba(13, 148, 136, 0.2);
 	}
 
 	/* Clean field cell styling */
@@ -321,7 +321,7 @@
 
 	/* Selected state text colors */
 	:global(#field-table tbody tr.selected .field-name) {
-		color: #2563eb;
+		color: var(--brand-hover);
 		font-weight: 600;
 	}
 
@@ -440,10 +440,10 @@
 
 	.skip-message {
 		padding: 0.75rem;
-		background: #e0f2fe;
-		border: 1px solid #b3e5fc;
+		background: #ccfbf1;
+		border: 1px solid #99f6e4;
 		border-radius: 0.5rem;
-		color: #0277bd;
+		color: var(--brand-hover);
 		font-size: 0.875rem;
 		text-align: center;
 		margin-bottom: 0.75rem;
@@ -452,8 +452,8 @@
 	}
 
 	.skip-message:hover {
-		background: #b3e5fc;
-		color: #01579b;
+		background: #99f6e4;
+		color: var(--brand-active);
 	}
 
 	/* Error Messages */
@@ -503,8 +503,8 @@
 
 	.search-input input:focus {
 		outline: none;
-		border-color: #2563eb;
-		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+		border-color: var(--brand-hover);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	.search-icon {

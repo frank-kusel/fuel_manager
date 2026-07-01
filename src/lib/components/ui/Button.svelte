@@ -89,9 +89,13 @@
 		user-select: none;
 	}
 
-	.btn:focus {
+	.btn:focus-visible {
 		outline: none;
-		box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+		box-shadow: var(--focus-ring);
+	}
+
+	.btn:active:not(:disabled) {
+		transform: translateY(1px);
 	}
 
 	.btn:disabled,
@@ -131,8 +135,8 @@
 	}
 
 	.btn-success:hover:not(:disabled) {
-		background: #15803d;
-		border-color: #15803d;
+		background: var(--success-dark);
+		border-color: var(--success-dark);
 	}
 
 	.btn-warning {
@@ -142,8 +146,8 @@
 	}
 
 	.btn-warning:hover:not(:disabled) {
-		background: #d97706;
-		border-color: #d97706;
+		background: var(--warning-dark);
+		border-color: var(--warning-dark);
 	}
 
 	.btn-error {
@@ -153,24 +157,27 @@
 	}
 
 	.btn-error:hover:not(:disabled) {
-		background: #b91c1c;
-		border-color: #b91c1c;
+		background: var(--error-dark);
+		border-color: var(--error-dark);
 	}
 
 	/* Sizes */
 	.btn-small {
+		min-height: 2rem;
 		padding: 0.375rem 0.75rem;
-		font-size: 0.75rem;
+		font-size: var(--text-xs);
 	}
 
 	.btn-medium {
+		min-height: 2.5rem;
 		padding: 0.5rem 1rem;
-		font-size: 0.875rem;
+		font-size: var(--text-sm);
 	}
 
 	.btn-large {
+		min-height: 3rem;
 		padding: 0.75rem 1.5rem;
-		font-size: 1rem;
+		font-size: var(--text-base);
 	}
 
 	/* Full width */

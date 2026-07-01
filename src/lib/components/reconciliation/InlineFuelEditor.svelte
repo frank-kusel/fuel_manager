@@ -549,8 +549,8 @@
 	}
 
 	.entry-item.editing {
-		border-color: #f97316;
-		background: rgba(249, 115, 22, 0.02);
+		border-color: var(--brand);
+		background: rgba(13, 148, 136, 0.02);
 	}
 
 	.entry-header {
@@ -619,8 +619,8 @@
 
 	.form-input:focus, .form-textarea:focus {
 		outline: none;
-		border-color: #f97316;
-		box-shadow: 0 0 0 1px #f97316;
+		border-color: var(--brand);
+		box-shadow: 0 0 0 1px var(--brand);
 	}
 
 	.entry-details {

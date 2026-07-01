@@ -265,7 +265,7 @@
 		width: 2rem;
 		height: 2rem;
 		border: 2px solid #e5e7eb;
-		border-top-color: #3b82f6;
+		border-top-color: var(--brand);
 		border-radius: 50%;
 		animation: spin 1s linear infinite;
 		margin-bottom: 1rem;

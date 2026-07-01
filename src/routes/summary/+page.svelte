@@ -430,8 +430,8 @@
 
 	.refresh-btn:hover:not(:disabled) {
 		background: #f9fafb;
-		border-color: #f97316;
-		color: #f97316;
+		border-color: var(--brand);
+		color: var(--brand);
 	}
 
 	.refresh-btn:disabled {
@@ -512,7 +512,7 @@
 		left: 1rem;
 		width: 2rem;
 		height: 2rem;
-		background: #3b82f6;
+		background: var(--brand);
 		color: white;
 		border-radius: 50%;
 		display: flex;
@@ -652,7 +652,7 @@
 	.entry-fuel-amount {
 		font-weight: 700;
 		font-size: 1.125rem;
-		color: #2563eb;
+		color: var(--brand-hover);
 		margin: 0;
 	}
 

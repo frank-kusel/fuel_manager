@@ -169,12 +169,12 @@
 
 	/* Selected driver row */
 	.driver-table tbody tr.driver-row.selected {
-		background: rgba(37, 99, 235, 0.08);
+		background: rgba(13, 148, 136, 0.08);
 		border-radius: 0.5rem;
 	}
 
 	.driver-table tbody tr.driver-row.selected .driver-code {
-		color: #2563eb;
+		color: var(--brand-hover);
 		font-weight: 600;
 	}
 
@@ -369,7 +369,7 @@
 
 	.vehicle-code {
 		font-weight: 600;
-		color: var(--primary, #2563eb);
+		color: var(--brand);
 		font-size: 0.75rem;
 	}
 

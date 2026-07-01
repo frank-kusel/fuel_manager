@@ -625,15 +625,15 @@
 
 	/* Primary Button (Continue/Submit) */
 	.nav-action-btn.primary-btn {
-		background: linear-gradient(135deg, #2563eb, #1d4ed8);
+		background: linear-gradient(135deg, var(--brand-hover), var(--brand-active));
 		color: white;
 		flex: 2;
 	}
 
 	.nav-action-btn.primary-btn:hover:not(:disabled) {
-		background: linear-gradient(135deg, #1d4ed8, #1e40af);
+		background: linear-gradient(135deg, var(--brand-active), var(--brand-active));
 		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
 	}
 
 	.nav-action-btn.primary-btn:disabled {
@@ -750,13 +750,13 @@
 	.field-chip {
 		display: inline-flex;
 		align-items: center;
-		background: #f0fdf4;
-		border: 1px solid #10b981;
+		background: #f0fdfa;
+		border: 1px solid var(--brand);
 		border-radius: 16px;
 		padding: 0.25rem 0.625rem;
 		font-size: 0.75rem;
 		font-weight: 500;
-		color: #065f46;
+		color: var(--brand-hover);
 	}
 
 
@@ -812,8 +812,8 @@
 
 	.datetime-input:focus {
 		outline: none;
-		border-color: #2563eb;
-		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+		border-color: var(--brand-hover);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	.datetime-input:hover:not(:focus) {
@@ -892,7 +892,7 @@
 	}
 	
 	.success-content h3 {
-		color: #f97316;
+		color: var(--brand);
 		font-size: 1.25rem;
 		font-weight: 700;
 		margin: 0;
@@ -1027,7 +1027,7 @@
 		
 		.success-content h3 {
 			font-size: 1.125rem;
-			color: #f97316;
+			color: var(--brand);
 		}
 		
 		.success-content p {

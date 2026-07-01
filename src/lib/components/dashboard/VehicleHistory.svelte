@@ -317,7 +317,7 @@
 
 	.vehicle-card:hover {
 		background: var(--gray-100);
-		border-color: #f97316;
+		border-color: var(--brand);
 		transform: translateY(-1px);
 	}
 
@@ -356,7 +356,7 @@
 	}
 
 	.selected-badge {
-		background: #f97316;
+		background: var(--brand);
 		color: white;
 		font-size: 0.75rem;
 		font-weight: 600;
@@ -410,7 +410,7 @@
 	.subtotal-amount {
 		font-size: 1.25rem;
 		font-weight: 700;
-		color: #f97316;
+		color: var(--brand);
 		margin-bottom: 0.125rem;
 	}
 
@@ -460,7 +460,7 @@
 	.col-fuel {
 		text-align: right;
 		font-weight: 600;
-		color: #f97316;
+		color: var(--brand);
 	}
 
 	.date-main {

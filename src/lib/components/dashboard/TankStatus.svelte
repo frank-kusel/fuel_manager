@@ -182,7 +182,7 @@
 	.level-value {
 		font-size: 1.5rem;
 		font-weight: 700;
-		color: #f97316;
+		color: var(--brand);
 		display: flex;
 		align-items: baseline;
 		gap: 0.25rem;
@@ -204,7 +204,7 @@
 	
 	.tank-fill {
 		height: 100%;
-		background: linear-gradient(90deg, #f97316 0%, #ea580c 100%);
+		background: linear-gradient(90deg, var(--brand) 0%, var(--brand-hover) 100%);
 		transition: width 0.5s ease;
 		border-radius: 0.5rem;
 	}
@@ -221,7 +221,7 @@
 	.variance-compact.good {
 		background: #f0fdf4;
 		border-color: #bbf7d0;
-		color: #166534;
+		color: var(--success-dark);
 	}
 	
 	.variance-compact.warning {

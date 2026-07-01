@@ -563,8 +563,8 @@
 
 	.setting-input:focus, .setting-select:focus {
 		outline: none;
-		border-color: #f97316;
-		box-shadow: 0 0 0 1px #f97316;
+		border-color: var(--brand);
+		box-shadow: 0 0 0 1px var(--brand);
 	}
 
 	.setting-input:disabled {

@@ -321,8 +321,8 @@
 
 	.vehicle-dropdown:focus {
 		outline: none;
-		border-color: #f97316;
-		box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+		border-color: var(--brand);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 
 	/* States */
@@ -345,7 +345,7 @@
 		width: 40px;
 		height: 40px;
 		border: 4px solid #f3f4f6;
-		border-top-color: #f97316;
+		border-top-color: var(--brand);
 		border-radius: 50%;
 		animation: spin 1s linear infinite;
 	}
@@ -412,7 +412,7 @@
 
 	.col-fuel {
 		font-weight: 700;
-		color: #f97316;
+		color: var(--brand);
 		text-align: right;
 	}
 
@@ -423,7 +423,7 @@
 	}
 
 	.col-usage {
-		color: #059669;
+		color: var(--success);
 		font-weight: 600;
 		text-align: right;
 	}

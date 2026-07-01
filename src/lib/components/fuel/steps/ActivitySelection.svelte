@@ -246,8 +246,8 @@
 	}
 
 	.activity-card.selected {
-		background: rgba(37, 99, 235, 0.06);
-		border-color: rgba(37, 99, 235, 0.2);
+		background: rgba(13, 148, 136, 0.06);
+		border-color: rgba(13, 148, 136, 0.2);
 	}
 
 	.activity-main {
@@ -279,7 +279,7 @@
 	}
 
 	.activity-card.selected .activity-name {
-		color: #2563eb;
+		color: var(--brand-hover);
 		font-weight: 600;
 	}
 
@@ -309,13 +309,13 @@
 	}
 
 	.selection-indicator {
-		color: #2563eb;
+		color: var(--brand-hover);
 		font-size: 1rem;
 		font-weight: bold;
 		flex-shrink: 0;
 		width: 1.25rem;
 		height: 1.25rem;
-		background: rgba(37, 99, 235, 0.1);
+		background: rgba(13, 148, 136, 0.1);
 		border-radius: 50%;
 		display: flex;
 		align-items: center;

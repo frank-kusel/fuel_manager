@@ -515,12 +515,12 @@
 	
 	.action-btn:hover {
 		background: #f9fafb;
-		border-color: #f97316;
-		color: #f97316;
+		border-color: var(--brand);
+		color: var(--brand);
 	}
-	
+
 	.action-btn:active {
-		background: #fef3e2;
+		background: #ccfbf1;
 	}
 	
 	.tank-overview {
@@ -559,8 +559,8 @@
 	
 	.form-group input:focus {
 		outline: none;
-		border-color: #f97316;
-		box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+		border-color: var(--brand);
+		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 	}
 	
 	.form-actions {
@@ -607,7 +607,7 @@
 		padding: 0.5rem 0.75rem;
 		font-size: 0.75rem;
 		font-weight: 500;
-		background: #f97316;
+		background: var(--brand);
 		color: white;
 		border: none;
 		border-radius: 0.5rem;
@@ -616,7 +616,7 @@
 	}
 
 	.header-btn:hover {
-		background: #ea580c;
+		background: var(--brand-hover);
 		transform: translateY(-1px);
 	}
 
@@ -658,7 +658,7 @@
 	}
 
 	.item-value.refill {
-		color: #059669;
+		color: var(--success);
 	}
 
 	.empty-state {
