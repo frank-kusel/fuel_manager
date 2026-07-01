@@ -413,13 +413,14 @@
 
 	.date-field input {
 		width: 100%;
-		padding: 0.5rem 0.75rem;
+		min-height: 2.75rem;
+		padding: 0.625rem 0.75rem;
 		border: 1px solid var(--gray-300);
-		border-radius: 6px;
-		font-size: 0.875rem;
+		border-radius: var(--radius-md);
+		font-size: var(--text-base);
 		background: white;
 		color: var(--gray-900);
-		transition: border-color 0.2s ease;
+		transition: border-color 0.15s ease, box-shadow 0.15s ease;
 		box-sizing: border-box;
 	}
 
@@ -503,13 +504,14 @@
 
 	.month-field select {
 		width: 100%;
-		padding: 0.5rem 0.75rem;
+		min-height: 2.75rem;
+		padding: 0.625rem 0.75rem;
 		border: 1px solid var(--gray-300);
-		border-radius: 6px;
-		font-size: 0.875rem;
+		border-radius: var(--radius-md);
+		font-size: var(--text-base);
 		background: white;
 		color: var(--gray-900);
-		transition: border-color 0.2s ease;
+		transition: border-color 0.15s ease, box-shadow 0.15s ease;
 	}
 
 	.month-field select:focus {
@@ -586,22 +588,5 @@
 		.export-buttons-grid :global(.btn) {
 			width: 100%;
 		}
-	}
-
-	/* CSS variables fallbacks */
-	:root {
-		--gray-50: #f9fafb;
-		--gray-200: #e5e7eb;
-		--gray-300: #d1d5db;
-		--gray-600: #4b5563;
-		--gray-700: #374151;
-		--gray-900: #111827;
-		--red-50: #fef2f2;
-		--red-200: #fecaca;
-		--red-800: #991b1b;
-		--green-50: #f0fdf4;
-		--green-200: #bbf7d0;
-		--green-800: #166534;
-		--primary: #0d9488;
 	}
 </style>

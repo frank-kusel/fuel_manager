@@ -330,7 +330,7 @@
 		align-items: center;
 		justify-content: center;
 		text-decoration: none;
-		color: #9ca3af;
+		color: var(--gray-500);
 		font-size: 0.75rem;
 		gap: 0.25rem;
 		transition: all 0.2s ease;
