@@ -238,17 +238,18 @@
 	.odo-control-btn {
 		background: transparent;
 		border: 1px solid #d1d5db;
-		padding: 0.25rem 0.375rem;
-		border-radius: 0.25rem;
-		font-size: 0.75rem;
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
 		color: #6b7280;
 		cursor: pointer;
 		transition: all 0.2s ease;
-		min-width: 1.75rem;
-		min-height: 1.75rem;
+		min-width: 2.25rem;
+		min-height: 2.25rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		touch-action: manipulation;
 	}
 	
 	.odo-control-btn:hover {
