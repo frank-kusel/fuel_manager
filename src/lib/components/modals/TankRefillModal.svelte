@@ -21,6 +21,11 @@
 
 	async function submitRefill() {
 		if (!refillLitres) return;
+		// Never allow a future delivery date (month-flip mistake in the picker)
+		if (refillDate > new Date().toLocaleDateString('en-CA')) {
+			alert('Delivery date cannot be in the future — check the month on the calendar.');
+			return;
+		}
 
 		submitting = true;
 		try {
@@ -101,7 +106,7 @@
 				</div>
 				<div class="form-group">
 					<label>Delivery Date</label>
-					<input type="date" bind:value={refillDate} />
+					<input type="date" max={new Date().toLocaleDateString('en-CA')} bind:value={refillDate} />
 				</div>
 				<div class="form-group">
 					<label>Invoice Number</label>

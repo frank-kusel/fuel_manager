@@ -234,7 +234,7 @@
 					</div>
 					<div class="form-group">
 						<label>Date</label>
-						<input type="date" bind:value={dipstickDate} />
+						<input type="date" max={new Date().toLocaleDateString('en-CA')} bind:value={dipstickDate} />
 					</div>
 					<div class="form-group full-width">
 						<label>Notes (Optional)</label>
@@ -285,7 +285,7 @@
 					</div>
 					<div class="form-group">
 						<label>Delivery Date</label>
-						<input type="date" bind:value={refillDate} />
+						<input type="date" max={new Date().toLocaleDateString('en-CA')} bind:value={refillDate} />
 					</div>
 					<div class="form-group">
 						<label>Invoice Number</label>

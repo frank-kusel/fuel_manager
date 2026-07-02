@@ -18,6 +18,11 @@
 
 	async function submitDipstickReading() {
 		if (!dipstickReading) return;
+		// Never allow a future dip date (month-flip mistake in the picker)
+		if (dipstickDate > new Date().toLocaleDateString('en-CA')) {
+			alert('Dip date cannot be in the future — check the month on the calendar.');
+			return;
+		}
 
 		submitting = true;
 		try {
@@ -80,7 +85,7 @@
 			</div>
 			<div class="form-group">
 				<label>Date</label>
-				<input type="date" bind:value={dipstickDate} />
+				<input type="date" max={new Date().toLocaleDateString('en-CA')} bind:value={dipstickDate} />
 			</div>
 			<div class="form-group">
 				<label>Notes (Optional)</label>

@@ -526,6 +526,7 @@
 						id="qe-date"
 						class="input"
 						type="date"
+						max={new Date().toLocaleDateString('en-CA')}
 						bind:value={entryDate}
 						oninput={() => fuelEntryWorkflowStore.setEntryDate(entryDate)}
 					/>

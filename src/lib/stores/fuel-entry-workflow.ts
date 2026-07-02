@@ -212,6 +212,18 @@ function createFuelEntryWorkflowStore() {
 					allStepErrors.push(...stepValidation.errors);
 				});
 				errors.push(...allStepErrors);
+
+				// Entry date may never be in the future. Guards against the
+				// month-flip mistake in the native date picker (e.g. logging
+				// yesterday's entries but tapping 26 July instead of 26 June).
+				// Compare against the LOCAL date, not UTC, so late-evening
+				// entries aren't wrongly rejected.
+				if (data.entryDate) {
+					const todayLocal = new Date().toLocaleDateString('en-CA');
+					if (data.entryDate > todayLocal) {
+						errors.push(`Entry date cannot be in the future (${data.entryDate}) — check the month on the calendar`);
+					}
+				}
 				break;
 		}
 		

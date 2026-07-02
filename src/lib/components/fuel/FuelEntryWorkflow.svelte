@@ -426,6 +426,7 @@
 								id="entryDate"
 								type="date"
 								value={$workflowData.entryDate}
+								max={new Date().toLocaleDateString('en-CA')}
 								oninput={(e) => fuelEntryWorkflowStore.setEntryDate(e.currentTarget.value)}
 								class="datetime-input"
 							/>
