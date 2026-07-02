@@ -297,7 +297,6 @@
 					<!-- Date header -->
 					<div class="day-header">
 						<h2 class="day-title">{formatDate(daySummary.date)}</h2>
-						<div class="day-date">{daySummary.date}</div>
 					</div>
 
 					<!-- Daily summary stats -->
@@ -473,25 +472,19 @@
 		position: sticky;
 		top: 0;
 		z-index: 10;
-		background: rgba(255, 255, 255, 0.95);
-		backdrop-filter: blur(8px);
+		/* Matches the page background so it reads as transparent, while
+		   staying opaque under sticky scroll so the title remains legible. */
+		background: var(--gray-100);
 		text-align: center;
 		margin-bottom: 1.5rem;
 		padding: 1rem 0;
-		border-bottom: 1px solid rgba(241, 245, 249, 0.8);
 	}
 
 	.day-title {
 		font-size: 1.25rem;
 		font-weight: 600;
-		color: #1f2937;
-		margin: 0 0 0.25rem 0;
-	}
-
-	.day-date {
-		font-size: 0.875rem;
-		color: #6b7280;
-		font-weight: 500;
+		color: var(--gray-800);
+		margin: 0;
 	}
 
 	.daily-summary {
@@ -783,7 +776,6 @@
 		.day-header {
 			padding: 0.75rem 1rem;
 			margin-bottom: 1rem;
-			border-bottom: 1px solid rgba(241, 245, 249, 0.9);
 		}
 
 		.day-title {

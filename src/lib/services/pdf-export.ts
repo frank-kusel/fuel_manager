@@ -96,39 +96,44 @@ export class PDFExportService {
 			<head>
 				<title>${title}</title>
 				<style>
-					body { 
-						font-family: Arial, sans-serif; 
-						margin: 40px; 
-						color: #333;
+					/* Clean ledger aesthetic: black on white, grey hairline rules.
+					   Only two semantic colors: red = fuel out, green = fuel in. */
+					body {
+						font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+						margin: 56px;
+						color: #000;
 						line-height: 1.6;
+						font-variant-numeric: tabular-nums;
 					}
-					.header { 
-						text-align: center; 
-						margin-bottom: 30px; 
-						border-bottom: 2px solid #ddd; 
-						padding-bottom: 20px; 
+					.header {
+						margin-bottom: 32px;
+						border-bottom: 1px solid #d6d3d1;
+						padding-bottom: 16px;
 					}
-					.header h1 { 
-						margin: 0 0 10px; 
-						color: #f97316; 
-						font-size: 24px;
+					.header h1 {
+						margin: 0 0 6px;
+						color: #000;
+						font-size: 22px;
+						font-weight: 700;
+						letter-spacing: -0.01em;
 					}
-					.header .period { 
-						color: #666; 
-						font-size: 16px; 
-						margin: 5px 0;
+					.header .period {
+						color: #78716c;
+						font-size: 14px;
+						margin: 4px 0 0;
 					}
 					.reconciliation-status {
-						background: #f9fafb;
-						border: 1px solid #e5e7eb;
-						border-radius: 8px;
+						border: 1px solid #d6d3d1;
 						padding: 15px;
-						margin-bottom: 20px;
+						margin-bottom: 24px;
 					}
 					.reconciliation-status h3 {
 						margin: 0 0 10px;
-						color: #111827;
-						font-size: 16px;
+						color: #000;
+						font-size: 14px;
+						font-weight: 700;
+						text-transform: uppercase;
+						letter-spacing: 0.05em;
 					}
 					.status-grid {
 						display: grid;
@@ -139,95 +144,111 @@ export class PDFExportService {
 						display: flex;
 						justify-content: space-between;
 						align-items: center;
-						font-size: 14px;
+						font-size: 13px;
 					}
 					.status-badge {
-						padding: 4px 8px;
-						border-radius: 4px;
+						padding: 2px 8px;
+						border: 1px solid #d6d3d1;
 						font-weight: 600;
-						font-size: 12px;
+						font-size: 11px;
+						text-transform: uppercase;
+						letter-spacing: 0.05em;
 					}
 					.status-reconciled {
-						background: #d1fae5;
-						color: #065f46;
+						color: #000;
+						border-color: #78716c;
 					}
 					.status-pending {
-						background: #fef3c7;
-						color: #92400e;
+						color: #78716c;
 					}
-					.summary-grid { 
-						display: grid; 
-						grid-template-columns: repeat(2, 1fr); 
-						gap: 20px; 
-						margin-bottom: 30px; 
+					.summary-grid {
+						display: grid;
+						grid-template-columns: repeat(2, 1fr);
+						gap: 16px;
+						margin-bottom: 32px;
 					}
-					.summary-card { 
-						border: 1px solid #ddd; 
-						padding: 15px; 
-						border-radius: 8px; 
-						background: #fafafa;
+					.summary-card {
+						border: 1px solid #d6d3d1;
+						padding: 14px 16px;
+						background: #fff;
 					}
 					.summary-card h4 {
-						margin: 0 0 8px;
-						color: #111827;
-						font-size: 14px;
+						margin: 0 0 6px;
+						color: #78716c;
+						font-size: 11px;
+						font-weight: 600;
+						text-transform: uppercase;
+						letter-spacing: 0.05em;
 					}
 					.summary-card .value {
-						font-size: 18px;
+						font-size: 20px;
 						font-weight: 700;
-						color: #f97316;
+						color: #000;
+					}
+					.summary-card .value.fuel-out {
+						color: #B91C1C;
 					}
 					.data-table {
 						width: 100%;
 						border-collapse: collapse;
-						margin-bottom: 30px;
+						margin-bottom: 32px;
 					}
 					.data-table th,
 					.data-table td {
-						padding: 12px;
+						padding: 8px 10px;
 						text-align: left;
-						border-bottom: 1px solid #ddd;
-						font-size: 13px;
+						border-bottom: 1px solid #d6d3d1;
+						font-size: 12px;
 					}
 					.data-table th {
-						background: #f9fafb;
-						font-weight: 600;
-						color: #111827;
+						background: #fff;
+						font-weight: 700;
+						color: #000;
+						border-bottom: 1px solid #78716c;
+						text-transform: uppercase;
+						font-size: 10px;
+						letter-spacing: 0.05em;
 					}
-					.data-table tr:nth-child(even) {
-						background: #fafafa;
+					.num {
+						text-align: right;
+					}
+					.fuel-out {
+						color: #B91C1C;
+					}
+					.fuel-in {
+						color: #15803D;
 					}
 					.signature-section {
-						margin-top: 50px;
+						margin-top: 56px;
 						display: flex;
 						justify-content: flex-end;
 					}
 					.signature-box {
-						border: 1px solid #ddd;
+						border: 1px solid #d6d3d1;
 						padding: 20px;
 						width: 300px;
 						text-align: center;
-						background: #fafafa;
+						background: #fff;
 					}
 					.signature-line {
-						border-top: 1px solid #333;
+						border-top: 1px solid #000;
 						margin: 40px 0 10px;
 						height: 1px;
 					}
 					.signature-label {
 						font-size: 12px;
-						color: #666;
+						color: #78716c;
 						margin-top: 5px;
 					}
 					.generated-info {
-						margin-top: 30px;
-						padding-top: 20px;
-						border-top: 1px solid #eee;
-						font-size: 11px;
-						color: #999;
+						margin-top: 32px;
+						padding-top: 16px;
+						border-top: 1px solid #d6d3d1;
+						font-size: 10px;
+						color: #78716c;
 						text-align: center;
 					}
-					@media print { 
+					@media print {
 						body { margin: 20px; }
 						.reconciliation-status,
 						.summary-grid,
@@ -357,7 +378,7 @@ export class PDFExportService {
 			<div class="summary-grid">
 				<div class="summary-card">
 					<h4>Total Fuel Dispensed</h4>
-					<div class="value">${totalFuel.toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}L</div>
+					<div class="value fuel-out">${totalFuel.toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}L</div>
 				</div>
 				<div class="summary-card">
 					<h4>Total Entries</h4>
@@ -372,28 +393,28 @@ export class PDFExportService {
 					<div class="value">${uniqueVehicles}</div>
 				</div>
 			</div>
-			
+
 			<table class="data-table">
 				<thead>
 					<tr>
 						<th>Date</th>
 						<th>Vehicle</th>
 						<th>Driver</th>
-						<th>Fuel (L)</th>
+						<th class="num">Fuel (L)</th>
 						<th>Activity</th>
 						<th>Location</th>
 					</tr>
 				</thead>
 				<tbody>
 		`;
-		
+
 		data.forEach(entry => {
 			content += `
 				<tr>
 					<td>${new Date(entry.entry_date + 'T' + (entry.time || '00:00')).toLocaleDateString('en-ZA')}</td>
 					<td>${entry.vehicles?.code || 'N/A'} - ${entry.vehicles?.name || ''}</td>
 					<td>${entry.drivers?.name || 'N/A'}</td>
-					<td style="text-align: right; font-weight: 600;">${(entry.litres_dispensed || 0).toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+					<td class="num fuel-out" style="font-weight: 600;">${(entry.litres_dispensed || 0).toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
 					<td>${entry.activities?.name || 'N/A'}</td>
 					<td>${entry.fields?.name || entry.zones?.name || 'N/A'}</td>
 				</tr>

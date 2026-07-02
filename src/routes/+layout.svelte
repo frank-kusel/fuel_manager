@@ -32,7 +32,7 @@
 	}
 
 	// Handle action selection
-	function handleAction(action: 'fuel' | 'dipstick' | 'refill') {
+	function handleAction(action: 'fuel' | 'dipstick' | 'refill' | 'quick') {
 		closeActionMenu();
 
 		if (action === 'fuel') {
@@ -41,6 +41,8 @@
 			showDipstickModal = true;
 		} else if (action === 'refill') {
 			showRefillModal = true;
+		} else if (action === 'quick') {
+			goto('/fuel/quick');
 		}
 	}
 
@@ -189,6 +191,15 @@
 				<div class="action-menu-content">
 					<div class="action-menu-title">Tank Refill</div>
 					<div class="action-menu-desc">Record tank delivery and refill</div>
+				</div>
+			</button>
+			<button class="action-menu-item" onclick={() => handleAction('quick')}>
+				<div class="action-menu-icon">
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+				</div>
+				<div class="action-menu-content">
+					<div class="action-menu-title">Quick entry</div>
+					<div class="action-menu-desc">Single-page form for experienced users</div>
 				</div>
 			</button>
 		</div>

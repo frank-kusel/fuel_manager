@@ -1,7 +1,90 @@
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ApiResponse, FuelEntry } from '$lib/types';
+
+// ---------------------------------------------------------------------------
+// Ledger-style export palette
+// Strictly black/white/grey with exactly two semantic exceptions:
+//   RED   = fuel/tank removals (litres dispensed / fuel out / negative adjustments)
+//   GREEN = fuel in (deliveries / refills / positive adjustments)
+// ---------------------------------------------------------------------------
+const XL_RED = 'B91C1C';
+const XL_HEADER_FILL = 'F5F5F4';
+const XL_HAIRLINE = 'D6D3D1';
+
+const PDF_RED: [number, number, number] = [185, 28, 28];
+const PDF_GREEN: [number, number, number] = [21, 128, 61];
+const PDF_GREY: [number, number, number] = [120, 113, 108];
+const PDF_HAIRLINE: [number, number, number] = [214, 211, 209];
+
+const xlHairlineBorder = {
+	top: { style: 'thin', color: { rgb: XL_HAIRLINE } },
+	bottom: { style: 'thin', color: { rgb: XL_HAIRLINE } },
+	left: { style: 'thin', color: { rgb: XL_HAIRLINE } },
+	right: { style: 'thin', color: { rgb: XL_HAIRLINE } }
+};
+
+interface LedgerColumnStyle {
+	numFmt?: string;
+	halign?: 'left' | 'right' | 'center';
+	fontColor?: string;
+}
+
+// Apply the clean-ledger cell styles to a worksheet built with aoa_to_sheet.
+// Styling only — never touches cell values, merges, or layout.
+function applyLedgerStyles(
+	worksheet: XLSX.WorkSheet,
+	opts: {
+		titleRows: number[];
+		headerRows: number[];
+		dataStartRow: number;
+		rowCount: number;
+		colCount: number;
+		columnStyles?: Record<number, LedgerColumnStyle>;
+	}
+): void {
+	const columnStyles = opts.columnStyles || {};
+
+	for (let r = 0; r < opts.rowCount; r++) {
+		for (let c = 0; c < opts.colCount; c++) {
+			const addr = XLSX.utils.encode_cell({ r, c });
+			const cell: any = (worksheet as any)[addr];
+			if (!cell) continue;
+
+			if (opts.titleRows.includes(r)) {
+				// Title row: larger bold black, no fill
+				cell.s = {
+					font: { bold: true, sz: 14, color: { rgb: '000000' } },
+					alignment: { horizontal: 'left', vertical: 'center' }
+				};
+			} else if (opts.headerRows.includes(r)) {
+				// Headers: bold black on very light grey, thin bottom border
+				cell.s = {
+					font: { bold: true, sz: 10, color: { rgb: '000000' } },
+					fill: { patternType: 'solid', fgColor: { rgb: XL_HEADER_FILL } },
+					border: {
+						...xlHairlineBorder,
+						bottom: { style: 'thin', color: { rgb: 'A8A29E' } }
+					},
+					alignment: { horizontal: 'center', vertical: 'center' }
+				};
+			} else if (r >= opts.dataStartRow) {
+				// Body: black text, hairline grey borders
+				const colStyle = columnStyles[c] || {};
+				const style: any = {
+					font: { sz: 10, color: { rgb: colStyle.fontColor || '000000' } },
+					border: xlHairlineBorder,
+					alignment: { horizontal: colStyle.halign || 'left', vertical: 'center' }
+				};
+				if (colStyle.numFmt && typeof cell.v === 'number') {
+					style.numFmt = colStyle.numFmt;
+				}
+				cell.s = style;
+			}
+		}
+	}
+}
 
 // Extend jsPDF interface to include autoTable
 declare module 'jspdf' {
@@ -198,6 +281,23 @@ class ExportService {
 				{ s: { r: 2, c: 7 }, e: { r: 2, c: 8 } }, // Fuel Store
 				{ s: { r: 2, c: 9 }, e: { r: 2, c: 10 } }  // Other
 			];
+
+			// Clean-ledger styling: monochrome, hairline borders,
+			// red for fuel dispensed (fuel out of the tank)
+			applyLedgerStyles(worksheet, {
+				titleRows: [0],
+				headerRows: [2, 3],
+				dataStartRow: 4,
+				rowCount: worksheetData.length,
+				colCount: 11,
+				columnStyles: {
+					4: { numFmt: '#,##0.0', halign: 'right', fontColor: XL_RED }, // Fuel (litres dispensed = fuel out)
+					5: { numFmt: '#,##0.0', halign: 'right' }, // HrsKm
+					6: { numFmt: '#,##0', halign: 'right' },   // Odo. End
+					8: { numFmt: '0', halign: 'right' },       // Issue No.
+					9: { numFmt: '#,##0.0', halign: 'right' }  // Tons
+				}
+			});
 
 			// Add worksheet to workbook
 			XLSX.utils.book_append_sheet(workbook, worksheet, 'Vehicle Daily Capture');
@@ -433,6 +533,22 @@ class ExportService {
 				{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } } // Main header
 			];
 
+			// Clean-ledger styling: monochrome, hairline borders,
+			// red for fuel consumed (fuel out of the tank)
+			applyLedgerStyles(worksheet, {
+				titleRows: [0],
+				headerRows: [2],
+				dataStartRow: 3,
+				rowCount: worksheetData.length,
+				colCount: 7,
+				columnStyles: {
+					3: { numFmt: '#,##0.00', halign: 'right' }, // Distance
+					4: { numFmt: '#,##0.00', halign: 'right', fontColor: XL_RED }, // Fuel (dispensed = fuel out)
+					5: { numFmt: '#,##0.00', halign: 'right' }, // Consumption
+					6: { halign: 'center' } // Unit
+				}
+			});
+
 			// Add worksheet to workbook
 			XLSX.utils.book_append_sheet(workbook, worksheet, 'Monthly Summary');
 			
@@ -498,31 +614,35 @@ class ExportService {
 			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
 			const averageFuel = data.length > 0 ? totalFuel / data.length : 0;
 			
-			// Professional journal-style header
-			pdf.setFontSize(18);
-			pdf.setFont('times', 'bold');
-			pdf.text('Monthly Fuel Consumption Report', pageWidth / 2, 25, { align: 'center' });
-			
-			pdf.setFontSize(14);
-			pdf.setFont('times', 'normal');
-			pdf.text(companyName, pageWidth / 2, 33, { align: 'center' });
-			
-			pdf.setFontSize(12);
-			pdf.setFont('times', 'italic');
-			pdf.text(`${monthName} ${year}`, pageWidth / 2, 40, { align: 'center' });
-			
-			// Summary statistics at the top
+			// Minimal journal-style header: bold black title, small grey subtitle, hairline rule
+			const marginX = 20;
+			pdf.setFontSize(16);
+			pdf.setFont('helvetica', 'bold');
+			pdf.setTextColor(0, 0, 0);
+			pdf.text('Monthly Fuel Consumption Report', marginX, 24);
+
 			pdf.setFontSize(10);
-			pdf.setFont('times', 'bold');
-			pdf.text('Summary Statistics', 15, 52);
-			
+			pdf.setFont('helvetica', 'normal');
+			pdf.setTextColor(...PDF_GREY);
+			pdf.text(companyName, marginX, 31);
+			pdf.text(`${monthName} ${year}`, marginX, 36.5);
+
+			pdf.setDrawColor(...PDF_HAIRLINE);
+			pdf.setLineWidth(0.2);
+			pdf.line(marginX, 41, pageWidth - marginX, 41);
+
+			// Summary statistics at the top
 			pdf.setFontSize(9);
-			pdf.setFont('times', 'normal');
-			pdf.text(`Total Active Vehicles: ${data.length}`, 15, 60);
-			pdf.text(`Total Fuel Consumption: ${totalFuel.toFixed(2)} Litres`, 15, 66);
-			
-			// Professional table with separate name and registration columns
-			const tableStartY = 78;
+			pdf.setFont('helvetica', 'bold');
+			pdf.setTextColor(0, 0, 0);
+			pdf.text('Summary Statistics', marginX, 49);
+
+			pdf.setFont('helvetica', 'normal');
+			pdf.text(`Total Active Vehicles: ${data.length}`, marginX, 55);
+			pdf.text(`Total Fuel Consumption: ${totalFuel.toFixed(2)} Litres`, marginX, 60);
+
+			// Table with separate name and registration columns
+			const tableStartY = 68;
 			const tableData = data.map(vehicle => [
 				vehicle.code,
 				vehicle.name,
@@ -534,8 +654,9 @@ class ExportService {
 				vehicle.unit || '—'
 			]);
 			
-			// Add subtotal row
+			// Add subtotal row (8 cells — fuel total sits under the Fuel column)
 			tableData.push([
+				'',
 				'',
 				'',
 				'',
@@ -545,18 +666,18 @@ class ExportService {
 				''
 			]);
 
-			// Scientific journal table style with compact spacing
+			// Minimal ledger table: white header, grey hairline grid, tabular right-aligned numerals
 			autoTable(pdf, {
 				startY: tableStartY,
 				head: [['Vehicle ID', 'Vehicle Name', 'Registration', 'Classification', 'Distance', 'Fuel (L)', 'Efficiency*', 'Unit']],
 				body: tableData,
 				theme: 'grid',
 				styles: {
-					fontSize: 10,
-					cellPadding: 1,
-					lineColor: [200, 200, 200],
+					fontSize: 9,
+					cellPadding: 1.5,
+					lineColor: PDF_HAIRLINE,
 					lineWidth: 0.1,
-					font: 'times',
+					font: 'helvetica',
 					textColor: [0, 0, 0],
 					minCellHeight: 3
 				},
@@ -564,9 +685,11 @@ class ExportService {
 					fillColor: [255, 255, 255],
 					textColor: [0, 0, 0],
 					fontStyle: 'bold',
-					fontSize: 10,
+					fontSize: 9,
 					halign: 'center',
-					minCellHeight: 4
+					minCellHeight: 4,
+					lineColor: PDF_HAIRLINE,
+					lineWidth: 0.1
 				},
 				columnStyles: {
 					0: { halign: 'center' }, // Vehicle ID
@@ -579,35 +702,42 @@ class ExportService {
 					7: { halign: 'center' } // Unit
 				},
 				didParseCell: function (data: any) {
-					// Style the subtotal row (last row)
+					if (data.section !== 'body') return;
+					// Style the subtotal row (last row): bold, no fill
 					if (data.row.index === tableData.length - 1) {
 						data.cell.styles.fontStyle = 'bold';
-						data.cell.styles.fillColor = [240, 240, 240];
+					} else if (data.column.index === 5) {
+						// Fuel dispensed = fuel out of the tank -> red
+						data.cell.styles.textColor = PDF_RED;
 					}
 				},
 				// Let autoTable calculate column widths automatically for full page width
-				margin: { left: 15, right: 15 },
+				margin: { left: marginX, right: marginX },
 				didDrawPage: (data: any) => {
-					// Professional footer
+					// Footer
 					pdf.setFontSize(8);
-					pdf.setFont('times', 'normal');
-					const printDate = new Date().toLocaleDateString('en-ZA', { 
-						year: 'numeric', 
-						month: '2-digit', 
+					pdf.setFont('helvetica', 'normal');
+					pdf.setTextColor(...PDF_GREY);
+					const printDate = new Date().toLocaleDateString('en-ZA', {
+						year: 'numeric',
+						month: '2-digit',
 						day: '2-digit',
 						hour: '2-digit',
 						minute: '2-digit'
 					});
-					pdf.text(`Generated: ${printDate}`, 15, pageHeight - 10);
+					pdf.text(`Generated: ${printDate}`, marginX, pageHeight - 10);
+					pdf.setTextColor(0, 0, 0);
 				}
 			});
 
 			// Efficiency calculation footnote
 			const finalY = (pdf as any).lastAutoTable.finalY + 8;
-			
+
 			pdf.setFontSize(8);
-			pdf.setFont('times', 'italic');
-			pdf.text('* Efficiency calculated as L/100km or L/hr depending on the unit', 15, finalY);
+			pdf.setFont('helvetica', 'italic');
+			pdf.setTextColor(...PDF_GREY);
+			pdf.text('* Efficiency calculated as L/100km or L/hr depending on the unit', marginX, finalY);
+			pdf.setTextColor(0, 0, 0);
 			
 			// Generate filename and download
 			const filename = `Fuel_Analysis_Report_${year}_${month.toString().padStart(2, '0')}.pdf`;
@@ -838,28 +968,33 @@ class ExportService {
 			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
 			const averageFuel = data.length > 0 ? totalFuel / data.length : 0;
 			
-			// Professional journal-style header
-			pdf.setFontSize(18);
-			pdf.setFont('times', 'bold');
-			pdf.text('Monthly Fuel Consumption Report', pageWidth / 2, 18, { align: 'center' });
-			
-			pdf.setFontSize(14);
-			pdf.setFont('times', 'normal');
-			pdf.text(companyName, pageWidth / 2, 26, { align: 'center' });
-			
-			pdf.setFontSize(12);
-			pdf.setFont('times', 'italic');
-			pdf.text(`${monthName} ${year}`, pageWidth / 2, 33, { align: 'center' });
-			
+			// Minimal journal-style header: bold black title, small grey subtitle, hairline rule
+			const marginX = 20;
+			pdf.setFontSize(16);
+			pdf.setFont('helvetica', 'bold');
+			pdf.setTextColor(0, 0, 0);
+			pdf.text('Monthly Fuel Consumption Report', marginX, 18);
+
+			pdf.setFontSize(10);
+			pdf.setFont('helvetica', 'normal');
+			pdf.setTextColor(...PDF_GREY);
+			pdf.text(companyName, marginX, 25);
+			pdf.text(`${monthName} ${year}`, marginX, 30.5);
+			pdf.setTextColor(0, 0, 0);
+
+			pdf.setDrawColor(...PDF_HAIRLINE);
+			pdf.setLineWidth(0.2);
+			pdf.line(marginX, 35, pageWidth - marginX, 35);
+
 			// Calculate variables needed for the new reconciliation sections below
 			const bowserDifference = reconciliationData.bowserEnd - reconciliationData.bowserStart;
 			const fuelVariance = bowserDifference - reconciliationData.fuelDispensed;
-			const labelX = 15;
-			const valueX = 75;
-			const detailsX = 130;
-			
+			const labelX = marginX;
+			const valueX = 80;
+			const detailsX = 135;
+
 			// Start table directly after header
-			let yPos = 45;
+			let yPos = 42;
 
 			// Professional table with separate name and registration columns
 			const tableStartY = yPos;
@@ -886,18 +1021,18 @@ class ExportService {
 				''
 			]);
 
-			// Scientific journal table style with compact spacing
+			// Minimal ledger table: white header, grey hairline grid, tabular right-aligned numerals
 			autoTable(pdf, {
 				startY: tableStartY,
 				head: [['Vehicle ID', 'Vehicle Name', 'Registration', 'Classification', 'Distance', 'Fuel (L)', 'Efficiency*', 'Unit']],
 				body: tableData,
 				theme: 'grid',
 				styles: {
-					fontSize: 10,
-					cellPadding: 1,
-					lineColor: [200, 200, 200],
+					fontSize: 9,
+					cellPadding: 1.5,
+					lineColor: PDF_HAIRLINE,
 					lineWidth: 0.1,
-					font: 'times',
+					font: 'helvetica',
 					textColor: [0, 0, 0],
 					minCellHeight: 3
 				},
@@ -905,9 +1040,11 @@ class ExportService {
 					fillColor: [255, 255, 255],
 					textColor: [0, 0, 0],
 					fontStyle: 'bold',
-					fontSize: 10,
+					fontSize: 9,
 					halign: 'center',
-					minCellHeight: 4
+					minCellHeight: 4,
+					lineColor: PDF_HAIRLINE,
+					lineWidth: 0.1
 				},
 				columnStyles: {
 					0: { halign: 'center' }, // Vehicle ID
@@ -920,12 +1057,16 @@ class ExportService {
 					7: { halign: 'center' } // Unit
 				},
 				didParseCell: function (data: any) {
-					// Style the subtotal row (last row)
+					if (data.section !== 'body') return;
+					// Style the subtotal row (last row): bold, no fill
 					if (data.row.index === tableData.length - 1) {
 						data.cell.styles.fontStyle = 'bold';
-						data.cell.styles.fillColor = [245, 245, 245];
+					} else if (data.column.index === 5) {
+						// Fuel dispensed = fuel out of the tank -> red
+						data.cell.styles.textColor = PDF_RED;
 					}
-				}
+				},
+				margin: { left: marginX, right: marginX }
 			});
 
 			// Get table end position
@@ -934,127 +1075,153 @@ class ExportService {
 
 			// Add footnote about efficiency - reduced spacing
 			pdf.setFontSize(8);
-			pdf.setFont('times', 'italic');
-			pdf.text('* Efficiency: l/100km or l/hr', 15, tableEndY + 5);
+			pdf.setFont('helvetica', 'italic');
+			pdf.setTextColor(...PDF_GREY);
+			pdf.text('* Efficiency: l/100km or l/hr', marginX, tableEndY + 5);
+			pdf.setTextColor(0, 0, 0);
 
 			// RECONCILIATION SECTIONS MOVED HERE - after table
-			pdf.setFontSize(12);
-			pdf.setFont('times', 'bold');
-			pdf.text('Fuel Reconciliation', 15, reconciliationY);
-			
+			pdf.setFontSize(11);
+			pdf.setFont('helvetica', 'bold');
+			pdf.text('Fuel Reconciliation', marginX, reconciliationY);
+
 			reconciliationY += 6;
-			pdf.setFontSize(10);
-			pdf.setFont('times', 'normal');
-			
+			pdf.setFontSize(9);
+			pdf.setFont('helvetica', 'normal');
+
 			pdf.text('Fuel Dispensed:', labelX, reconciliationY);
+			pdf.setTextColor(...PDF_RED); // fuel out
 			pdf.text(`${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
-			
+
 			const bowserOpeningDate = `1 ${monthName} ${year}`;
 			const bowserClosingDate = `${new Date(year, month, 0).getDate()} ${monthName} ${year}`;
-			
+
 			pdf.text('Bowser Opening:', labelX, reconciliationY);
 			pdf.text(`${reconciliationData.bowserStart.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.setTextColor(...PDF_GREY);
 			pdf.text(`(${bowserOpeningDate})`, detailsX, reconciliationY);
+			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
-			
+
 			pdf.text('Bowser Closing:', labelX, reconciliationY);
 			pdf.text(`${reconciliationData.bowserEnd.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.setTextColor(...PDF_GREY);
 			pdf.text(`(${bowserClosingDate})`, detailsX, reconciliationY);
+			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
-			
+
 			pdf.text('Bowser Difference:', labelX, reconciliationY);
 			pdf.text(`${bowserDifference.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
 			reconciliationY += 4;
-			
+
 			pdf.text('Fuel Variance:', labelX, reconciliationY);
 			pdf.text(`${fuelVariance.toFixed(1)}L`, valueX, reconciliationY);
-			
+
 			reconciliationY += 10;
-			
+
 			// Tank Reconciliation Section
-			pdf.setFontSize(12);
-			pdf.setFont('times', 'bold');
-			pdf.text('Tank Reconciliation', 15, reconciliationY);
-			
+			pdf.setFontSize(11);
+			pdf.setFont('helvetica', 'bold');
+			pdf.text('Tank Reconciliation', marginX, reconciliationY);
+
 			reconciliationY += 4;
-			pdf.setFontSize(10);
-			pdf.setFont('times', 'normal');
-			
+			pdf.setFontSize(9);
+			pdf.setFont('helvetica', 'normal');
+
 			// Show opening balance as first day of current month (value comes from previous month's closing)
 			const openingDate = `1 ${monthName} ${year}`;
 
-			pdf.setFont('times', 'bold');
+			pdf.setFont('helvetica', 'bold');
 			pdf.text('Opening Balance:', labelX, reconciliationY);
 			pdf.text(`${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
-			pdf.setFont('times', 'normal');
+			pdf.setFont('helvetica', 'normal');
+			pdf.setTextColor(...PDF_GREY);
 			pdf.text(`(${openingDate})`, detailsX, reconciliationY);
+			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
-			
+
 			// Tank Activities with improved formatting
 			if (reconciliationData.tankActivities.length > 0) {
 				let totalAdditions = 0;
 				reconciliationData.tankActivities.forEach(activity => {
-					const activityDate = new Date(activity.delivery_date).toLocaleDateString('en-ZA', { 
-						day: 'numeric', 
-						month: 'short' 
+					const activityDate = new Date(activity.delivery_date).toLocaleDateString('en-ZA', {
+						day: 'numeric',
+						month: 'short'
 					});
 					const amount = activity.litres_added || 0;
 					totalAdditions += amount;
 					const sign = amount >= 0 ? '+' : '';
 					const invoiceText = activity.invoice_number || 'Adjustment';
-					
+
 					pdf.text(`• ${activityDate}:`, labelX + 5, reconciliationY);
+					// Deliveries/refills (fuel in) -> green; negative adjustments (fuel out) -> red
+					if (amount >= 0) {
+						pdf.setTextColor(...PDF_GREEN);
+					} else {
+						pdf.setTextColor(...PDF_RED);
+					}
 					pdf.text(`${sign}${amount.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+					pdf.setTextColor(...PDF_GREY);
 					pdf.text(`(${invoiceText})`, detailsX, reconciliationY);
+					pdf.setTextColor(0, 0, 0);
 					reconciliationY += 4;
 				});
-				
-				pdf.setFont('times', 'bold');
+
+				pdf.setFont('helvetica', 'bold');
 				pdf.text('Total Additions:', labelX, reconciliationY);
+				pdf.setTextColor(...PDF_GREEN); // fuel in
 				pdf.text(`+${totalAdditions.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
-				pdf.setFont('times', 'normal');
+				pdf.setTextColor(0, 0, 0);
+				pdf.setFont('helvetica', 'normal');
 				reconciliationY += 4;
 			}
 
 			// Total Drawings (fuel dispensed)
-			pdf.setFont('times', 'bold');
+			pdf.setFont('helvetica', 'bold');
 			pdf.text('Total Drawings:', labelX, reconciliationY);
+			pdf.setTextColor(...PDF_RED); // fuel out
 			pdf.text(`-${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
-			pdf.setFont('times', 'normal');
+			pdf.setTextColor(0, 0, 0);
+			pdf.setFont('helvetica', 'normal');
 			reconciliationY += 4;
 
 			// Expected vs Actual calculation
 			const totalTankAdditions = reconciliationData.tankActivities.reduce((sum, activity) => sum + (activity.litres_added || 0), 0);
 			const expectedLevel = reconciliationData.tankStartCalculated - reconciliationData.fuelDispensed + totalTankAdditions;
-			
+
 			const calculationFormula = `(${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', {minimumFractionDigits: 1})} - ${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})} + ${totalTankAdditions.toLocaleString('en-ZA', {minimumFractionDigits: 1})})`;
-			pdf.setFont('times', 'bold');
+			pdf.setFont('helvetica', 'bold');
 			pdf.text('Closing Balance:', labelX, reconciliationY);
 			pdf.text(`${expectedLevel.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
-			pdf.setFont('times', 'normal');
+			pdf.setFont('helvetica', 'normal');
+			pdf.setTextColor(...PDF_GREY);
 			pdf.text(calculationFormula, detailsX, reconciliationY);
+			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
-			
+
 			const lastDayOfMonth = new Date(year, month, 0).getDate();
 			const actualReadingDate = `${lastDayOfMonth} ${monthName} ${year}`;
 			pdf.text('Actual Reading:', labelX, reconciliationY);
 			pdf.text(`${reconciliationData.lastDipReading.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.setTextColor(...PDF_GREY);
 			pdf.text(`(${actualReadingDate})`, detailsX, reconciliationY);
+			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
-			
+
 			// Tank variance - simplified with alignment
 			const tankVariance = expectedLevel - reconciliationData.lastDipReading;
 			pdf.text('Tank Variance:', labelX, reconciliationY);
 			pdf.text(`${tankVariance.toFixed(1)}L`, valueX, reconciliationY);
-			
+
 			let footerY = reconciliationY + 15;
 
 			// Report generation timestamp
 			pdf.setFontSize(7);
-			pdf.setFont('times', 'italic');
-			pdf.setTextColor(128, 128, 128);
-			pdf.text(`Report generated on ${new Date().toLocaleString()}`, 15, pageHeight - 10);
+			pdf.setFont('helvetica', 'italic');
+			pdf.setTextColor(...PDF_GREY);
+			pdf.text(`Report generated on ${new Date().toLocaleString()}`, marginX, pageHeight - 10);
 
 			// Save the PDF
 			const fileName = `Monthly_Fuel_Report_${monthName}_${year}.pdf`;
