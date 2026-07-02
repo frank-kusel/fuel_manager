@@ -6,10 +6,15 @@
 		insightsError
 	} from '$lib/stores/dashboard-insights';
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 
 	onMount(() => {
 		dashboardInsightsStore.load();
 	});
+
+	function openVehicle(vehicleId: string) {
+		goto(`/tools/database/vehicles/${vehicleId}`);
+	}
 
 	const nf = new Intl.NumberFormat('en-ZA');
 	const nf1 = new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 1 });
@@ -127,7 +132,11 @@
 				<table class="fleet-table">
 					<tbody>
 						{#each d.fleet.slice(0, 6) as row}
-							<tr>
+							<tr
+								class="fleet-row"
+								onclick={() => openVehicle(row.vehicleId)}
+								title="Open {row.code} details"
+							>
 								<td class="fleet-vehicle">
 									<span class="fleet-code">{row.code}</span>
 									<span class="fleet-name">{row.name}</span>
@@ -366,6 +375,14 @@
 	.fleet-table td {
 		padding: 0.375rem 0;
 		border-bottom: 1px solid var(--gray-100);
+	}
+
+	.fleet-row {
+		cursor: pointer;
+	}
+
+	.fleet-row:hover td {
+		background: var(--gray-50);
 	}
 
 	.fleet-table tr:last-child td {

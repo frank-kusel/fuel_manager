@@ -149,7 +149,7 @@ function createInsightsStore() {
 			const monthStartIso = isoDate(win.start);
 			const windowEnd = win.end;
 
-			const [prevRes, vehiclesRes, dipRes, bowsersRes] = await Promise.all([
+			const [prevRes, vehiclesRes, dipRes, bowsersRes, futureRes] = await Promise.all([
 				client
 					.from('fuel_entries')
 					.select('entry_date, litres_dispensed')
@@ -165,7 +165,11 @@ function createInsightsStore() {
 					.eq('reading_type', 'dipstick')
 					.order('reading_date', { ascending: false })
 					.limit(1),
-				client.from('bowsers').select('name, capacity').eq('active', true).limit(1)
+				client.from('bowsers').select('name, capacity').eq('active', true).limit(1),
+				client
+					.from('fuel_entries')
+					.select('id, entry_date, vehicles(code)')
+					.gt('entry_date', isoDate(now))
 			]);
 
 			const firstError = prevRes.error || vehiclesRes.error || dipRes.error || bowsersRes.error;
@@ -346,6 +350,16 @@ function createInsightsStore() {
 				attention.push({
 					severity: 'warning',
 					text: `${brokenGaugeCount} ${brokenGaugeCount === 1 ? 'entry' : 'entries'} this month with a broken gauge`
+				});
+			}
+			const futureEntries = futureRes.data || [];
+			if (futureEntries.length > 0) {
+				const codes = [...new Set(futureEntries.map((e: any) => e.vehicles?.code).filter(Boolean))]
+					.slice(0, 3)
+					.join(', ');
+				attention.push({
+					severity: 'danger',
+					text: `${futureEntries.length} future-dated ${futureEntries.length === 1 ? 'entry' : 'entries'}${codes ? ` (${codes})` : ''} — check the entry dates`
 				});
 			}
 			if (attention.length === 0) {

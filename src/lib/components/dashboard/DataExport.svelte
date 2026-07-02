@@ -176,11 +176,18 @@
 	}
 </script>
 
-<div class="history-card">
-	<div class="history-header">
-		<h4>Monthly Vehicle Summary</h4>
-	</div>
-		
+<div class="export-panels">
+	<section class="panel">
+		<div class="panel-head">
+			<div class="panel-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+			</div>
+			<div>
+				<h4 class="panel-title">Monthly vehicle summary</h4>
+				<p class="panel-sub">Per-vehicle totals for a month, as Excel or a signed PDF</p>
+			</div>
+		</div>
+
 		<div class="monthly-controls">
 			<div class="month-inputs">
 				<div class="month-field">
@@ -282,9 +289,18 @@
 				<span class="message-text">PDF report generated successfully!</span>
 			</div>
 		{/if}
+	</section>
 
-	<div class="daily-export-section">
-		<h4>Daily Capture Export</h4>
+	<section class="panel">
+		<div class="panel-head">
+			<div class="panel-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg>
+			</div>
+			<div>
+				<h4 class="panel-title">Daily capture export</h4>
+				<p class="panel-sub">Every entry in a date range, as Excel</p>
+			</div>
+		</div>
 		<div class="export-controls">
 			<div class="date-inputs">
 				<div class="date-field">
@@ -341,48 +357,59 @@
 				<span class="message-text">Excel file downloaded successfully!</span>
 			</div>
 		{/if}
-	</div>
+	</section>
 
 </div>
 
 <style>
-	.history-card {
-		background: var(--gray-100);
-		border-radius: 8px;
-		padding: 1rem;
-		margin-top: 1rem;
-	}
-
-	.history-header {
+	.export-panels {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 0.75rem;
+		flex-direction: column;
+		gap: 0.875rem;
 	}
 
-	.history-header h4 {
-		font-size: 1rem;
-		font-weight: 600;
+	.panel {
+		background: var(--white);
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-lg);
+		padding: 1rem 1.125rem;
+	}
+
+	.panel-head {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+		margin-bottom: 0.875rem;
+	}
+
+	.panel-icon {
+		flex-shrink: 0;
+		width: 2.25rem;
+		height: 2.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--radius-md);
+		background: #f0fdfa;
+		color: var(--brand-hover);
+	}
+
+	.panel-icon svg {
+		width: 1.25rem;
+		height: 1.25rem;
+	}
+
+	.panel-title {
+		font-size: var(--text-base);
+		font-weight: var(--font-weight-semibold);
 		color: var(--gray-900);
 		margin: 0;
 	}
 
-	.export-description {
-		color: var(--gray-600);
-		font-size: 0.875rem;
-	}
-
-	.daily-export-section {
-		margin-top: 1rem;
-		padding-top: 1rem;
-		border-top: 1px solid var(--gray-200);
-	}
-
-	.daily-export-section h4 {
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--gray-900);
-		margin: 0 0 0.75rem 0;
+	.panel-sub {
+		font-size: var(--text-sm);
+		color: var(--gray-500);
+		margin: 0.125rem 0 0;
 	}
 
 	.export-controls {
@@ -543,8 +570,8 @@
 
 	/* Mobile responsiveness */
 	@media (max-width: 768px) {
-		.history-card {
-			padding: 0.75rem;
+		.panel {
+			padding: 0.875rem;
 		}
 
 		.date-inputs {
