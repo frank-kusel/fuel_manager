@@ -81,7 +81,7 @@
 				class="nav-btn"
 				class:active={pathname === '/summary' || pathname === '/'}
 			>
-				Summary
+				Log
 			</a>
 			<a
 				href="/dashboard"
@@ -91,18 +91,18 @@
 				Dashboard
 			</a>
 			<a
-				href="/reports"
+				href="/tank"
 				class="nav-btn"
-				class:active={pathname.startsWith('/reports')}
+				class:active={pathname.startsWith('/tank')}
 			>
-				Reports
+				Tank
 			</a>
 			<a
-				href="/menu"
+				href="/audit"
 				class="nav-btn"
-				class:active={pathname.startsWith('/menu') || pathname.startsWith('/tools')}
+				class:active={pathname.startsWith('/audit') || pathname.startsWith('/reports') || pathname.startsWith('/menu') || pathname.startsWith('/tools')}
 			>
-				Menu
+				Audit
 			</a>
 			<button class="nav-btn action-btn" onclick={toggleActionMenu}>
 				<span>+ New Entry</span>
@@ -123,7 +123,7 @@
 			class:active={pathname === '/summary' || pathname === '/'}
 		>
 			<svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-			<span class="nav-label">Summary</span>
+			<span class="nav-label">Log</span>
 		</a>
 		<a
 			href="/dashboard"
@@ -131,7 +131,7 @@
 			class:active={pathname === '/dashboard'}
 		>
 			<svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20V16"/></svg>
-			<span class="nav-label">Dashboard</span>
+			<span class="nav-label">Dash</span>
 		</a>
 
 		<!-- Central Action Button -->
@@ -142,21 +142,21 @@
 		</button>
 
 		<a
-			href="/reports"
+			href="/tank"
 			class="mobile-nav-btn"
-			class:active={pathname.startsWith('/reports')}
+			class:active={pathname.startsWith('/tank')}
 		>
-			<svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
-			<span class="nav-label">Reports</span>
+			<svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M5 13h14"/><path d="M9 7h6"/></svg>
+			<span class="nav-label">Tank</span>
 		</a>
 
 		<a
-			href="/menu"
+			href="/audit"
 			class="mobile-nav-btn"
-			class:active={pathname.startsWith('/menu') || pathname.startsWith('/tools')}
+			class:active={pathname.startsWith('/audit') || pathname.startsWith('/reports') || pathname.startsWith('/menu') || pathname.startsWith('/tools')}
 		>
-			<svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-			<span class="nav-label">Menu</span>
+			<svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><path d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z"/></svg>
+			<span class="nav-label">Audit</span>
 		</a>
 	</nav>
 
