@@ -296,7 +296,7 @@
 	.search-input input:focus {
 		outline: none;
 		border-color: var(--brand-hover);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 	}
 
 	.search-icon {
@@ -436,12 +436,12 @@
 
 	.field-checkbox-card:hover:not(.disabled) {
 		border-color: var(--brand);
-		background: #f0fdfa;
+		background: #faf1f2;
 	}
 
 	.field-checkbox-card.selected {
 		border-color: var(--brand);
-		background: #f0fdfa;
+		background: #faf1f2;
 	}
 
 	.field-checkbox-card.disabled {

@@ -223,13 +223,13 @@
 	}
 
 	.dot.low {
-		background: #ccfbf1;
-		border: 2px solid #5eead4;
+		background: #f3dee1;
+		border: 2px solid #d8a4ab;
 	}
 
 	.dot.medium {
-		background: #99f6e4;
-		border: 2px solid #5eead4;
+		background: #e9ccd0;
+		border: 2px solid #d8a4ab;
 	}
 
 	.dot.high {
@@ -240,7 +240,7 @@
 	.dot.very-high {
 		background: var(--brand-active);
 		border: 2px solid #1e40af;
-		box-shadow: 0 0 8px rgba(13, 148, 136, 0.4);
+		box-shadow: 0 0 8px rgba(142, 43, 52, 0.4);
 	}
 
 	.dot:not(.skeleton):hover {

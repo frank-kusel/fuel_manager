@@ -231,7 +231,7 @@
 			<div class="monthly-actions">
 				<div class="export-buttons-grid">
 					<Button 
-						variant="success"
+						variant="primary"
 						size="medium"
 						loading={isExportingMonthly}
 						disabled={isExportingMonthly || isExportingPDF}
@@ -245,7 +245,7 @@
 					</Button>
 					
 					<Button 
-						variant="error"
+						variant="outline"
 						size="medium"
 						loading={isExportingPDF}
 						disabled={isExportingMonthly || isExportingPDF}
@@ -328,7 +328,7 @@
 
 			<div class="export-actions">
 				<Button 
-					variant="success"
+					variant="primary"
 					size="medium"
 					loading={isExporting}
 					disabled={!startDate || !endDate || isExporting}
@@ -390,7 +390,7 @@
 		align-items: center;
 		justify-content: center;
 		border-radius: var(--radius-md);
-		background: #f0fdfa;
+		background: #faf1f2;
 		color: var(--brand-hover);
 	}
 
@@ -454,7 +454,7 @@
 	.date-field input:focus {
 		outline: none;
 		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 	}
 
 	.date-field input:disabled {
@@ -544,7 +544,7 @@
 	.month-field select:focus {
 		outline: none;
 		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 	}
 
 	.month-field select:disabled {

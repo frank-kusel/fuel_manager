@@ -246,8 +246,8 @@
 	}
 
 	.activity-card.selected {
-		background: rgba(13, 148, 136, 0.06);
-		border-color: rgba(13, 148, 136, 0.2);
+		background: rgba(142, 43, 52, 0.06);
+		border-color: rgba(142, 43, 52, 0.2);
 	}
 
 	.activity-main {
@@ -315,7 +315,7 @@
 		flex-shrink: 0;
 		width: 1.25rem;
 		height: 1.25rem;
-		background: rgba(13, 148, 136, 0.1);
+		background: rgba(142, 43, 52, 0.1);
 		border-radius: 50%;
 		display: flex;
 		align-items: center;

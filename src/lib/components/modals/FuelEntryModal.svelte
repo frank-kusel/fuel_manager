@@ -218,14 +218,14 @@
 	}
 
 	.prompt-btn.primary {
-		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
+		background: var(--brand);
 		color: white;
 	}
 
 	.prompt-btn.primary:hover {
-		background: linear-gradient(135deg, var(--brand-hover), var(--brand-active));
+		background: var(--brand-hover);
 		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+		box-shadow: 0 4px 12px rgba(142, 43, 52, 0.3);
 	}
 
 	.prompt-btn.secondary {

@@ -134,7 +134,7 @@
 
 	.menu-card:hover {
 		border-color: var(--brand);
-		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+		box-shadow: 0 4px 12px rgba(142, 43, 52, 0.15);
 		transform: translateY(-1px);
 	}
 
@@ -151,7 +151,7 @@
 		align-items: center;
 		justify-content: center;
 		border-radius: var(--radius-md);
-		background: #f0fdfa;
+		background: #faf1f2;
 		color: var(--brand-hover);
 	}
 

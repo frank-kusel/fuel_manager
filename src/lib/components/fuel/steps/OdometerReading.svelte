@@ -265,7 +265,7 @@
 	}
 	
 	.odo-control-btn.save-btn {
-		background: #f0fdfa;
+		background: #faf1f2;
 		border-color: var(--brand);
 		color: var(--brand-hover);
 	}
@@ -309,7 +309,7 @@
 
 	.new-odo:focus-within {
 		border-color: var(--brand-hover);
-		box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 4px rgba(142, 43, 52, 0.1);
 	}
 
 	
@@ -329,7 +329,7 @@
 	}
 	
 	.new-odo .odo-value:hover {
-		background: rgba(13, 148, 136, 0.05);
+		background: rgba(142, 43, 52, 0.05);
 	}
 
 	.new-odo-input {

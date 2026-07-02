@@ -638,13 +638,13 @@
 
 	/* Primary Button (Continue/Submit) */
 	.nav-action-btn.primary-btn {
-		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
+		background: var(--brand);
 		color: white;
 		flex: 2;
 	}
 
 	.nav-action-btn.primary-btn:hover:not(:disabled) {
-		background: linear-gradient(135deg, var(--brand-hover), var(--brand-active));
+		background: var(--brand-hover);
 		transform: translateY(-1px);
 		box-shadow: 0 4px 12px var(--brand-ring);
 	}
@@ -668,7 +668,7 @@
 	
 	.progress-indicator {
 		height: 100%;
-		background: linear-gradient(90deg, var(--brand), var(--brand-hover));
+		background: var(--brand);
 		transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 		box-shadow: 0 0 8px var(--brand-glow);
 		border-radius: 2px;
@@ -763,7 +763,7 @@
 	.field-chip {
 		display: inline-flex;
 		align-items: center;
-		background: #f0fdfa;
+		background: #faf1f2;
 		border: 1px solid var(--brand);
 		border-radius: 16px;
 		padding: 0.25rem 0.625rem;
@@ -826,7 +826,7 @@
 	.datetime-input:focus {
 		outline: none;
 		border-color: var(--brand-hover);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 	}
 
 	.datetime-input:hover:not(:focus) {

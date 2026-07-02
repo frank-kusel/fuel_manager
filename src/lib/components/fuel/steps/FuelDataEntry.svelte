@@ -259,7 +259,7 @@
 	.bowser-select:focus {
 		outline: none;
 		border-color: var(--brand-hover);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 	}
 
 	/* Main Fuel Input - Large and Touch-Friendly */
@@ -407,7 +407,7 @@
 	.end-reading-input:focus {
 		outline: none;
 		border-color: var(--brand);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 		background: white;
 	}
 
@@ -443,11 +443,11 @@
 
 	.edit-btn:active,
 	.resync-btn:active {
-		background: #ccfbf1;
+		background: #f3dee1;
 	}
 
 	.resync-btn {
-		background: #ccfbf1;
+		background: #f3dee1;
 		border-color: var(--brand);
 		color: var(--brand-hover);
 	}

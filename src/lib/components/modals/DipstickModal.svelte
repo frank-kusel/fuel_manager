@@ -217,7 +217,7 @@
 	.form-group input:focus {
 		outline: none;
 		border-color: var(--brand);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 	}
 
 	.modal-footer {

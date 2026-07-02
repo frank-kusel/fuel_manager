@@ -411,8 +411,8 @@
 
 	/* Claim */
 	.claim {
-		background: linear-gradient(135deg, #f0fdfa, var(--white) 70%);
-		border-color: #99f6e4;
+		background: #faf1f2;
+		border-color: #e9ccd0;
 	}
 
 	.claim-main {
@@ -459,7 +459,7 @@
 		gap: 1.5rem;
 		margin-top: 0.875rem;
 		padding-top: 0.75rem;
-		border-top: 1px solid #ccfbf1;
+		border-top: 1px solid #f3dee1;
 		flex-wrap: wrap;
 	}
 

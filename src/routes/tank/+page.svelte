@@ -101,11 +101,26 @@
 					<div class="fill" class:low={tankPct < 15} style="width: {tankPct}%"></div>
 				</div>
 			{/if}
-			<div class="hero-meta">
-				Derived: dip on {tank.lastDipDate} ({nf.format(Math.round(tank.lastDipLitres || 0))} L)
-				+ {nf.format(Math.round(tank.refillsSinceDip))} L received
-				− {nf.format(Math.round(tank.dispensedSinceDip))} L dispensed
-			</div>
+			<table class="ledger">
+				<tbody>
+					<tr>
+						<td>Opening — dip on {tank.lastDipDate}</td>
+						<td class="ledger-val">{nf.format(Math.round(tank.lastDipLitres || 0))} L</td>
+					</tr>
+					<tr>
+						<td>+ Deliveries since</td>
+						<td class="ledger-val">{nf.format(Math.round(tank.refillsSinceDip))} L</td>
+					</tr>
+					<tr>
+						<td>− Dispensed since</td>
+						<td class="ledger-val">{nf.format(Math.round(tank.dispensedSinceDip))} L</td>
+					</tr>
+					<tr class="ledger-total">
+						<td>= Book balance</td>
+						<td class="ledger-val">{tank.derivedLevel !== null ? nf.format(Math.round(tank.derivedLevel)) : '—'} L</td>
+					</tr>
+				</tbody>
+			</table>
 		</section>
 
 		<!-- Dip freshness -->
@@ -297,7 +312,7 @@
 
 	.fill {
 		height: 100%;
-		background: linear-gradient(90deg, var(--brand), var(--brand-hover));
+		background: var(--brand);
 		border-radius: 5px;
 		transition: width 0.5s ease;
 	}
@@ -306,10 +321,31 @@
 		background: var(--error);
 	}
 
-	.hero-meta {
-		margin-top: 0.625rem;
-		font-size: var(--text-xs);
-		color: var(--gray-400);
+	/* Derivation ledger */
+	.ledger {
+		width: 100%;
+		margin-top: 0.75rem;
+		border-collapse: collapse;
+		font-size: var(--text-sm);
+		font-variant-numeric: tabular-nums;
+		color: var(--gray-600);
+	}
+
+	.ledger td {
+		padding: 0.3rem 0;
+		border-bottom: 1px dashed var(--gray-200);
+	}
+
+	.ledger-val {
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.ledger-total td {
+		border-bottom: none;
+		border-top: 1.5px solid var(--gray-300);
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-900);
 	}
 
 	/* Reconciliation banner */

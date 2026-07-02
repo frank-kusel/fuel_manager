@@ -13,29 +13,29 @@
 	   components consume the tokens, so nothing else needs to be touched.
 	   ========================================================================= */
 
-	/* ---- Primary: brand teal (drives inputs, focus, links) ---- */
-	--primary: #0d9488;
-	--primary-light: #ccfbf1;
-	--primary-dark: #0f766e;
-	--secondary: #64748b;
+	/* ---- Primary: deep maroon (drives inputs, focus, links) ---- */
+	--primary: #8e2b34;
+	--primary-light: #f3dee1;
+	--primary-dark: #75232b;
+	--secondary: #78716c;
 
-	/* ---- Brand: deep teal — header / nav / FAB / primary actions ---- */
-	--brand: #0d9488;
-	--brand-hover: #0f766e;
-	--brand-active: #115e59;
-	--brand-tint: rgba(13, 148, 136, 0.10);
-	--brand-tint-weak: rgba(13, 148, 136, 0.05);
-	--brand-ring: rgba(13, 148, 136, 0.30);
-	--brand-glow: rgba(13, 148, 136, 0.40);
-	--brand-glow-strong: rgba(13, 148, 136, 0.50);
+	/* ---- Brand: warm maroon/oxblood — header / nav / FAB / primary actions ---- */
+	--brand: #8e2b34;
+	--brand-hover: #75232b;
+	--brand-active: #5c1b22;
+	--brand-tint: rgba(142, 43, 52, 0.10);
+	--brand-tint-weak: rgba(142, 43, 52, 0.05);
+	--brand-ring: rgba(142, 43, 52, 0.30);
+	--brand-glow: rgba(142, 43, 52, 0.25);
+	--brand-glow-strong: rgba(142, 43, 52, 0.35);
 
-	/* ---- Accent: warm amber — draft / in-progress state (max contrast vs teal) ---- */
+	/* ---- Accent: warm amber — draft / in-progress state ---- */
 	--accent: #d97706;
 	--accent-hover: #b45309;
 	--accent-active: #92400e;
-	--accent-glow: rgba(217, 119, 6, 0.40);
-	--accent-glow-strong: rgba(217, 119, 6, 0.50);
-	--accent-glow-max: rgba(217, 119, 6, 0.60);
+	--accent-glow: rgba(217, 119, 6, 0.30);
+	--accent-glow-strong: rgba(217, 119, 6, 0.40);
+	--accent-glow-max: rgba(217, 119, 6, 0.50);
 
 	/* ---- Status ---- */
 	--success: #16a34a;
@@ -47,21 +47,21 @@
 	--validation-error: #dc2626;
 	--validation-warning: #f59e0b;
 
-	/* ---- Focus rings (keyed to brand teal) ---- */
-	--focus-ring: 0 0 0 3px rgba(13, 148, 136, 0.20);
+	/* ---- Focus rings (keyed to brand maroon) ---- */
+	--focus-ring: 0 0 0 3px rgba(142, 43, 52, 0.18);
 	--focus-ring-error: 0 0 0 3px rgba(220, 38, 38, 0.18);
 
-	/* ---- Gray Scale ---- */
-	--gray-50: #f8fafc;
-	--gray-100: #f1f5f9;
-	--gray-200: #e2e8f0;
-	--gray-300: #cbd5e1;
-	--gray-400: #94a3b8;
-	--gray-500: #64748b;
-	--gray-600: #475569;
-	--gray-700: #334155;
-	--gray-800: #1e293b;
-	--gray-900: #0f172a;
+	/* ---- Gray Scale (warm stone — pairs with the maroon brand) ---- */
+	--gray-50: #fafaf9;
+	--gray-100: #f5f5f4;
+	--gray-200: #e7e5e4;
+	--gray-300: #d6d3d1;
+	--gray-400: #a8a29e;
+	--gray-500: #78716c;
+	--gray-600: #57534e;
+	--gray-700: #44403c;
+	--gray-800: #292524;
+	--gray-900: #1c1917;
 	--white: #ffffff;
 
 	/* ---- Spacing Scale ---- */
@@ -83,11 +83,11 @@
 	--border-radius-sm: var(--radius-sm);
 	--border-radius-lg: var(--radius-lg);
 
-	/* ---- Elevation / Shadows ---- */
-	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
-	--shadow-md: 0 1px 3px rgba(0, 0, 0, 0.1);
-	--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-	--shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+	/* ---- Elevation / Shadows (kept deliberately quiet — flat surfaces) ---- */
+	--shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.04);
+	--shadow-md: 0 1px 3px rgba(28, 25, 23, 0.07);
+	--shadow-lg: 0 6px 16px rgba(28, 25, 23, 0.08);
+	--shadow-xl: 0 12px 24px rgba(28, 25, 23, 0.10);
 	/* legacy alias (identical value) */
 	--shadow: var(--shadow-md);
 
@@ -113,8 +113,8 @@
 	   render as their authors intended. */
 	--color-primary: var(--brand);
 	--color-primary-light: var(--primary-light);
-	--color-primary-50: #f0fdfa;
-	--color-primary-200: #99f6e4;
+	--color-primary-50: #faf1f2;
+	--color-primary-200: #e9ccd0;
 	--color-primary-700: var(--brand-active);
 	--color-text: var(--gray-900);
 	--color-text-primary: var(--gray-900);
@@ -153,7 +153,7 @@
 	--green-200: #bbf7d0;
 	--green-600: #16a34a;
 	--green-800: #166534;
-	--blue-50: #f0fdfa;
+	--blue-50: #faf1f2;
 	--blue-500: var(--brand);
 	--blue-600: var(--brand-hover);
 }
@@ -165,7 +165,7 @@ body {
 	font-family: var(--font-sans);
 	line-height: 1.5;
 	color: var(--gray-900);
-	background: #ffffff;
+	background: var(--gray-100);
 	font-size: 14px;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;

@@ -284,7 +284,7 @@
 	.skip-button {
 		width: 100%;
 		padding: 0.75rem 1rem;
-		border: 1px solid #99f6e4;
+		border: 1px solid #e9ccd0;
 		border-radius: 6px;
 		background: white;
 		color: var(--brand);
@@ -298,13 +298,13 @@
 	}
 
 	.skip-button:hover {
-		background: #f0fdfa;
+		background: #faf1f2;
 		border-color: var(--brand);
 		color: var(--brand-hover);
 	}
 
 	.skip-button:active {
-		background: #ccfbf1;
+		background: #f3dee1;
 		transform: scale(0.98);
 	}
 
@@ -332,7 +332,7 @@
 	.search-input input:focus {
 		outline: none;
 		border-color: var(--brand-hover);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 	}
 
 	.search-icon {
@@ -388,9 +388,9 @@
 
 	.field-card:hover {
 		border-color: var(--brand);
-		background: #f0fdfa;
+		background: #faf1f2;
 		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+		box-shadow: 0 4px 12px rgba(142, 43, 52, 0.15);
 	}
 
 	.field-card.selected {
@@ -398,7 +398,7 @@
 		background: var(--brand);
 		color: var(--gray-900, #0f172a);
 		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+		box-shadow: 0 4px 12px rgba(142, 43, 52, 0.3);
 	}
 
 	.field-header {
@@ -513,9 +513,9 @@
 
 	.zone-card:hover {
 		border-color: var(--brand);
-		background: #f0fdfa;
+		background: #faf1f2;
 		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+		box-shadow: 0 4px 12px rgba(142, 43, 52, 0.15);
 	}
 
 	.zone-card.selected {
@@ -523,7 +523,7 @@
 		background: var(--brand);
 		color: var(--gray-900, #0f172a);
 		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+		box-shadow: 0 4px 12px rgba(142, 43, 52, 0.3);
 	}
 
 	.zone-header {

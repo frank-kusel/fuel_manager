@@ -768,7 +768,7 @@
 	.fuel-drop {
 		width: 60px;
 		height: 80px;
-		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
+		background: var(--brand);
 		border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
 		position: relative;
 		opacity: 0.6;

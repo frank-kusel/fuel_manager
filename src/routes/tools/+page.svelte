@@ -122,7 +122,7 @@
 
 	.tool-card:hover:not(.disabled) {
 		border-color: var(--brand);
-		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+		box-shadow: 0 4px 12px rgba(142, 43, 52, 0.15);
 		transform: translateY(-2px);
 	}
 
@@ -142,7 +142,7 @@
 
 	.tool-button:hover {
 		border-color: var(--brand);
-		box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+		box-shadow: 0 4px 12px rgba(142, 43, 52, 0.15);
 		transform: translateY(-2px);
 	}
 

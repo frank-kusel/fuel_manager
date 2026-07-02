@@ -204,7 +204,7 @@
 	
 	.tank-fill {
 		height: 100%;
-		background: linear-gradient(90deg, var(--brand) 0%, var(--brand-hover) 100%);
+		background: var(--brand);
 		transition: width 0.5s ease;
 		border-radius: 0.5rem;
 	}

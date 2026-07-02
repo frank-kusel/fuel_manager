@@ -550,7 +550,7 @@
 
 	.entry-item.editing {
 		border-color: var(--brand);
-		background: rgba(13, 148, 136, 0.02);
+		background: rgba(142, 43, 52, 0.02);
 	}
 
 	.entry-header {

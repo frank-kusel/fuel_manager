@@ -243,7 +243,7 @@
 		width: 2.25rem;
 		height: 2.25rem;
 		border-radius: var(--radius-lg);
-		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
+		background: var(--brand);
 		color: #ffffff;
 		box-shadow: 0 2px 8px var(--brand-glow);
 	}
@@ -275,7 +275,7 @@
 	.nav-btn:hover {
 		background: var(--brand-tint-weak);
 		color: var(--brand);
-		border-color: rgba(13, 148, 136, 0.2);
+		border-color: rgba(142, 43, 52, 0.2);
 	}
 
 	.nav-btn.active {
@@ -286,14 +286,14 @@
 	}
 
 	.action-btn {
-		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
+		background: var(--brand);
 		color: white;
 		border: none;
 		font-weight: 600;
 	}
 
 	.action-btn:hover {
-		background: linear-gradient(135deg, var(--brand-hover), var(--brand-active));
+		background: var(--brand-hover);
 		color: white;
 		border-color: transparent;
 		transform: translateY(-1px);
@@ -358,7 +358,7 @@
 		transform: translateX(-50%);
 		width: 24px;
 		height: 3px;
-		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
+		background: var(--brand);
 		border-radius: 0 0 6px 6px;
 	}
 
@@ -383,7 +383,7 @@
 	.central-action {
 		position: relative;
 		margin: 0;
-		background: linear-gradient(135deg, var(--brand), var(--brand-hover));
+		background: var(--brand);
 		color: white;
 		border-radius: 50%;
 		width: 56px;
@@ -399,20 +399,20 @@
 	}
 
 	.central-action:hover {
-		background: linear-gradient(135deg, var(--brand-hover), var(--brand-active));
+		background: var(--brand-hover);
 		transform: scale(1.05);
 		box-shadow: 0 6px 20px var(--brand-glow-strong);
 	}
 
 	/* Draft in progress state */
 	.central-action.has-draft {
-		background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+		background: var(--accent);
 		box-shadow: 0 4px 16px var(--accent-glow);
 		animation: pulse-button 2s ease-in-out infinite;
 	}
 
 	.central-action.has-draft:hover {
-		background: linear-gradient(135deg, var(--accent-hover), var(--accent-active));
+		background: var(--accent-hover);
 		box-shadow: 0 6px 20px var(--accent-glow-strong);
 	}
 
@@ -507,18 +507,18 @@
 	}
 
 	.action-menu-item:hover {
-		background: #f0fdfa;
+		background: #faf1f2;
 	}
 
 	.action-menu-item:active {
-		background: #ccfbf1;
+		background: #f3dee1;
 	}
 
 	.action-menu-icon {
 		width: 48px;
 		height: 48px;
 		border-radius: 12px;
-		background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
+		background: #faf1f2;
 		display: flex;
 		align-items: center;
 		justify-content: center;

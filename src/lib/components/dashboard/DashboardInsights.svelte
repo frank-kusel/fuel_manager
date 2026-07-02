@@ -20,7 +20,7 @@
 	const nf1 = new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 1 });
 
 	// Stacked-bar shades, darkest = biggest slice
-	const SLICE_COLORS = ['#0f766e', '#0d9488', '#2dd4bf', '#7dd8cc', '#ccfbf1'];
+	const SLICE_COLORS = ['#75232b', '#8e2b34', '#b06570', '#cf96a0', '#f3dee1'];
 
 	let maxDaily = $derived(
 		$insightsData ? Math.max(1, ...$insightsData.daily.map((d) => d.litres)) : 1
@@ -490,7 +490,7 @@
 
 	.daily-bar {
 		flex: 1;
-		background: #7dd8cc;
+		background: #cf96a0;
 		border-radius: 2px 2px 0 0;
 		min-height: 2px;
 		transition: height 0.3s ease;

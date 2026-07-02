@@ -293,9 +293,9 @@
 
 	/* Clean selected state */
 	:global(#field-table tbody tr.selected) {
-		background: rgba(13, 148, 136, 0.08);
+		background: rgba(142, 43, 52, 0.08);
 		border-radius: 0.5rem;
-		border-bottom-color: rgba(13, 148, 136, 0.2);
+		border-bottom-color: rgba(142, 43, 52, 0.2);
 	}
 
 	/* Clean field cell styling */
@@ -440,8 +440,8 @@
 
 	.skip-message {
 		padding: 0.75rem;
-		background: #ccfbf1;
-		border: 1px solid #99f6e4;
+		background: #f3dee1;
+		border: 1px solid #e9ccd0;
 		border-radius: 0.5rem;
 		color: var(--brand-hover);
 		font-size: 0.875rem;
@@ -452,7 +452,7 @@
 	}
 
 	.skip-message:hover {
-		background: #99f6e4;
+		background: #e9ccd0;
 		color: var(--brand-active);
 	}
 
@@ -504,7 +504,7 @@
 	.search-input input:focus {
 		outline: none;
 		border-color: var(--brand-hover);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 	}
 
 	.search-icon {

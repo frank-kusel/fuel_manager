@@ -386,7 +386,7 @@
 
 	.tank-fill {
 		height: 100%;
-		background: linear-gradient(90deg, #10b981, #059669);
+		background: var(--success);
 		transition: width 0.5s ease;
 	}
 
@@ -520,7 +520,7 @@
 	}
 
 	.action-btn:active {
-		background: #ccfbf1;
+		background: #f3dee1;
 	}
 	
 	.tank-overview {
@@ -560,7 +560,7 @@
 	.form-group input:focus {
 		outline: none;
 		border-color: var(--brand);
-		box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
 	}
 	
 	.form-actions {
