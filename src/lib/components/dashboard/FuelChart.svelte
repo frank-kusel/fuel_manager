@@ -56,6 +56,7 @@
 			const result = await client
 				.from('fuel_entries')
 				.select('entry_date, litres_dispensed')
+				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.order('entry_date', { ascending: true });
 

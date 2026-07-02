@@ -31,6 +31,7 @@ export const load: PageServerLoad = async ({ params }) => {
 			zone:zones(name)
 		`)
 		.eq('vehicle_id', id)
+		.is('deleted_at', null)
 		.order('entry_date', { ascending: false })
 		.order('time', { ascending: false })
 		.limit(100);
@@ -43,6 +44,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		.from('fuel_entries')
 		.select('litres_used, odometer_start, odometer_end, fuel_consumption_l_per_100km, entry_date, activity_id')
 		.eq('vehicle_id', id)
+		.is('deleted_at', null)
 		.gte('entry_date', thirtyDaysAgo.toISOString().split('T')[0])
 		.order('entry_date', { ascending: true });
 

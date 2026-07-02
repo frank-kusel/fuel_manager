@@ -14,6 +14,9 @@ import type {
 	Field,
 	Zone, 
 	RefillRecord,
+	MoveFuelEntryDirection,
+	MoveFuelEntryResult,
+	SoftDeleteFuelEntryResult,
 	ApiResponse 
 } from '$lib/types';
 
@@ -197,66 +200,98 @@ class SupabaseService {
 		);
 	}
 
-	async updateVehicleOdometer(id: string, newOdometer: number): Promise<ApiResponse<Vehicle>> {
+	// Get current odometer reading for a vehicle from latest fuel entry
+	async getCurrentOdometer(vehicleId: string): Promise<ApiResponse<number | null>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('vehicles')
-				.update({ 
-					current_odometer: newOdometer, 
-					updated_at: new Date().toISOString() 
-				})
-				.eq('id', id)
-				.select()
-				.single()
-		);
+		return this.query(async () => {
+			const result = await client
+				.from('current_vehicle_odometers')
+				.select('current_odometer')
+				.eq('vehicle_id', vehicleId)
+				.single();
+
+			return { data: result.data?.current_odometer ?? null, error: result.error };
+		});
 	}
 
-	async updateBowserReading(id: string, newReading: number, fuelEntryId?: string): Promise<ApiResponse<Bowser>> {
+	// Get current bowser reading from latest fuel entry
+	async getCurrentBowserReading(bowserId: string): Promise<ApiResponse<number | null>> {
 		const client = this.ensureInitialized();
-		
-		try {
-			// First get the current reading for history
-			const currentBowser = await client
-				.from('bowsers')
+		return this.query(async () => {
+			const result = await client
+				.from('current_bowser_readings')
 				.select('current_reading')
-				.eq('id', id)
+				.eq('bowser_id', bowserId)
 				.single();
-			
-			const previousReading = currentBowser.data?.current_reading || null;
-			
-			// Update bowser reading with last_updated timestamp
-			const updateResult = await client
-				.from('bowsers')
-				.update({ 
-					current_reading: newReading, 
-					last_updated: new Date().toISOString(),
-					updated_at: new Date().toISOString() 
-				})
-				.eq('id', id)
-				.select()
-				.single();
-			
-			// Create history record (if table exists)
-			try {
-				await client
-					.from('bowser_reading_history')
-					.insert({
-						bowser_id: id,
-						fuel_entry_id: fuelEntryId || null,
-						previous_reading: previousReading,
-						new_reading: newReading,
-						created_by: null
-					});
-			} catch (historyError) {
-				// History table might not exist yet, log but don't fail the main operation
-				console.warn('Could not create bowser reading history:', historyError);
+
+			return { data: result.data?.current_reading ?? null, error: result.error };
+		});
+	}
+
+	// Cascade bowser reading changes to subsequent entries
+	async cascadeBowserReadings(
+		fuelEntryId: string,
+		newBowserReadingEnd: number
+	): Promise<ApiResponse<{ updated_count: number; entries_updated: string[] }>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('cascade_bowser_readings', {
+				p_fuel_entry_id: fuelEntryId,
+				p_new_bowser_reading_end: newBowserReadingEnd
+			});
+
+			if (result.error) {
+				return { data: null, error: result.error };
 			}
-			
-			return { data: updateResult.data, error: updateResult.error?.message };
-		} catch (error) {
-			return { data: null, error: error instanceof Error ? error.message : 'Failed to update bowser reading' };
-		}
+
+			// Extract the first row result (function returns TABLE)
+			const data = result.data?.[0] || { updated_count: 0, entries_updated: [] };
+			return { data, error: null };
+		});
+	}
+
+	// Recalculate all bowser readings (fixes discontinuities)
+	async recalculateAllBowserReadings(
+		bowserId?: string
+	): Promise<ApiResponse<Array<{
+		bowser_id: string;
+		bowser_name: string;
+		entries_processed: number;
+		discontinuities_found: number;
+	}>>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('recalculate_all_bowser_readings', {
+				p_bowser_id: bowserId || null
+			});
+
+			return { data: result.data || [], error: result.error };
+		});
+	}
+
+	// Find bowser reading discontinuities (diagnostic)
+	async findBowserDiscontinuities(
+		bowserId?: string,
+		threshold: number = 0.1
+	): Promise<ApiResponse<Array<{
+		bowser_name: string;
+		entry_id: string;
+		entry_date: string;
+		entry_time: string;
+		expected_start: number;
+		actual_start: number;
+		difference: number;
+		litres_dispensed: number;
+	}>>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('find_bowser_discontinuities', {
+				p_bowser_id: bowserId || null,
+				p_threshold: threshold
+			});
+
+			return { data: result.data || [], error: result.error };
+		});
 	}
 
 	async deleteVehicle(id: string): Promise<ApiResponse<null>> {
@@ -326,6 +361,7 @@ class SupabaseService {
 				fields!left (code, name),
 				bowsers!left (name)
 			`)
+			.is('deleted_at', null)
 			.order('entry_date', { ascending: false });
 
 		if (startDate) {
@@ -351,14 +387,133 @@ class SupabaseService {
 
 	async updateFuelEntry(id: string, updates: Partial<FuelEntry>): Promise<ApiResponse<FuelEntry>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('fuel_entries')
 				.update({ ...updates, updated_at: new Date().toISOString() })
 				.eq('id', id)
+				.is('deleted_at', null)
 				.select()
 				.single()
 		);
+	}
+
+	async softDeleteFuelEntry(id: string): Promise<ApiResponse<SoftDeleteFuelEntryResult>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('void_fuel_entry', {
+				p_entry_id: id
+			});
+
+			return {
+				data: result.data?.[0] ?? null,
+				error: result.error
+			};
+		});
+	}
+
+	async moveFuelEntryWithinDay(
+		id: string,
+		direction: MoveFuelEntryDirection
+	): Promise<ApiResponse<MoveFuelEntryResult>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('move_fuel_entry_within_day', {
+				p_entry_id: id,
+				p_direction: direction
+			});
+
+			return {
+				data: result.data?.[0] ?? null,
+				error: result.error
+			};
+		});
+	}
+
+	/**
+	 * Update a fuel entry and automatically cascade corrections to all subsequent entries.
+	 * This maintains data integrity by recalculating bowser readings for all entries that come after.
+	 */
+	async updateFuelEntryWithCascade(id: string, updates: Partial<FuelEntry>): Promise<ApiResponse<FuelEntry>> {
+		const client = this.ensureInitialized();
+
+		try {
+			// Step 1: Get the original entry to know its position and bowser
+			const originalResult = await client
+				.from('fuel_entries')
+				.select('*')
+				.eq('id', id)
+				.is('deleted_at', null)
+				.single();
+
+			if (originalResult.error || !originalResult.data) {
+				return { data: null, error: 'Fuel entry not found' };
+			}
+
+			const original = originalResult.data;
+			const bowserId = updates.bowser_id ?? original.bowser_id;
+
+			// Step 2: Update the fuel entry
+			const updateResult = await client
+				.from('fuel_entries')
+				.update({ ...updates, updated_at: new Date().toISOString() })
+				.eq('id', id)
+				.is('deleted_at', null)
+				.select()
+				.single();
+
+			if (updateResult.error) {
+				return { data: null, error: updateResult.error.message };
+			}
+
+			const updatedEntry = updateResult.data;
+
+			// Step 3: If bowser readings changed, cascade corrections to subsequent entries
+			if (bowserId && (
+				updates.bowser_reading_end !== undefined ||
+				updates.litres_dispensed !== undefined
+			)) {
+				// Get all subsequent entries for this bowser, ordered by date and time
+				const subsequentResult = await client
+					.from('fuel_entries')
+					.select('*')
+					.eq('bowser_id', bowserId)
+					.is('deleted_at', null)
+					.or(`entry_date.gt.${updatedEntry.entry_date},and(entry_date.eq.${updatedEntry.entry_date},time.gt.${updatedEntry.time})`)
+					.order('entry_date', { ascending: true })
+					.order('time', { ascending: true });
+
+				if (subsequentResult.data && subsequentResult.data.length > 0) {
+					// Step 4: Recalculate all subsequent entries
+					let runningReading = updatedEntry.bowser_reading_end;
+
+					for (const entry of subsequentResult.data) {
+						// Calculate new readings based on litres dispensed
+						const newStart = runningReading;
+						const newEnd = runningReading - (entry.litres_dispensed || 0);
+
+						// Update the entry with corrected readings
+						await client
+							.from('fuel_entries')
+							.update({
+								bowser_reading_start: newStart,
+								bowser_reading_end: newEnd,
+								updated_at: new Date().toISOString()
+							})
+							.eq('id', entry.id);
+
+						runningReading = newEnd;
+					}
+				}
+			}
+
+			return { data: updateResult.data, error: null };
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to update fuel entry with cascade'
+			};
+		}
 	}
 
 	// Multi-field fuel entry operations
@@ -720,10 +875,10 @@ class SupabaseService {
 		);
 	}
 
-	// Get fuel entries with location data for summary
-	async getFuelEntriesWithLocation(date: string): Promise<ApiResponse<any[]>> {
+	// Get fuel entries for a specific date with related data
+	async getFuelEntriesByDate(date: string): Promise<ApiResponse<any[]>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('fuel_entries')
 				.select(`
@@ -735,6 +890,29 @@ class SupabaseService {
 					zones:zone_id(code, name)
 				`)
 				.eq('entry_date', date)
+				.is('deleted_at', null)
+				.order('time', { ascending: false })
+		);
+	}
+
+	// Get fuel activity entries for a selected date range with related data
+	async getRecentActivityEntries(startDate: string, endDate: string): Promise<ApiResponse<any[]>> {
+		const client = this.ensureInitialized();
+		return this.query(() =>
+			client
+				.from('fuel_entries')
+				.select(`
+					*,
+					vehicles!left(code, name, type, odometer_unit, average_consumption_l_per_100km),
+					drivers!left(employee_code, name),
+					activities!left(name, category),
+					fields!left(name, code),
+					zones!left(name, code)
+				`)
+				.is('deleted_at', null)
+				.gte('entry_date', startDate)
+				.lte('entry_date', endDate)
+				.order('entry_date', { ascending: false })
 				.order('time', { ascending: false })
 		);
 	}
@@ -760,24 +938,28 @@ class SupabaseService {
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed')
+					.is('deleted_at', null)
 					.gte('entry_date', today),
 				
 				// Past 7 days fuel usage
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed, odometer_start, odometer_end')
+					.is('deleted_at', null)
 					.gte('entry_date', past7DaysStart),
 				
 				// This month's fuel usage
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed, odometer_start, odometer_end, vehicle_id, fuel_consumption_l_per_100km, gauge_working')
+					.is('deleted_at', null)
 					.gte('entry_date', monthStart),
 				
 				// Previous month's fuel usage
 				client
 					.from('fuel_entries')
 					.select('litres_used, litres_dispensed')
+					.is('deleted_at', null)
 					.gte('entry_date', prevMonthStart)
 					.lte('entry_date', prevMonthEnd),
 				
@@ -793,20 +975,30 @@ class SupabaseService {
 						zones!left(name, code),
 						fuel_entry_fields!left(field_id, fields!inner(name, code))
 					`)
+					.is('deleted_at', null)
 					.order('entry_date', { ascending: false })
 					.order('time', { ascending: false })
 					.limit(10),
 				
-				// Bowser levels
+				// Bowser levels with current readings from view
 				client
 					.from('bowsers')
-					.select('name, current_reading, capacity, fuel_type')
+					.select(`
+						name,
+						capacity,
+						fuel_type,
+						id,
+						current_bowser_readings!left(current_reading)
+					`)
 					.eq('active', true),
-				
-				// Active vehicles count
+
+				// Active vehicles count with odometer data from view
 				client
 					.from('vehicles')
-					.select('id, current_odometer')
+					.select(`
+						id,
+						current_vehicle_odometers!left(current_odometer)
+					`)
 					.eq('active', true),
 				
 				// Tank status for calculated level
@@ -849,7 +1041,10 @@ class SupabaseService {
 			
 			// Active vehicles with odometer data
 			const activeVehicles = vehicles.data?.length || 0;
-			const vehiclesWithOdometer = vehicles.data?.filter(v => v.current_odometer && v.current_odometer > 0).length || 0;
+			const vehiclesWithOdometer = vehicles.data?.filter(v =>
+				v.current_vehicle_odometers?.[0]?.current_odometer &&
+				v.current_vehicle_odometers[0].current_odometer > 0
+			).length || 0;
 
 			// Calculate consumption statistics
 			const validConsumptionEntries = consumptionEntries.length;
@@ -889,9 +1084,9 @@ class SupabaseService {
 					activeVehicles,
 					vehiclesWithOdometer,
 					totalBowsers: bowsers.data?.length || 0,
-					
+
 					// Bowser reading (Tank A - first bowser)
-					bowserReading: bowsers.data?.[0]?.current_reading || 0,
+					bowserReading: bowsers.data?.[0]?.current_bowser_readings?.[0]?.current_reading || 0,
 					
 					// Recent activity
 					recentEntries: recentEntries.data || [],
@@ -921,6 +1116,7 @@ class SupabaseService {
 					activities!left(name, category)
 				`)
 				.gte('entry_date', startDate)
+				.is('deleted_at', null)
 				.order('entry_date', { ascending: true });
 			
 			if (vehicleId) {
@@ -1126,6 +1322,7 @@ class SupabaseService {
 				.from('fuel_entries')
 				.select('id, entry_date, litres_dispensed, litres_used, time, vehicle_id')
 				.eq('vehicle_id', vehicleId)
+				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate)
 				.order('entry_date', { ascending: false })
@@ -1154,6 +1351,7 @@ class SupabaseService {
 					vehicles!left (odometer_unit)
 				`)
 				.eq('vehicle_id', vehicleId)
+				.is('deleted_at', null)
 				.order('entry_date', { ascending: false })
 				.order('time', { ascending: false })
 		);
@@ -1196,6 +1394,7 @@ class SupabaseService {
 			const fuelResult = await client
 				.from('fuel_entries')
 				.select('litres_dispensed')
+				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate);
 				
@@ -1211,6 +1410,7 @@ class SupabaseService {
 				const bowserStartResult = await client
 					.from('fuel_entries')
 					.select('bowser_reading_end, entry_date, time')
+					.is('deleted_at', null)
 					.lt('entry_date', startDate)
 					.not('bowser_reading_end', 'is', null)
 					.order('entry_date', { ascending: false })
@@ -1221,6 +1421,7 @@ class SupabaseService {
 				const bowserEndResult = await client
 					.from('fuel_entries')
 					.select('bowser_reading_end, entry_date, time')
+					.is('deleted_at', null)
 					.gte('entry_date', startDate)
 					.lte('entry_date', endDate)
 					.not('bowser_reading_end', 'is', null)
@@ -1333,6 +1534,7 @@ class SupabaseService {
 				const dispensedResult = await client
 					.from('fuel_entries')
 					.select('litres_dispensed, entry_date')
+					.is('deleted_at', null)
 					.gte('entry_date', startDateStr)
 					.lte('entry_date', date);
 
@@ -1538,6 +1740,7 @@ class SupabaseService {
 					fields:field_id(id, code, name),
 					zones:zone_id(id, code, name)
 				`)
+				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate)
 				.order('entry_date', { ascending: false })
