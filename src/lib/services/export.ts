@@ -25,6 +25,19 @@ const xlHairlineBorder = {
 	right: { style: 'thin', color: { rgb: XL_HAIRLINE } }
 };
 
+/**
+ * Strip emoji / non-printable-ASCII from text destined for generated
+ * documents. jsPDF's built-in Helvetica cannot render emoji or multibyte
+ * symbols — glyph widths miscalculate and text prints stretched or
+ * truncated (e.g. the vehicle type "6 - Vehicle 🛻").
+ */
+function cleanDocText(text: string | null | undefined): string {
+	return (text || '')
+		.replace(/[^\x20-\x7E]/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
 interface LedgerColumnStyle {
 	numFmt?: string;
 	halign?: 'left' | 'right' | 'center';
@@ -457,7 +470,11 @@ class ExportService {
 						code: summary.code,
 						name: summary.name,
 						registration: summary.registration,
-						category: summary.type, // Use type directly from supabase
+						// Vehicle types in the DB carry emoji (e.g. "6 - Vehicle 🛻")
+						// which jsPDF's Helvetica cannot render — glyph widths go
+						// wrong and the text prints stretched/truncated. Strip to
+						// printable ASCII for documents.
+						category: cleanDocText(summary.type),
 						distance: distance,
 						fuel: Math.round(summary.totalFuel * 100) / 100, // 2 decimal places
 						consumption: consumption,
@@ -703,12 +720,11 @@ class ExportService {
 				},
 				didParseCell: function (data: any) {
 					if (data.section !== 'body') return;
-					// Style the subtotal row (last row): bold, no fill
+					// Style the subtotal row (last row): bold, no fill.
+					// The Fuel column stays black — red is reserved for tank
+					// MOVEMENTS in the reconciliation, so it keeps its meaning.
 					if (data.row.index === tableData.length - 1) {
 						data.cell.styles.fontStyle = 'bold';
-					} else if (data.column.index === 5) {
-						// Fuel dispensed = fuel out of the tank -> red
-						data.cell.styles.textColor = PDF_RED;
 					}
 				},
 				// Let autoTable calculate column widths automatically for full page width
@@ -1058,12 +1074,11 @@ class ExportService {
 				},
 				didParseCell: function (data: any) {
 					if (data.section !== 'body') return;
-					// Style the subtotal row (last row): bold, no fill
+					// Style the subtotal row (last row): bold, no fill.
+					// The Fuel column stays black — red is reserved for tank
+					// MOVEMENTS in the reconciliation, so it keeps its meaning.
 					if (data.row.index === tableData.length - 1) {
 						data.cell.styles.fontStyle = 'bold';
-					} else if (data.column.index === 5) {
-						// Fuel dispensed = fuel out of the tank -> red
-						data.cell.styles.textColor = PDF_RED;
 					}
 				},
 				margin: { left: marginX, right: marginX }
@@ -1073,6 +1088,18 @@ class ExportService {
 			const tableEndY = (pdf as any).lastAutoTable.finalY || tableStartY + 100;
 			let reconciliationY = tableEndY + 15;
 
+			// Page-break guard: the reconciliation block previously ran into the
+			// fixed-position footer (or off the page) when the table was long.
+			const ensureRoom = (needed = 8) => {
+				if (reconciliationY + needed > pageHeight - 18) {
+					pdf.addPage();
+					reconciliationY = 20;
+					pdf.setFontSize(9);
+					pdf.setFont('helvetica', 'normal');
+					pdf.setTextColor(0, 0, 0);
+				}
+			};
+
 			// Add footnote about efficiency - reduced spacing
 			pdf.setFontSize(8);
 			pdf.setFont('helvetica', 'italic');
@@ -1081,6 +1108,7 @@ class ExportService {
 			pdf.setTextColor(0, 0, 0);
 
 			// RECONCILIATION SECTIONS MOVED HERE - after table
+			ensureRoom(36);
 			pdf.setFontSize(11);
 			pdf.setFont('helvetica', 'bold');
 			pdf.text('Fuel Reconciliation', marginX, reconciliationY);
@@ -1122,6 +1150,7 @@ class ExportService {
 			reconciliationY += 10;
 
 			// Tank Reconciliation Section
+			ensureRoom(40);
 			pdf.setFontSize(11);
 			pdf.setFont('helvetica', 'bold');
 			pdf.text('Tank Reconciliation', marginX, reconciliationY);
@@ -1146,6 +1175,7 @@ class ExportService {
 			if (reconciliationData.tankActivities.length > 0) {
 				let totalAdditions = 0;
 				reconciliationData.tankActivities.forEach(activity => {
+					ensureRoom();
 					const activityDate = new Date(activity.delivery_date).toLocaleDateString('en-ZA', {
 						day: 'numeric',
 						month: 'short'
@@ -1179,6 +1209,7 @@ class ExportService {
 			}
 
 			// Total Drawings (fuel dispensed)
+			ensureRoom(28);
 			pdf.setFont('helvetica', 'bold');
 			pdf.text('Total Drawings:', labelX, reconciliationY);
 			pdf.setTextColor(...PDF_RED); // fuel out
@@ -1203,17 +1234,27 @@ class ExportService {
 
 			const lastDayOfMonth = new Date(year, month, 0).getDate();
 			const actualReadingDate = `${lastDayOfMonth} ${monthName} ${year}`;
+			// A zero dip reading almost always means "no dip taken for this
+			// month" — printing 0,0L reads as an empty tank. Show a dash and
+			// say so; the variance is then meaningless too.
+			const hasDip = (reconciliationData.lastDipReading || 0) > 0;
 			pdf.text('Actual Reading:', labelX, reconciliationY);
-			pdf.text(`${reconciliationData.lastDipReading.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(
+				hasDip
+					? `${reconciliationData.lastDipReading.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`
+					: '—',
+				valueX,
+				reconciliationY
+			);
 			pdf.setTextColor(...PDF_GREY);
-			pdf.text(`(${actualReadingDate})`, detailsX, reconciliationY);
+			pdf.text(hasDip ? `(${actualReadingDate})` : '(no dip recorded for month end)', detailsX, reconciliationY);
 			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
 
 			// Tank variance - simplified with alignment
 			const tankVariance = expectedLevel - reconciliationData.lastDipReading;
 			pdf.text('Tank Variance:', labelX, reconciliationY);
-			pdf.text(`${tankVariance.toFixed(1)}L`, valueX, reconciliationY);
+			pdf.text(hasDip ? `${tankVariance.toFixed(1)}L` : '—', valueX, reconciliationY);
 
 			let footerY = reconciliationY + 15;
 
