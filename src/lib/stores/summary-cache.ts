@@ -27,6 +27,7 @@ interface SummaryCacheState {
 }
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const STORAGE_KEY = 'farmtrack_summary_cache_v1';
 
 const initialState: SummaryCacheState = {
 	entries: [],
@@ -36,8 +37,45 @@ const initialState: SummaryCacheState = {
 	error: null
 };
 
+// Hydrate from localStorage so a cold app-open renders the last-known log
+// instantly (stale-while-revalidate) instead of waiting ~1s for Supabase
+// in London. Fresh data replaces it silently in the background.
+function loadPersisted(): SummaryCacheState {
+	try {
+		if (typeof localStorage === 'undefined') return initialState;
+		const raw = localStorage.getItem(STORAGE_KEY);
+		if (!raw) return initialState;
+		const parsed = JSON.parse(raw);
+		if (!Array.isArray(parsed.entries)) return initialState;
+		return {
+			...initialState,
+			entries: parsed.entries,
+			fieldNamesMap: parsed.fieldNamesMap || {},
+			timestamp: parsed.timestamp || null
+		};
+	} catch {
+		return initialState;
+	}
+}
+
+function persist(state: SummaryCacheState) {
+	try {
+		if (typeof localStorage === 'undefined') return;
+		localStorage.setItem(
+			STORAGE_KEY,
+			JSON.stringify({
+				entries: state.entries,
+				fieldNamesMap: state.fieldNamesMap,
+				timestamp: state.timestamp
+			})
+		);
+	} catch {
+		// Quota/private mode — cache stays in-memory only.
+	}
+}
+
 function createSummaryCacheStore() {
-	const { subscribe, set, update } = writable<SummaryCacheState>(initialState);
+	const { subscribe, set, update } = writable<SummaryCacheState>(loadPersisted());
 
 	return {
 		subscribe,
@@ -87,16 +125,46 @@ function createSummaryCacheStore() {
 			update(state => ({ ...state, error, loading: false }));
 		},
 
+		// Get cached data regardless of age, flagged with freshness — for
+		// stale-while-revalidate rendering.
+		getAnyCachedData: (): {
+			entries: FuelSummaryEntry[];
+			fieldNamesMap: Record<string, string>;
+			fresh: boolean;
+		} | null => {
+			let result: {
+				entries: FuelSummaryEntry[];
+				fieldNamesMap: Record<string, string>;
+				fresh: boolean;
+			} | null = null;
+			subscribe(state => {
+				if (!state.timestamp || state.entries.length === 0) {
+					result = null;
+					return;
+				}
+				result = {
+					entries: state.entries,
+					fieldNamesMap: state.fieldNamesMap,
+					fresh: Date.now() - state.timestamp < CACHE_DURATION
+				};
+			})();
+			return result;
+		},
+
 		// Update cache with new data
 		updateCache: (entries: FuelSummaryEntry[], fieldNamesMap: Record<string, string>) => {
-			update(state => ({
-				...state,
-				entries,
-				fieldNamesMap,
-				timestamp: Date.now(),
-				loading: false,
-				error: null
-			}));
+			update(state => {
+				const next = {
+					...state,
+					entries,
+					fieldNamesMap,
+					timestamp: Date.now(),
+					loading: false,
+					error: null
+				};
+				persist(next);
+				return next;
+			});
 		},
 
 		// Update field names map only (for incremental updates)

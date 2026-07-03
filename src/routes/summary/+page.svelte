@@ -34,15 +34,18 @@
 
 	onMount(() => {
 		if (browser) {
-			// Check if we have valid cached data
-			const cachedData = summaryCacheStore.getCachedData();
+			// Stale-while-revalidate: render whatever cache exists (persisted
+			// across app opens via localStorage) instantly, then refresh in
+			// the background unless it's fresh (<5 min).
+			const cachedData = summaryCacheStore.getAnyCachedData();
 			if (cachedData) {
-				// Use cached data for instant load
 				entries = cachedData.entries;
 				fieldNamesMap = cachedData.fieldNamesMap;
 				loading = false;
+				if (!cachedData.fresh) {
+					loadEntries(true);
+				}
 			} else {
-				// Load fresh data
 				loadEntries();
 			}
 		}
@@ -116,10 +119,14 @@
 		}
 	}
 
-	async function loadEntries() {
+	async function loadEntries(silent = false) {
 		try {
-			loading = true;
-			summaryCacheStore.setLoading(true);
+			// Silent mode = stale-while-revalidate background refresh: the
+			// cached list stays on screen instead of a blocking spinner.
+			if (!silent) {
+				loading = true;
+				summaryCacheStore.setLoading(true);
+			}
 			await supabaseService.init();
 			const client = supabaseService.getClient();
 

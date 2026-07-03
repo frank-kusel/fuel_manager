@@ -58,6 +58,20 @@
 				.then(() => console.log('Service Worker registered'))
 				.catch(err => console.error('Service Worker registration failed:', err));
 		}
+
+		// Prefetch reference data (vehicles/drivers/activities/fields/zones/
+		// bowsers) while the user is on their first screen, so the fuel-entry
+		// wizard and quick entry open instantly instead of waiting ~1s for
+		// Supabase in London. The store caches for 5 minutes.
+		const idle = (cb: () => void) =>
+			'requestIdleCallback' in window
+				? (window as any).requestIdleCallback(cb, { timeout: 4000 })
+				: setTimeout(cb, 1500);
+		idle(() => {
+			import('$lib/stores/reference-data').then(({ referenceDataStore }) =>
+				referenceDataStore.loadAllData()
+			);
+		});
 	});
 </script>
 

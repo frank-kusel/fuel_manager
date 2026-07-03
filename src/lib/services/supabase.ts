@@ -98,17 +98,15 @@ class SupabaseService {
 		const client = this.ensureInitialized();
 		const map = new Map<string, number>();
 		try {
+			// current_vehicle_odometers is a DISTINCT ON view over active
+			// fuel_entries — a few dozen tiny rows instead of scanning the
+			// last 1000 entries (~350ms of payload at London latency).
 			const { data } = await client
-				.from('fuel_entries')
-				.select('vehicle_id, odometer_end, entry_date, time')
-				.is('deleted_at', null)
-				.not('odometer_end', 'is', null)
-				.order('entry_date', { ascending: false })
-				.order('time', { ascending: false })
-				.limit(1000);
+				.from('current_vehicle_odometers')
+				.select('vehicle_id, current_odometer');
 			for (const row of data || []) {
-				if (row.vehicle_id && !map.has(row.vehicle_id)) {
-					map.set(row.vehicle_id, row.odometer_end);
+				if (row.vehicle_id && row.current_odometer != null) {
+					map.set(row.vehicle_id, row.current_odometer);
 				}
 			}
 		} catch {
@@ -117,22 +115,17 @@ class SupabaseService {
 		return map;
 	}
 
-	/** Latest bowser_reading_end per bowser, derived from fuel_entries. */
+	/** Latest bowser_reading_end per bowser, via the current_bowser_readings view. */
 	private async getLatestReadingByBowser(): Promise<Map<string, number>> {
 		const client = this.ensureInitialized();
 		const map = new Map<string, number>();
 		try {
 			const { data } = await client
-				.from('fuel_entries')
-				.select('bowser_id, bowser_reading_end, entry_date, time')
-				.is('deleted_at', null)
-				.not('bowser_reading_end', 'is', null)
-				.order('entry_date', { ascending: false })
-				.order('time', { ascending: false })
-				.limit(1000);
+				.from('current_bowser_readings')
+				.select('bowser_id, current_reading');
 			for (const row of data || []) {
-				if (row.bowser_id && !map.has(row.bowser_id)) {
-					map.set(row.bowser_id, row.bowser_reading_end);
+				if (row.bowser_id && row.current_reading != null) {
+					map.set(row.bowser_id, row.current_reading);
 				}
 			}
 		} catch {
@@ -144,14 +137,18 @@ class SupabaseService {
 	// Vehicle operations
 	async getVehicles(): Promise<ApiResponse<Vehicle[]>> {
 		const client = this.ensureInitialized();
-		const result = await this.query<Vehicle[]>(() =>
-			client
-				.from('vehicles')
-				.select('*')
-				.order('code')
-		);
+		// Fetch the table and the derived-odometer view in parallel — the
+		// enrichment costs no extra wall-clock time this way.
+		const [result, odoMap] = await Promise.all([
+			this.query<Vehicle[]>(() =>
+				client
+					.from('vehicles')
+					.select('*')
+					.order('code')
+			),
+			this.getLatestOdometerByVehicle()
+		]);
 		if (result.data) {
-			const odoMap = await this.getLatestOdometerByVehicle();
 			result.data = result.data.map((v: Vehicle) => ({
 				...v,
 				current_odometer: (v as any).current_odometer ?? odoMap.get(v.id) ?? null
@@ -714,15 +711,17 @@ class SupabaseService {
 	// Bowser operations
 	async getBowsers(): Promise<ApiResponse<Bowser[]>> {
 		const client = this.ensureInitialized();
-		const result = await this.query<Bowser[]>(() =>
-			client
-				.from('bowsers')
-				.select('*')
-				.eq('active', true)
-				.order('name')
-		);
+		const [result, readingMap] = await Promise.all([
+			this.query<Bowser[]>(() =>
+				client
+					.from('bowsers')
+					.select('*')
+					.eq('active', true)
+					.order('name')
+			),
+			this.getLatestReadingByBowser()
+		]);
 		if (result.data) {
-			const readingMap = await this.getLatestReadingByBowser();
 			result.data = result.data.map((b: Bowser) => ({
 				...b,
 				current_reading: (b as any).current_reading ?? readingMap.get(b.id) ?? null
