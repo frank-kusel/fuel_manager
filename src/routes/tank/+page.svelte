@@ -195,7 +195,7 @@
 		</div>
 
 		<a class="tools-link" href="/tools/reconciliations">
-			Full reconciliation tool
+			Month-end close
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
 		</a>
 	{/if}

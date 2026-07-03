@@ -37,6 +37,7 @@
 	let refills = $state<{ litres_added: number; delivery_date: string; invoice_number: string | null }[]>([]);
 	let activities = $state<string[]>([]);
 	let lastDipDate = $state<string | null>(null);
+	let latestClose = $state<{ reconciliation_date: string; variance_percentage: number | null } | null>(null);
 
 	const nf = new Intl.NumberFormat('en-ZA');
 
@@ -93,7 +94,7 @@
 				refillsQ = refillsQ.gte('delivery_date', start).lte('delivery_date', end);
 			}
 
-			const [entriesRes, refillsRes, actsRes, dipRes] = await Promise.all([
+			const [entriesRes, refillsRes, actsRes, dipRes, closeRes] = await Promise.all([
 				entriesQ,
 				refillsQ,
 				client.from('activities').select('name').eq('active', true).order('name'),
@@ -102,6 +103,11 @@
 					.select('reading_date')
 					.eq('reading_type', 'dipstick')
 					.order('reading_date', { ascending: false })
+					.limit(1),
+				client
+					.from('tank_reconciliations')
+					.select('reconciliation_date, variance_percentage')
+					.order('reconciliation_date', { ascending: false })
 					.limit(1)
 			]);
 			const firstError = entriesRes.error || refillsRes.error || actsRes.error || dipRes.error;
@@ -115,6 +121,7 @@
 			refills = refillsRes.data || [];
 			activities = (actsRes.data || []).map((a: any) => a.name);
 			lastDipDate = dipRes.data?.[0]?.reading_date ?? null;
+			latestClose = closeRes.data?.[0] ?? null;
 
 			// First run: seed the non-eligible guesses so the user starts from
 			// a conservative default instead of everything-eligible.
@@ -162,6 +169,17 @@
 		return Math.floor((Date.now() - new Date(lastDipDate).getTime()) / 86400000);
 	});
 
+	// Month-end close status: the previous calendar month should have a
+	// tank_reconciliations row (reconciliation_date = its last day).
+	let prevMonthClose = $derived.by(() => {
+		const now = new Date();
+		const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+		const key = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+		const label = prev.toLocaleDateString('en-ZA', { month: 'long' });
+		const closed = latestClose?.reconciliation_date?.startsWith(key) ?? false;
+		return { key, label, closed };
+	});
+
 	let checklist = $derived.by(() => [
 		{
 			ok: settings.regNo.trim().length > 0,
@@ -179,9 +197,11 @@
 			detail: 'Deliveries in, with supplier and invoice number'
 		},
 		{
-			ok: dipAgeDays !== null && dipAgeDays <= 30,
-			title: 'Tank reconciled to a physical dip',
-			detail: lastDipDate ? `Last dip ${lastDipDate}` : 'No dipstick reading recorded'
+			ok: prevMonthClose.closed,
+			title: 'Previous month closed',
+			detail: prevMonthClose.closed
+				? `${prevMonthClose.label} closed · variance ${latestClose?.variance_percentage ?? 0}%`
+				: `${prevMonthClose.label} not closed yet — run the month-end close`
 		},
 		{
 			ok: refills.length > 0 && refills.every((r) => !!r.invoice_number),
@@ -331,8 +351,7 @@
 		<h2 class="section-heading">Manage</h2>
 		<div class="manage-links">
 			<a href="/tools/database" class="manage-link">Database management</a>
-			<a href="/tools/reconciliations" class="manage-link">Reconciliations</a>
-			<a href="/reports" class="manage-link">Vehicle fuel history</a>
+			<a href="/tools/reconciliations" class="manage-link">Month-end close</a>
 			<a href="/menu" class="manage-link">System settings</a>
 		</div>
 	{/if}

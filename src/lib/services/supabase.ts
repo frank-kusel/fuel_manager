@@ -1389,6 +1389,26 @@ class SupabaseService {
 
 	// Reconciliation operations
 
+	// variance and variance_percentage are GENERATED columns in the live table
+	// (calculated − measured, % relative to the measured dip) — never insert them.
+	private tankReconciliationFields(data: {
+		reconciliationDate: string;
+		calculatedLevel: number;
+		measuredLevel: number;
+		notes?: string;
+	}) {
+		const variance = data.calculatedLevel - data.measuredLevel;
+		const variancePct = data.measuredLevel !== 0 ? (variance / data.measuredLevel) * 100 : 0;
+		return {
+			tank_id: 'tank_a',
+			reconciliation_date: data.reconciliationDate,
+			calculated_level: data.calculatedLevel,
+			measured_level: data.measuredLevel,
+			accepted: Math.abs(variancePct) <= 5,
+			notes: data.notes
+		};
+	}
+
 	async createTankReconciliation(data: {
 		reconciliationDate: string;
 		calculatedLevel: number;
@@ -1396,16 +1416,30 @@ class SupabaseService {
 		notes?: string;
 	}): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('tank_reconciliations')
-				.insert({
-					reconciliation_date: data.reconciliationDate,
-					calculated_level: data.calculatedLevel,
-					measured_level: data.measuredLevel,
-					accepted: Math.abs((data.calculatedLevel - data.measuredLevel) / 24000 * 100) <= 5, // 24000L tank capacity
-					notes: data.notes
-				})
+				.insert(this.tankReconciliationFields(data))
+				.select()
+				.single()
+		);
+	}
+
+	async updateTankReconciliation(
+		id: string,
+		data: {
+			reconciliationDate: string;
+			calculatedLevel: number;
+			measuredLevel: number;
+			notes?: string;
+		}
+	): Promise<ApiResponse<any>> {
+		const client = this.ensureInitialized();
+		return this.query(() =>
+			client
+				.from('tank_reconciliations')
+				.update(this.tankReconciliationFields(data))
+				.eq('id', id)
 				.select()
 				.single()
 		);
@@ -1484,166 +1518,101 @@ class SupabaseService {
 		}
 	}
 
-	async getTankReconciliationData(date: string): Promise<ApiResponse<{
-		tankCalculated: number;
-		tankMeasured: number;
-		previousMonthMissing?: boolean;
-		previousMonth?: string;
+	/**
+	 * Everything the Month-end close screen needs for one month, dip-to-dip:
+	 * book = opening dip + deliveries − dispensed over (openingDate, closingDate].
+	 * Deliberately does NOT read tank_status (its snapshot row is broken) or
+	 * fuel_reconciliations (superseded — the bowser chain makes it tautological).
+	 */
+	async getMonthCloseData(monthStart: string, monthEnd: string): Promise<ApiResponse<{
+		closingDip: { reading_value: number; reading_date: string } | null;
+		openingDip: { reading_value: number; reading_date: string } | null;
+		deliveries: number;
+		dispensed: number;
+		bowserStart: number;
+		bowserEnd: number;
+		monthDispensed: number;
+		existingClose: any | null;
 	}>> {
 		const client = this.ensureInitialized();
 
 		try {
-			// Calculate the tank level as of the specific date (end of month)
-			let tankCalculated = 0;
-			let previousMonthMissing = false;
-			let previousMonth = '';
-
-			try {
-				// Determine the start and end of the current period (month)
-				const endDate = new Date(date);
-				const year = endDate.getFullYear();
-				const month = endDate.getMonth() + 1; // getMonth() is 0-indexed
-
-				// First day of the month - format without timezone conversion
-				const startDate = new Date(year, month - 1, 1);
-				const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`;
-
-				// Get previous month in YYYY-MM format
-				const prevMonth = month === 1 ? 12 : month - 1;
-				const prevYear = month === 1 ? year - 1 : year;
-				previousMonth = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-
-				// Try to get the previous month's closing calculated level from reconciliations
-				let openingLevel = 0;
-				const prevReconciliationDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${new Date(prevYear, prevMonth, 0).getDate()}`;
-				console.log('Looking for previous reconciliation date:', prevReconciliationDate);
-
-				const prevReconciliationResult = await client
-					.from('tank_reconciliations')
-					.select('calculated_level, reconciliation_date')
-					.eq('reconciliation_date', prevReconciliationDate)
-					.order('created_at', { ascending: false })
-					.limit(1);
-
-				console.log('Previous reconciliation result:', prevReconciliationResult);
-
-				if (prevReconciliationResult.data && prevReconciliationResult.data.length > 0) {
-					// Use previous month's calculated level
-					openingLevel = prevReconciliationResult.data[0].calculated_level || 0;
-					console.log('Using previous month closing level:', openingLevel);
-				} else {
-					// Previous month wasn't reconciled - flag this
-					previousMonthMissing = true;
-					console.log('Previous month not found, using baseline');
-
-					// Fall back to baseline level
-					const tankStatusResult = await client
-						.from('tank_status')
-						.select('baseline_level')
-						.eq('tank_id', 'tank_a')
-						.single();
-					openingLevel = tankStatusResult.data?.baseline_level || 0;
-					console.log('Baseline level:', openingLevel);
-				}
-
-				// Get fuel ADDED to the tank for this month (from tank_refills)
-				console.log('Querying tank_refills from', startDateStr, 'to', date);
-				const refillsResult = await client
-					.from('tank_refills')
-					.select('litres_added, delivery_date')
-					.eq('tank_id', 'tank_a')
-					.gte('delivery_date', startDateStr)
-					.lte('delivery_date', date);
-
-				console.log('Tank refills result:', refillsResult);
-				const monthAdded = refillsResult.data?.reduce((sum, r) => sum + (r.litres_added || 0), 0) || 0;
-				console.log('Total litres added this month:', monthAdded);
-
-				// Get fuel DISPENSED from the tank for this month (from fuel_entries)
-				console.log('Querying fuel_entries from', startDateStr, 'to', date);
-				const dispensedResult = await client
-					.from('fuel_entries')
-					.select('litres_dispensed, entry_date')
-					.is('deleted_at', null)
-					.gte('entry_date', startDateStr)
-					.lte('entry_date', date);
-
-				console.log('Fuel entries result count:', dispensedResult.data?.length);
-				const monthDispensed = dispensedResult.data?.reduce((sum, e) => sum + (e.litres_dispensed || 0), 0) || 0;
-				console.log('Total litres dispensed this month:', monthDispensed);
-
-				// Calculate: opening + refills added - fuel dispensed
-				tankCalculated = openingLevel + monthAdded - monthDispensed;
-				console.log('Tank calculation:', openingLevel, '+', monthAdded, '-', monthDispensed, '=', tankCalculated);
-			} catch (tankError) {
-				console.warn('Could not calculate tank level:', tankError);
-			}
-
-			// Get latest tank reading (measured level) up to the specified date
-			let tankMeasured = 0;
-			try {
-				const tankReadingResult = await client
+			const [closingRes, existingRes, meterRes] = await Promise.all([
+				client
 					.from('tank_readings')
-					.select('reading_value')
-					.eq('tank_id', 'tank_a')
-					.lte('reading_date', date)
+					.select('reading_value, reading_date')
+					.eq('reading_type', 'dipstick')
+					.gte('reading_date', monthStart)
+					.lte('reading_date', monthEnd)
+					.order('reading_date', { ascending: false })
+					.limit(1),
+				client
+					.from('tank_reconciliations')
+					.select('*')
+					.eq('reconciliation_date', monthEnd)
+					.order('created_at', { ascending: false })
+					.limit(1),
+				this.getDateRangeReconciliationData(monthStart, monthEnd)
+			]);
+			if (closingRes.error) throw new Error(closingRes.error.message);
+			if (existingRes.error) throw new Error(existingRes.error.message);
+
+			const closingDip = closingRes.data?.[0] || null;
+			let openingDip: { reading_value: number; reading_date: string } | null = null;
+			let deliveries = 0;
+			let dispensed = 0;
+
+			if (closingDip) {
+				const openingRes = await client
+					.from('tank_readings')
+					.select('reading_value, reading_date')
+					.eq('reading_type', 'dipstick')
+					.lt('reading_date', closingDip.reading_date)
 					.order('reading_date', { ascending: false })
 					.limit(1);
-				tankMeasured = tankReadingResult.data?.[0]?.reading_value || 0;
-			} catch (readingError) {
-				console.warn('Could not fetch tank readings:', readingError);
+				if (openingRes.error) throw new Error(openingRes.error.message);
+				openingDip = openingRes.data?.[0] || null;
+
+				if (openingDip) {
+					const [refillsRes, dispensedRes] = await Promise.all([
+						client
+							.from('tank_refills')
+							.select('litres_added')
+							.gt('delivery_date', openingDip.reading_date)
+							.lte('delivery_date', closingDip.reading_date),
+						client
+							.from('fuel_entries')
+							.select('litres_dispensed')
+							.is('deleted_at', null)
+							.gt('entry_date', openingDip.reading_date)
+							.lte('entry_date', closingDip.reading_date)
+					]);
+					if (refillsRes.error) throw new Error(refillsRes.error.message);
+					if (dispensedRes.error) throw new Error(dispensedRes.error.message);
+					deliveries = (refillsRes.data || []).reduce((s, r) => s + (r.litres_added || 0), 0);
+					dispensed = (dispensedRes.data || []).reduce((s, e) => s + (e.litres_dispensed || 0), 0);
+				}
 			}
 
 			return {
 				data: {
-					tankCalculated,
-					tankMeasured,
-					previousMonthMissing,
-					previousMonth
+					closingDip,
+					openingDip,
+					deliveries,
+					dispensed,
+					bowserStart: meterRes.data?.bowserStart ?? 0,
+					bowserEnd: meterRes.data?.bowserEnd ?? 0,
+					monthDispensed: meterRes.data?.fuelDispensed ?? 0,
+					existingClose: existingRes.data?.[0] || null
 				},
 				error: null
 			};
 		} catch (error) {
 			return {
 				data: null,
-				error: error instanceof Error ? error.message : 'Failed to get tank reconciliation data'
+				error: error instanceof Error ? error.message : 'Failed to load month close data'
 			};
 		}
-	}
-
-	async createFuelReconciliation(data: {
-		startDate: string;
-		endDate: string;
-		fuelDispensed: number;
-		bowserStart: number;
-		bowserEnd: number;
-	}): Promise<ApiResponse<any>> {
-		const client = this.ensureInitialized();
-
-		// Calculate bowser difference (bowser reading increases, so end - start = fuel added)
-		const bowserDifference = data.bowserEnd - data.bowserStart;
-		const fuelVariance = Math.abs(data.fuelDispensed - bowserDifference);
-		const reconciliationStatus = fuelVariance <= 1 ? 'reconciled' : 'discrepancy';
-
-		// Convert date range to month format (YYYY-MM) for the existing schema
-		// Use the start date to determine the month
-		const month = data.startDate.substring(0, 7); // Extract YYYY-MM from YYYY-MM-DD
-
-		return this.query(() =>
-			client
-				.from('fuel_reconciliations')
-				.insert({
-					month: month,
-					fuel_dispensed: data.fuelDispensed,
-					fuel_received: bowserDifference,
-					discrepancy_count: fuelVariance > 1 ? 1 : 0,
-					status: reconciliationStatus,
-					reconciled_date: new Date().toISOString(),
-					notes: `${data.startDate} to ${data.endDate}. Bowser: ${data.bowserStart}L → ${data.bowserEnd}L (${bowserDifference}L added).`
-				})
-				.select()
-				.single()
-		);
 	}
 
 	// Database management methods for new Tools section
@@ -1676,84 +1645,17 @@ class SupabaseService {
 		});
 	}
 
-	// Reconciliation history method for new Tools section
-	async getReconciliationHistory(limit: number = 50): Promise<ApiResponse<any[]>> {
+	// Month-end close history (tank_reconciliations only — legacy
+	// fuel_reconciliations rows stay in the DB but are no longer shown).
+	async getTankCloseHistory(limit: number = 24): Promise<ApiResponse<any[]>> {
 		const client = this.ensureInitialized();
-		
-		try {
-			// Get fuel reconciliations
-			let fuelRecords = [];
-			try {
-				const fuelResult = await client
-					.from('fuel_reconciliations')
-					.select('*')
-					.order('month', { ascending: false })
-					.limit(Math.floor(limit / 2));
-
-				fuelRecords = (fuelResult.data || []).map(record => {
-					// Convert month (YYYY-MM) to last day of that month for display
-					let periodEndDate = record.reconciled_date || record.created_at;
-					if (record.month) {
-						// Parse month string (YYYY-MM) and get last day
-						const [year, month] = record.month.split('-').map(Number);
-						const lastDay = new Date(year, month, 0).getDate(); // Day 0 of next month = last day of current month
-						periodEndDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-					}
-
-					// Extract bowser start/end from notes if not in separate columns
-					let bowserStart = 0;
-					let bowserEnd = 0;
-					if (record.notes) {
-						const bowserMatch = record.notes.match(/Bowser:\s*([\d,\.]+)L\s*→\s*([\d,\.]+)L/);
-						if (bowserMatch) {
-							bowserStart = parseFloat(bowserMatch[1].replace(/,/g, ''));
-							bowserEnd = parseFloat(bowserMatch[2].replace(/,/g, ''));
-						}
-					}
-
-					return {
-						...record,
-						type: 'fuel',
-						date: periodEndDate,
-						bowser_start: bowserStart,
-						bowser_end: bowserEnd
-					};
-				});
-			} catch (fuelError) {
-				console.warn('Could not fetch fuel reconciliations:', fuelError);
-			}
-			
-			// Get tank reconciliations
-			let tankRecords = [];
-			try {
-				const tankResult = await client
-					.from('tank_reconciliations')
-					.select('*')
-					.order('reconciliation_date', { ascending: false })
-					.limit(Math.floor(limit / 2));
-				
-				tankRecords = (tankResult.data || []).map(record => ({
-					...record,
-					type: 'tank',
-					date: record.reconciliation_date,
-					status: record.accepted ? 'reconciled' : 'discrepancy'
-				}));
-			} catch (tankError) {
-				console.warn('Could not fetch tank reconciliations:', tankError);
-			}
-			
-			// Combine and sort by date
-			const allRecords = [...fuelRecords, ...tankRecords]
-				.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-				.slice(0, limit);
-			
-			return { data: allRecords, error: null };
-		} catch (error) {
-			return {
-				data: [],
-				error: error instanceof Error ? error.message : 'Failed to get reconciliation history'
-			};
-		}
+		return this.query(() =>
+			client
+				.from('tank_reconciliations')
+				.select('*')
+				.order('reconciliation_date', { ascending: false })
+				.limit(limit)
+		);
 	}
 
 	// Fuel entry management methods for inline editing

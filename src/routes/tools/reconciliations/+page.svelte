@@ -1,1113 +1,666 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
-	import Button from '$lib/components/ui/Button.svelte';
-	import InlineFuelEditor from '$lib/components/reconciliation/InlineFuelEditor.svelte';
-	import TankLevelAdjustment from '$lib/components/reconciliation/TankLevelAdjustment.svelte';
-	import ReportingFramework from '$lib/components/reporting/ReportingFramework.svelte';
+	import { onMount } from 'svelte';
 	import supabaseService from '$lib/services/supabase';
-	import { cacheActions, cacheStats } from '$lib/stores/reconciliation-cache';
 
-	// Component state
-	let selectedRange = $state('prevMonth');
-	let startDate = $state('');
-	let endDate = $state('');
-	let customRange = $state(false);
-	let loading = $state(false);
-	let fuelData = $state(null);
-	let tankData = $state(null);
-	let error = $state('');
-	let submitting = $state(false);
-	let reconciliationHistory = $state([]);
-	let historyLoading = $state(false);
-	let showFuelEditor = $state(false);
-	let showTankEditor = $state(false);
-	let showReporting = $state(false);
+	/**
+	 * Month-end close — the monthly reconciliation ritual, dip-to-dip:
+	 * opening dip + deliveries − dispensed = book balance, compared against
+	 * the closing dip. Closing a month writes a tank_reconciliations row
+	 * (reconciliation_date = last day of the month — the PDF export looks
+	 * rows up by that exact date, keep it stable).
+	 */
 
-	const datePresets = [
-		{ value: 'prevMonth', label: 'Previous Month' },
-		{ value: 'prevMonth2', label: 'Previous Month -1' },
-		{ value: 'week', label: 'Last 7 Days' },
-		{ value: 'custom', label: 'Custom Range' }
-	];
-
-	// Helper function to format date without timezone conversion
-	function formatDate(date: Date): string {
-		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, '0');
-		const day = String(date.getDate()).padStart(2, '0');
-		return `${year}-${month}-${day}`;
+	interface MonthOption {
+		key: string; // YYYY-MM
+		label: string; // "June 2026"
+		shortLabel: string; // "Jun"
+		monthStart: string;
+		monthEnd: string;
 	}
 
-	function updateDateRange() {
-		const today = new Date();
-		console.log('updateDateRange called with selectedRange:', selectedRange);
+	interface CloseData {
+		closingDip: { reading_value: number; reading_date: string } | null;
+		openingDip: { reading_value: number; reading_date: string } | null;
+		deliveries: number;
+		dispensed: number;
+		bowserStart: number;
+		bowserEnd: number;
+		monthDispensed: number;
+		existingClose: any | null;
+	}
 
-		switch (selectedRange) {
-			case 'prevMonth':
-				// Previous month: first day to last day
-				// If today is Nov 5, 2024 (month = 10), we want Oct 1 - Oct 31
-				const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-				const prevMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-				startDate = formatDate(prevMonthStart);
-				endDate = formatDate(prevMonthEnd);
-				customRange = false;
-				break;
-			case 'prevMonth2':
-				// Two months ago: first day to last day
-				// If today is Nov 5, 2024 (month = 10), we want Sep 1 - Sep 30
-				const prevMonth2Start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
-				const prevMonth2End = new Date(today.getFullYear(), today.getMonth() - 1, 0);
-				startDate = formatDate(prevMonth2Start);
-				endDate = formatDate(prevMonth2End);
-				customRange = false;
-				break;
-			case 'week':
-				// Last 7 days
-				const weekAgo = new Date(today);
-				weekAgo.setDate(today.getDate() - 6);
-				startDate = formatDate(weekAgo);
-				endDate = formatDate(today);
-				customRange = false;
-				break;
-			case 'custom':
-				customRange = true;
-				if (!startDate) startDate = formatDate(today);
-				if (!endDate) endDate = formatDate(today);
-				break;
+	const nf = new Intl.NumberFormat('en-ZA');
+	const nf1 = new Intl.NumberFormat('en-ZA', {
+		minimumFractionDigits: 1,
+		maximumFractionDigits: 1
+	});
+
+	function buildMonths(): MonthOption[] {
+		const now = new Date();
+		const months: MonthOption[] = [];
+		// Current month first, then back 5 more — newest chip on the left
+		for (let i = 0; i < 6; i++) {
+			const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+			const y = d.getFullYear();
+			const m = d.getMonth() + 1;
+			const lastDay = new Date(y, m, 0).getDate();
+			months.push({
+				key: `${y}-${String(m).padStart(2, '0')}`,
+				label: d.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }),
+				shortLabel: d.toLocaleDateString('en-ZA', { month: 'short' }),
+				monthStart: `${y}-${String(m).padStart(2, '0')}-01`,
+				monthEnd: `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+			});
 		}
-		
-		console.log('Date range updated:', { startDate, endDate, customRange });
-		
-		// Load data when date range changes (with cache invalidation)
-		if (startDate && endDate) {
-			// Clear cache for this date range to force refresh
-			cacheActions.invalidateFuelData(startDate, endDate);
-			cacheActions.invalidateTankData(endDate);
-			loadReconciliationData();
+		return months;
+	}
+
+	const months = buildMonths();
+
+	// Default to the previous month — that's the one you close
+	let selectedKey = $state(months[1].key);
+	let selected = $derived(months.find((m) => m.key === selectedKey) ?? months[1]);
+
+	let loading = $state(true);
+	let error = $state<string | null>(null);
+	let data = $state<CloseData | null>(null);
+	let history = $state<any[]>([]);
+	let note = $state('');
+	let closing = $state(false);
+	let statusMsg = $state<string | null>(null);
+
+	async function loadMonth() {
+		loading = true;
+		error = null;
+		statusMsg = null;
+		note = '';
+		data = null; // never show one month's numbers under another month's title
+		try {
+			await supabaseService.init();
+			const result = await supabaseService.getMonthCloseData(
+				selected.monthStart,
+				selected.monthEnd
+			);
+			if (result.error) throw new Error(result.error);
+			data = result.data;
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to load month data';
+			data = null;
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function loadHistory() {
+		try {
+			await supabaseService.init();
+			const result = await supabaseService.getTankCloseHistory(24);
+			if (!result.error) history = result.data || [];
+		} catch {
+			/* history is non-critical */
 		}
 	}
 
 	onMount(() => {
-		updateDateRange();
-		loadReconciliationHistory();
+		loadMonth();
+		loadHistory();
 	});
 
-	function handlePresetChange() {
-		console.log('handlePresetChange called');
-		updateDateRange();
+	function selectMonth(key: string) {
+		if (key === selectedKey) return;
+		selectedKey = key;
+		loadMonth();
 	}
 
-	function handleCustomDateChange() {
-		console.log('handleCustomDateChange called', { startDate, endDate });
-		if (selectedRange === 'custom' && startDate && endDate) {
-			// Clear cache and reload data for custom dates
-			cacheActions.invalidateFuelData(startDate, endDate);
-			cacheActions.invalidateTankData(endDate);
-			loadReconciliationData();
-		}
-	}
+	// ---- Derivation ----
+	let book = $derived.by(() => {
+		if (!data?.closingDip || !data?.openingDip) return null;
+		return data.openingDip.reading_value + data.deliveries - data.dispensed;
+	});
 
-	async function loadReconciliationData() {
-		console.log('loadReconciliationData called', { startDate, endDate });
-		if (!startDate || !endDate) return;
+	let variance = $derived.by(() => {
+		if (book === null || !data?.closingDip) return null;
+		return book - data.closingDip.reading_value;
+	});
 
-		const cacheKey = `${startDate}_${endDate}`;
+	let variancePct = $derived.by(() => {
+		if (variance === null || !data?.closingDip || data.closingDip.reading_value === 0) return null;
+		return (variance / data.closingDip.reading_value) * 100;
+	});
 
-		// Check cache first
-		const cachedFuelData = cacheActions.getFuelData(startDate, endDate);
-		const cachedTankData = cacheActions.getTankData(endDate);
+	let varianceStatus = $derived.by(() => {
+		if (variancePct === null) return null;
+		const abs = Math.abs(variancePct);
+		if (abs <= 2) return { key: 'good', label: 'Good' };
+		if (abs <= 5) return { key: 'acceptable', label: 'Acceptable' };
+		return { key: 'high', label: 'High variance' };
+	});
 
-		console.log('Cache check:', { cachedFuelData, cachedTankData });
+	let meterDiff = $derived(data ? data.bowserEnd - data.bowserStart : 0);
 
-		if (cachedFuelData && cachedTankData) {
-			// Use cached data
-			fuelData = cachedFuelData;
-			tankData = cachedTankData;
-			loading = false;
-			console.log('Using cached data:', { fuelData, tankData });
-			return;
-		}
-
-		// Prevent duplicate loading
-		if (cacheActions.isLoading(cacheKey)) {
-			console.log('Already loading this date range');
-			return;
-		}
-
-		loading = true;
-		error = '';
-		cacheActions.setLoading(cacheKey, true);
-		console.log('Starting data load...');
-		
-		try {
-			await supabaseService.init();
-			
-			// Load fuel reconciliation data if not cached
-			if (!cachedFuelData) {
-				console.log('Fetching fuel data from API...');
-				const fuelResult = await supabaseService.getDateRangeReconciliationData(startDate, endDate);
-				console.log('Fuel result:', fuelResult);
-				if (fuelResult.error) {
-					error = fuelResult.error;
-					console.error('Fuel data error:', fuelResult.error);
-				} else {
-					fuelData = fuelResult.data;
-					cacheActions.setFuelData(startDate, endDate, fuelResult.data);
-					console.log('Fuel data loaded:', fuelData);
-				}
-			} else {
-				fuelData = cachedFuelData;
-			}
-
-			// Load tank data if not cached
-			if (!cachedTankData) {
-				console.log('Fetching tank data from API...');
-				const tankResult = await supabaseService.getTankReconciliationData(endDate);
-				console.log('Tank result:', tankResult);
-				if (tankResult.error && !error) {
-					error = tankResult.error;
-					console.error('Tank data error:', tankResult.error);
-				} else {
-					tankData = tankResult.data;
-					cacheActions.setTankData(endDate, tankResult.data);
-					console.log('Tank data loaded:', tankData);
-				}
-			} else {
-				tankData = cachedTankData;
-			}
-			
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load reconciliation data';
-			console.error('Load reconciliation data error:', err);
-		}
-
-		loading = false;
-		cacheActions.setLoading(cacheKey, false);
-		console.log('Load complete. Final state:', { fuelData, tankData, error, loading });
-	}
-
-	async function performFuelReconciliation() {
-		console.log('performFuelReconciliation called', { fuelData, submitting });
-		if (!fuelData || submitting) return;
-
-		submitting = true;
-		error = '';
-		
-		try {
-			await supabaseService.init();
-			
-			const result = await supabaseService.createFuelReconciliation({
-				startDate,
-				endDate,
-				fuelDispensed: fuelData.fuelDispensed,
-				bowserStart: fuelData.bowserStart,
-				bowserEnd: fuelData.bowserEnd
-			});
-
-			if (result.error) {
-				error = result.error;
-			} else {
-				// Reload data to show updated status
-				await loadReconciliationData();
-				await loadReconciliationHistory();
-			}
-			
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to perform fuel reconciliation';
-		}
-		
-		submitting = false;
-	}
-
-	async function performTankReconciliation() {
-		console.log('performTankReconciliation called', { tankData, submitting });
-		if (!tankData || submitting) return;
-
-		submitting = true;
-		error = '';
-		
-		try {
-			await supabaseService.init();
-			
-			const result = await supabaseService.createTankReconciliation({
-				reconciliationDate: endDate,
-				calculatedLevel: tankData.tankCalculated,
-				measuredLevel: tankData.tankMeasured,
-				notes: `Reconciliation for ${startDate} to ${endDate}`
-			});
-
-			if (result.error) {
-				error = result.error;
-			} else {
-				// Reload data to show updated status
-				await loadReconciliationData();
-				await loadReconciliationHistory();
-			}
-			
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to perform tank reconciliation';
-		}
-		
-		submitting = false;
-	}
-
-	function formatNumber(num) {
-		if (num === null || num === undefined) return '-';
-		return new Intl.NumberFormat('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(num);
-	}
-
-	function getVarianceClass(variance, threshold = 1) {
-		const abs = Math.abs(variance || 0);
-		if (abs <= threshold) return 'good';
-		if (abs <= threshold * 3) return 'warning';
-		return 'alert';
-	}
-
-	function getTankVarianceClass(percentage) {
-		const abs = Math.abs(percentage || 0);
-		if (abs <= 2) return 'good';
-		if (abs <= 5) return 'warning';
-		return 'alert';
-	}
-
-	function getConfidenceScore(variance, type = 'fuel') {
-		if (type === 'fuel') {
-			const abs = Math.abs(variance || 0);
-			if (abs <= 1) return { score: 95, label: 'Very High' };
-			if (abs <= 3) return { score: 80, label: 'High' };
-			if (abs <= 10) return { score: 60, label: 'Medium' };
-			return { score: 30, label: 'Low' };
-		} else {
-			// Tank confidence based on percentage variance
-			const abs = Math.abs(variance || 0);
-			if (abs <= 2) return { score: 95, label: 'Very High' };
-			if (abs <= 5) return { score: 75, label: 'High' };
-			if (abs <= 10) return { score: 50, label: 'Medium' };
-			return { score: 25, label: 'Low' };
-		}
-	}
-
-	function getConfidenceClass(score) {
-		if (score >= 90) return 'confidence-very-high';
-		if (score >= 75) return 'confidence-high';
-		if (score >= 50) return 'confidence-medium';
-		return 'confidence-low';
-	}
-
-	async function loadReconciliationHistory() {
-		historyLoading = true;
-		error = '';
-		
-		try {
-			await supabaseService.init();
-			const result = await supabaseService.getReconciliationHistory(50); // Get last 50 records
-			
-			if (result.error) {
-				error = result.error;
-			} else {
-				reconciliationHistory = result.data || [];
-			}
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load reconciliation history';
-		}
-		
-		historyLoading = false;
-	}
-
-	// Derived calculations
-	const bowserDifference = $derived(fuelData ? fuelData.bowserEnd - fuelData.bowserStart : 0);
-	const fuelVariance = $derived(fuelData ? fuelData.fuelDispensed - bowserDifference : 0);
-	const tankVariance = $derived(tankData ? tankData.tankCalculated - tankData.tankMeasured : 0);
-	const tankVariancePercentage = $derived(tankData ? (tankVariance / 24000 * 100) : 0);
-	
-	// Confidence scoring
-	const fuelConfidence = $derived(getConfidenceScore(fuelVariance, 'fuel'));
-	const tankConfidence = $derived(getConfidenceScore(tankVariancePercentage, 'tank'));
-
-	// Debug button state
-	$effect(() => {
-		console.log('Button state check:', {
-			fuelData,
-			submitting,
-			fuelDataExists: !!fuelData,
-			isDisabled: submitting || !fuelData
+	function fmtDate(date: string): string {
+		return new Date(date + 'T12:00:00').toLocaleDateString('en-ZA', {
+			day: 'numeric',
+			month: 'short'
 		});
-	});
+	}
+
+	function fmtDateFull(date: string): string {
+		return new Date(date).toLocaleDateString('en-ZA', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		});
+	}
+
+	function monthLabelFor(recDate: string): string {
+		return new Date(recDate + 'T12:00:00').toLocaleDateString('en-ZA', {
+			month: 'short',
+			year: 'numeric'
+		});
+	}
+
+	function signed(v: number): string {
+		return `${v > 0 ? '+' : ''}${nf1.format(v)}`;
+	}
+
+	async function closeMonth() {
+		if (!data?.closingDip || !data?.openingDip || book === null || variance === null) return;
+
+		const isUpdate = !!data.existingClose;
+		const confirmed = confirm(
+			`${isUpdate ? 'Update the close for' : 'Close'} ${selected.label} with a variance of ` +
+				`${signed(variance)} L (${variancePct !== null ? signed(Math.round(variancePct * 100) / 100) : '—'}%)?\n\n` +
+				`Book ${nf1.format(book)} L vs dip ${nf1.format(data.closingDip.reading_value)} L.`
+		);
+		if (!confirmed) return;
+
+		closing = true;
+		error = null;
+		try {
+			const composedNote =
+				`${selected.label} close · dips ${data.openingDip.reading_date} → ${data.closingDip.reading_date}` +
+				` · deliveries ${nf1.format(data.deliveries)} L · dispensed ${nf1.format(data.dispensed)} L` +
+				` · meter ${nf1.format(data.bowserStart)} → ${nf1.format(data.bowserEnd)} L` +
+				(note.trim() ? ` · ${note.trim()}` : '');
+
+			const payload = {
+				reconciliationDate: selected.monthEnd,
+				calculatedLevel: Math.round(book * 10) / 10,
+				measuredLevel: data.closingDip.reading_value,
+				notes: composedNote
+			};
+
+			const result = isUpdate
+				? await supabaseService.updateTankReconciliation(data.existingClose.id, payload)
+				: await supabaseService.createTankReconciliation(payload);
+			if (result.error) throw new Error(result.error);
+
+			const doneMsg = `${selected.label} ${isUpdate ? 'close updated' : 'closed'} — variance ${signed(variance)} L recorded.`;
+			await Promise.all([loadMonth(), loadHistory()]);
+			statusMsg = doneMsg; // loadMonth clears it, so set after the reload
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to record the close';
+		} finally {
+			closing = false;
+		}
+	}
 </script>
 
 <svelte:head>
-	<title>Reconciliations - FarmTrack</title>
+	<title>Month-end close - FarmTrack</title>
 </svelte:head>
 
-<div class="reconciliation-container">
-	<div class="header">
-		<h1>Reconciliations</h1>
-		<p>Fuel usage and tank level reconciliation with flexible date ranges</p>
+<div class="close-page">
+	<div class="page-header">
+		<h1>Month-end close</h1>
+		<p>Compare the fuel book to the physical dip and sign off the month</p>
 	</div>
 
-	<!-- Date Range Selector -->
-	<div class="date-section">
-		<h2>Date Range</h2>
-		<div class="date-presets">
-			{#each datePresets as preset}
-				<button 
-					class="preset-btn"
-					class:active={selectedRange === preset.value}
-					onclick={() => { selectedRange = preset.value; handlePresetChange(); }}
-				>
-					{preset.label}
-				</button>
-			{/each}
-		</div>
-
-		{#if customRange}
-			<div class="custom-dates">
-				<div class="date-input">
-					<label for="start-date">Start Date</label>
-					<input 
-						id="start-date"
-						type="date" 
-						bind:value={startDate}
-						onchange={handleCustomDateChange}
-					/>
-				</div>
-				<div class="date-input">
-					<label for="end-date">End Date</label>
-					<input 
-						id="end-date"
-						type="date" 
-						bind:value={endDate}
-						onchange={handleCustomDateChange}
-					/>
-				</div>
-			</div>
-		{/if}
-
-		<div class="selected-range">
-			<strong>Selected Period:</strong> 
-			{startDate} {startDate !== endDate ? `to ${endDate}` : ''}
-		</div>
+	<div class="chips">
+		{#each months as m}
+			<button class="chip" class:on={m.key === selectedKey} onclick={() => selectMonth(m.key)}>
+				{m.shortLabel}
+			</button>
+		{/each}
 	</div>
 
+	{#if statusMsg}
+		<div class="status-banner">{statusMsg}</div>
+	{/if}
 	{#if error}
-		<div class="error-message">
-			<span class="error-icon">⚠️</span>
-			<span>{error}</span>
-		</div>
+		<div class="error-banner">{error}</div>
 	{/if}
 
-	{#if loading}
-		<div class="loading">Loading reconciliation data...</div>
-	{/if}
+	{#if loading && !data}
+		<div class="skeleton" style="height: 16rem"></div>
+	{:else if data}
+		<!-- Close panel -->
+		<section class="panel">
+			<div class="panel-head">
+				<h2 class="panel-title">{selected.label}</h2>
+				{#if varianceStatus}
+					<span class="pill {varianceStatus.key}">{varianceStatus.label}</span>
+				{/if}
+			</div>
 
-	<!-- Reconciliation Sections -->
-	<div class="reconciliation-sections">
-		<!-- Fuel Reconciliation -->
-		<div class="reconciliation-card">
-			<div class="card-header">
-				<div class="header-content">
-					<h3>Fuel Reconciliation</h3>
-					<p>Compare fuel dispensed vs bowser readings</p>
-				</div>
-				{#if fuelData}
-					<div class="status-badge {getVarianceClass(fuelVariance)}">
-						{#if Math.abs(fuelVariance) <= 1}
-							Good
-						{:else if Math.abs(fuelVariance) <= 3}
-							Minor Variance
-						{:else}
-							High Variance
-						{/if}
-					</div>
-				{/if}
-			</div>
-			<div class="card-content">
-				<div class="metrics-preview">
-					<div class="metric">
-						<span class="metric-label">Fuel Dispensed</span>
-						<span class="metric-value">{formatNumber(fuelData?.fuelDispensed)}L</span>
-					</div>
-					<div class="metric">
-						<span class="metric-label">Bowser Difference</span>
-						<span class="metric-value">{formatNumber(bowserDifference)}L</span>
-					</div>
-					<div class="metric">
-						<span class="metric-label">Variance</span>
-						<span class="metric-value variance {getVarianceClass(fuelVariance)}">
-							{Math.abs(fuelVariance) < 0.1 ? '0' : (fuelVariance >= 0 ? '+' : '') + fuelVariance.toFixed(1)}L
-						</span>
-					</div>
-					<div class="metric">
-						<span class="metric-label">Confidence</span>
-						<span class="metric-value confidence {getConfidenceClass(fuelConfidence.score)}">
-							{fuelConfidence.label} ({fuelConfidence.score}%)
-						</span>
-					</div>
-				</div>
-				{#if fuelData?.bowserStart !== undefined && fuelData?.bowserEnd !== undefined}
-					<div class="details">
-						<span class="details-text">Bowser: {formatNumber(fuelData.bowserStart)}L → {formatNumber(fuelData.bowserEnd)}L</span>
-					</div>
-				{/if}
-				<div class="reconcile-actions">
-					<Button
-						variant="primary"
-						onclick={() => {
-							console.log('Reconcile Fuel Usage clicked', { fuelData, submitting });
-							performFuelReconciliation();
-						}}
-						disabled={submitting || !fuelData}
-					>
-						{submitting ? 'Processing...' : 'Reconcile Fuel Usage'}
-					</Button>
-					<Button 
-						variant="outline" 
-						onclick={() => {
-							console.log('Edit Entries clicked');
-							showFuelEditor = true;
-						}}
-						disabled={!startDate || !endDate}
-					>
-						Edit Entries
-					</Button>
-					<Button 
-						variant="outline" 
-						onclick={() => {
-							console.log('Generate Report clicked');
-							showReporting = true;
-						}}
-						disabled={!startDate || !endDate}
-					>
-						Generate Report
-					</Button>
-				</div>
-			</div>
-		</div>
-
-		<!-- Tank Reconciliation -->
-		<div class="reconciliation-card">
-			<div class="card-header">
-				<div class="header-content">
-					<h3>Tank Reconciliation</h3>
-					<p>Compare tank levels vs dipstick readings</p>
-				</div>
-				{#if tankData}
-					<div class="status-badge {getTankVarianceClass(tankVariancePercentage)}">
-						{#if Math.abs(tankVariancePercentage) <= 2}
-							Good
-						{:else if Math.abs(tankVariancePercentage) <= 5}
-							Acceptable
-						{:else}
-							High Variance
-						{/if}
-					</div>
-				{/if}
-			</div>
-			<div class="card-content">
-				<div class="metrics-preview">
-					<div class="metric">
-						<span class="metric-label">Calculated Level</span>
-						<span class="metric-value">{formatNumber(tankData?.tankCalculated)}L</span>
-					</div>
-					<div class="metric">
-						<span class="metric-label">Measured Level</span>
-						<span class="metric-value">{formatNumber(tankData?.tankMeasured)}L</span>
-					</div>
-					<div class="metric">
-						<span class="metric-label">Variance</span>
-						<span class="metric-value variance {getTankVarianceClass(tankVariancePercentage)}">
-							{Math.abs(tankVariancePercentage) < 0.1 ? '0' : (tankVariancePercentage >= 0 ? '+' : '') + tankVariancePercentage.toFixed(1)}%
-						</span>
-					</div>
-					<div class="metric">
-						<span class="metric-label">Confidence</span>
-						<span class="metric-value confidence {getConfidenceClass(tankConfidence.score)}">
-							{tankConfidence.label} ({tankConfidence.score}%)
-						</span>
-					</div>
-				</div>
-				{#if tankData}
-					<div class="details">
-						<span class="details-text">Difference: {Math.abs(tankVariance) < 0.1 ? '0' : (tankVariance >= 0 ? '+' : '') + tankVariance.toFixed(1)}L of 24,000L capacity</span>
-					</div>
-					{#if tankData.previousMonthMissing}
-						<div class="warning-message">
-							⚠️ Warning: Previous month ({tankData.previousMonth}) was not reconciled. Calculated level may be inaccurate.
-						</div>
-					{/if}
-				{/if}
-				<div class="reconcile-actions">
-					<Button
-						variant="secondary"
-						onclick={() => {
-							console.log('Reconcile Tank Levels clicked', { tankData, submitting });
-							performTankReconciliation();
-						}}
-						disabled={submitting || !tankData}
-					>
-						{submitting ? 'Processing...' : 'Reconcile Tank Levels'}
-					</Button>
-					<Button 
-						variant="outline" 
-						onclick={() => showTankEditor = true}
-						disabled={!endDate}
-					>
-						Adjust Levels
-					</Button>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<!-- Reconciliation History -->
-	<div class="history-section">
-		<div class="section-header">
-			<h2>Reconciliation History</h2>
-			<Button variant="outline" size="sm" onclick={loadReconciliationHistory} disabled={historyLoading}>
-				{historyLoading ? 'Loading...' : 'Refresh'}
-			</Button>
-		</div>
-		
-		{#if historyLoading}
-			<div class="loading">Loading reconciliation history...</div>
-		{:else if reconciliationHistory.length > 0}
-			{@const fuelRecords = reconciliationHistory.filter(r => r.type === 'fuel')}
-			{@const tankRecords = reconciliationHistory.filter(r => r.type === 'tank')}
-			
-			{#if fuelRecords.length > 0}
-				<div class="table-section">
-					<h3>Fuel Reconciliation</h3>
-					<div class="table-container">
-						<table class="history-table">
-							<thead>
-								<tr>
-									<th>Date</th>
-									<th>Dispensed</th>
-									<th>Open</th>
-									<th>Close</th>
-									<th>Diff</th>
-									<th>Var</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each fuelRecords as record}
-									<tr>
-										<td>
-											{new Date(record.date).toLocaleDateString('en-ZA')}
-										</td>
-										<td>{formatNumber(record.fuel_dispensed)}L</td>
-										<td>{formatNumber(record.bowser_start || 0)}L</td>
-										<td>{formatNumber(record.bowser_end || 0)}L</td>
-										<td>{formatNumber((record.bowser_end || 0) - (record.bowser_start || 0))}L</td>
-										<td class="variance {getVarianceClass(Math.abs(record.fuel_dispensed - record.fuel_received))}">
-											{Math.abs(record.fuel_dispensed - record.fuel_received) < 0.1 ? '0' : 
-											(record.fuel_dispensed - record.fuel_received >= 0 ? '+' : '') + 
-											(record.fuel_dispensed - record.fuel_received).toFixed(1)}L
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
+			{#if data.existingClose}
+				<div class="closed-banner">
+					<span class="closed-ic">✓</span>
+					<span>
+						Closed on {fmtDateFull(data.existingClose.created_at)} — variance
+						{signed(data.existingClose.variance ?? 0)} L
+						({signed(data.existingClose.variance_percentage ?? 0)}%)
+					</span>
 				</div>
 			{/if}
 
-			{#if tankRecords.length > 0}
-				<div class="table-section">
-					<h3>Tank Reconciliation</h3>
-					<div class="table-container">
-						<table class="history-table">
-							<thead>
-								<tr>
-									<th>Date</th>
-									<th>Dip Level</th>
-									<th>Level</th>
-									<th>Difference (L)</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each tankRecords as record}
-									<tr>
-										<td>{new Date(record.date).toLocaleDateString('en-ZA')}</td>
-										<td>{formatNumber(record.measured_level)}L</td>
-										<td>{formatNumber(record.calculated_level)}L</td>
-										<td class="variance {getTankVarianceClass(Math.abs((record.calculated_level - record.measured_level) / 24000 * 100))}">
-											{Math.abs(record.calculated_level - record.measured_level) < 0.1 ? '0' : 
-											((record.calculated_level - record.measured_level) >= 0 ? '+' : '') + 
-											(record.calculated_level - record.measured_level).toFixed(1)}L
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
+			{#if !data.closingDip}
+				<p class="empty-note">
+					No dipstick reading recorded in {selected.label} — a physical dip is needed to close
+					the month.
+				</p>
+				<a class="tank-link" href="/tank">Record a dip on the Tank page →</a>
+			{:else if !data.openingDip}
+				<p class="empty-note">
+					No earlier dipstick reading to open from — the first-ever dip can't be reconciled
+					against anything.
+				</p>
+			{:else}
+				<table class="ledger">
+					<tbody>
+						<tr>
+							<td>Opening — dip on {fmtDate(data.openingDip.reading_date)}</td>
+							<td class="val">{nf1.format(data.openingDip.reading_value)} L</td>
+						</tr>
+						<tr>
+							<td>+ Deliveries</td>
+							<td class="val">{nf1.format(data.deliveries)} L</td>
+						</tr>
+						<tr>
+							<td>− Dispensed</td>
+							<td class="val">{nf1.format(data.dispensed)} L</td>
+						</tr>
+						<tr class="ledger-total">
+							<td>= Book balance at {fmtDate(data.closingDip.reading_date)}</td>
+							<td class="val">{book !== null ? nf1.format(book) : '—'} L</td>
+						</tr>
+						<tr>
+							<td>Dip on {fmtDate(data.closingDip.reading_date)}</td>
+							<td class="val">{nf1.format(data.closingDip.reading_value)} L</td>
+						</tr>
+						<tr class="ledger-variance {varianceStatus?.key || ''}">
+							<td>Variance</td>
+							<td class="val">
+								{variance !== null ? signed(variance) : '—'} L
+								{#if variancePct !== null}
+									({signed(Math.round(variancePct * 100) / 100)}%)
+								{/if}
+							</td>
+						</tr>
+					</tbody>
+				</table>
+
+				{#if data.bowserStart > 0}
+					<p class="meter-line">
+						Bowser meter {nf1.format(data.bowserStart)} → {nf1.format(data.bowserEnd)} L
+						(+{nf1.format(meterDiff)} L dispensed this calendar month)
+					</p>
+				{/if}
+
+				<div class="close-actions">
+					<input
+						class="note-input"
+						type="text"
+						placeholder="Optional note (e.g. reason for variance)"
+						bind:value={note}
+						maxlength="200"
+					/>
+					<button class="close-btn" onclick={closeMonth} disabled={closing}>
+						{closing ? 'Recording…' : data.existingClose ? 'Update close' : `Close ${selected.label.split(' ')[0]}`}
+					</button>
 				</div>
 			{/if}
-		{:else}
-			<div class="history-placeholder">
-				<p>No reconciliation history found</p>
-			</div>
-		{/if}
-	</div>
-	
-	<!-- Inline Fuel Entry Editor Modal -->
-	{#if showFuelEditor}
-		<InlineFuelEditor 
-			{startDate}
-			{endDate}
-			onclose={() => showFuelEditor = false}
-			onupdated={() => {
-				loadReconciliationData();
-				loadReconciliationHistory();
-			}}
-		/>
-	{/if}
-	
-	<!-- Tank Level Adjustment Modal -->
-	{#if showTankEditor}
-		<TankLevelAdjustment
-			date={endDate}
-			onclose={() => showTankEditor = false}
-			onupdated={() => {
-				loadReconciliationData();
-				loadReconciliationHistory();
-			}}
-		/>
-	{/if}
+		</section>
 
-	<!-- Advanced Reporting Modal -->
-	{#if showReporting}
-		<ReportingFramework
-			{startDate}
-			{endDate}
-			onclose={() => showReporting = false}
-		/>
+		<!-- History -->
+		<section class="panel">
+			<h2 class="panel-title">Close history</h2>
+			{#if history.length === 0}
+				<p class="empty-note">No months closed yet.</p>
+			{:else}
+				<div class="table-wrap">
+					<table class="history-table">
+						<thead>
+							<tr>
+								<th>Month</th>
+								<th class="num">Book</th>
+								<th class="num">Dip</th>
+								<th class="num">Variance</th>
+								<th class="num">%</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each history as row}
+								<tr>
+									<td>{monthLabelFor(row.reconciliation_date)}</td>
+									<td class="num">{nf.format(Math.round(row.calculated_level ?? 0))} L</td>
+									<td class="num">{nf.format(Math.round(row.measured_level ?? 0))} L</td>
+									<td class="num">{signed(row.variance ?? 0)} L</td>
+									<td class="num">{signed(row.variance_percentage ?? 0)}</td>
+									<td class="accepted">{row.accepted ? '✓' : '!'}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
+		</section>
 	{/if}
 </div>
 
 <style>
-	.reconciliation-container {
-		max-width: 1000px;
+	.close-page {
+		max-width: 800px;
 		margin: 0 auto;
-	}
-
-	.header {
-		margin-bottom: 2rem;
-	}
-
-	.header h1 {
-		margin: 0;
-		font-size: 2rem;
-		font-weight: 700;
-		color: #111827;
-	}
-
-	.header p {
-		margin: 0.5rem 0 0;
-		color: #6b7280;
-		font-size: 1rem;
-	}
-
-	.date-section {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 1.5rem;
-		margin-bottom: 2rem;
-	}
-
-	.date-section h2 {
-		margin: 0 0 1rem;
-		font-size: 1.25rem;
-		font-weight: 600;
-		color: #111827;
-	}
-
-	.date-presets {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-	}
-
-	.preset-btn {
-		padding: 0.5rem 1rem;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		background: white;
-		color: #374151;
-		font-size: 0.875rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.preset-btn:hover {
-		border-color: var(--brand);
-		color: var(--brand);
-	}
-
-	.preset-btn.active {
-		background: var(--brand);
-		border-color: var(--brand);
-		color: white;
-	}
-
-	.custom-dates {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-		margin-top: 1rem;
-	}
-
-	.date-input {
+		padding: 0 0.25rem 1rem;
 		display: flex;
 		flex-direction: column;
+		gap: 0.875rem;
+	}
+
+	.page-header h1 {
+		font-size: var(--text-xl);
+		font-weight: var(--font-weight-bold);
+		color: var(--gray-900);
+		margin: 0;
+	}
+
+	.page-header p {
+		font-size: var(--text-sm);
+		color: var(--gray-500);
+		margin: 0.25rem 0 0;
+	}
+
+	/* ---- Month chips (same language as Audit) ---- */
+	.chips {
+		display: flex;
 		gap: 0.5rem;
+		overflow-x: auto;
+		padding-bottom: 2px;
 	}
 
-	.date-input label {
-		font-size: 0.875rem;
+	.chip {
+		white-space: nowrap;
+		font-size: var(--text-sm);
 		font-weight: 500;
-		color: #374151;
+		color: var(--gray-600);
+		background: var(--white);
+		border: 1px solid var(--gray-300);
+		padding: 0.45rem 0.875rem;
+		border-radius: var(--radius-full);
+		cursor: pointer;
+		transition: all 0.15s ease;
 	}
 
-	.date-input input {
-		padding: 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.875rem;
+	.chip.on {
+		background: var(--brand);
+		border-color: var(--brand);
+		color: #fff;
 	}
 
-	.selected-range {
-		margin-top: 1rem;
-		padding: 0.75rem;
-		background: #f9fafb;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		color: #374151;
+	/* ---- Panels ---- */
+	.panel {
+		background: var(--white);
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-lg);
+		padding: 1rem 1.125rem;
 	}
 
-	.reconciliation-sections {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: 1rem;
-		margin-bottom: 2rem;
-	}
-
-	.reconciliation-card {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		overflow: hidden;
-	}
-
-	.card-header {
-		padding: 1.5rem 1.5rem 1rem;
-		border-bottom: 1px solid #f3f4f6;
+	.panel-head {
 		display: flex;
 		justify-content: space-between;
-		align-items: flex-start;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.75rem;
 	}
 
-	.header-content {
-		flex: 1;
-	}
-
-	.card-header h3 {
-		margin: 0 0 0.5rem;
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: #111827;
-	}
-
-	.card-header p {
+	.panel-title {
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-600);
 		margin: 0;
-		color: #6b7280;
-		font-size: 0.875rem;
 	}
 
-	.status-badge {
-		padding: 0.25rem 0.5rem;
-		border-radius: 4px;
-		font-size: 0.75rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.025em;
+	.panel-head .panel-title {
+		font-size: var(--text-base);
+		color: var(--gray-900);
 	}
 
-	.status-badge.good {
+	.pill {
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
+		padding: 0.2rem 0.6rem;
+		border-radius: var(--radius-full);
+	}
+
+	.pill.good {
 		background: #dcfce7;
 		color: var(--success-dark);
 	}
 
-	.status-badge.warning {
+	.pill.acceptable {
 		background: #fef3c7;
 		color: #92400e;
 	}
 
-	.status-badge.alert {
+	.pill.high {
 		background: #fee2e2;
 		color: #991b1b;
 	}
 
-	.card-content {
-		padding: 1rem 1.5rem 1.5rem;
-	}
-
-	.metrics-preview {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		margin-bottom: 1.5rem;
-	}
-
-	.metric {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid #f3f4f6;
-	}
-
-	.metric:last-child {
-		border-bottom: none;
-	}
-
-	.metric-label {
-		font-size: 0.875rem;
-		color: #6b7280;
-	}
-
-	.metric-value {
-		font-weight: 600;
-		color: #111827;
-	}
-
-	.reconcile-btn {
-		width: 100%;
-		padding: 0.75rem;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.reconcile-btn.fuel {
-		background: var(--brand);
-		color: white;
-	}
-
-	.reconcile-btn.fuel:hover {
-		background: var(--brand-hover);
-	}
-
-	.reconcile-btn.tank {
-		background: #10b981;
-		color: white;
-	}
-
-	.reconcile-btn.tank:hover {
-		background: #059669;
-	}
-
-	.reconcile-actions {
-		display: flex;
-		gap: 0.75rem;
-		align-items: center;
-	}
-
-
-	.variance.good {
-		color: var(--success-dark);
-	}
-
-	.variance.warning {
-		color: #92400e;
-	}
-
-	.variance.alert {
-		color: #991b1b;
-	}
-
-	.confidence.confidence-very-high {
-		color: var(--success-dark);
-	}
-
-	.confidence.confidence-high {
-		color: #059669;
-	}
-
-	.confidence.confidence-medium {
-		color: #d97706;
-	}
-
-	.confidence.confidence-low {
-		color: #dc2626;
-	}
-
-	.details {
-		margin-top: 1rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid #f3f4f6;
-	}
-
-	.details-text {
-		font-size: 0.75rem;
-		color: #6b7280;
-		font-weight: 500;
-	}
-
-	.error-message {
+	.closed-banner {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		background: #fee2e2;
-		border: 1px solid #fecaca;
-		color: #991b1b;
-		padding: 0.75rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		font-size: 0.875rem;
+		font-size: var(--text-sm);
+		color: var(--success-dark);
+		background: #f0fdf4;
+		border: 1px solid #bbf7d0;
+		border-radius: var(--radius-md);
+		padding: 0.5rem 0.75rem;
+		margin-bottom: 0.75rem;
 	}
 
-	.error-icon {
-		font-size: 1rem;
+	.closed-ic {
+		font-weight: var(--font-weight-bold);
 	}
 
-	.warning-message {
-		margin-top: 0.75rem;
-		padding: 0.75rem;
-		background: #fef3c7;
-		border: 1px solid #fbbf24;
-		border-radius: 6px;
+	/* ---- Ledger (same pattern as the Tank page) ---- */
+	.ledger {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--text-sm);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.ledger td {
+		padding: 0.4rem 0;
+		border-bottom: 1px solid var(--gray-100);
+		color: var(--gray-600);
+	}
+
+	.ledger .val {
+		text-align: right;
+		color: var(--gray-800);
+		white-space: nowrap;
+	}
+
+	.ledger-total td {
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-900);
+		border-top: 2px solid var(--gray-200);
+	}
+
+	.ledger-variance td {
+		font-weight: var(--font-weight-semibold);
+		border-bottom: none;
+	}
+
+	.ledger-variance.good td {
+		color: var(--success-dark);
+	}
+
+	.ledger-variance.acceptable td {
 		color: #92400e;
-		font-size: 0.75rem;
-		font-weight: 500;
 	}
 
-	.loading {
-		text-align: center;
-		padding: 2rem;
-		color: #6b7280;
-		font-style: italic;
+	.ledger-variance.high td {
+		color: var(--error);
 	}
 
-	.history-section {
-		background: white;
-		border-radius: 12px;
+	.meter-line {
+		font-size: var(--text-xs);
+		color: var(--gray-400);
+		margin: 0.625rem 0 0;
 	}
 
-	.history-section .section-header {
+	/* ---- Actions ---- */
+	.close-actions {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 1.5rem;
+		gap: 0.5rem;
+		margin-top: 0.875rem;
+		flex-wrap: wrap;
 	}
 
-	.history-section h2 {
-		margin: 0;
-		font-size: 1.25rem;
-		font-weight: 600;
-		color: #111827;
+	.note-input {
+		flex: 1;
+		min-width: 180px;
+		padding: 0.5rem 0.7rem;
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+		color: var(--gray-700);
+		background: var(--gray-50);
 	}
 
-	.table-section {
-		margin-bottom: 2rem;
+	.note-input:focus {
+		outline: none;
+		border-color: var(--brand-ring);
+		background: var(--white);
 	}
 
-	.table-section h3 {
-		margin: 0 0 1rem;
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: #111827;
+	.close-btn {
+		padding: 0.5rem 1.1rem;
+		border: none;
+		border-radius: var(--radius-md);
+		background: var(--brand);
+		color: #fff;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		cursor: pointer;
 	}
 
-	.table-container {
+	.close-btn:hover {
+		background: var(--brand-hover);
+	}
+
+	.close-btn:active {
+		background: var(--brand-active);
+	}
+
+	.close-btn:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+
+	/* ---- History table ---- */
+	.table-wrap {
 		overflow-x: auto;
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
 	}
 
 	.history-table {
 		width: 100%;
 		border-collapse: collapse;
-		background: white;
-		font-size: 0.875rem;
-	}
-
-	.history-table th {
-		background: #f9fafb;
-		border-bottom: 1px solid #e5e7eb;
-		padding: 0.75rem;
-		text-align: left;
-		font-weight: 600;
-		color: #374151;
+		font-size: var(--text-sm);
+		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
 
+	.history-table th {
+		text-align: left;
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-500);
+		font-size: var(--text-xs);
+		padding: 0.3rem 0.5rem;
+		border-bottom: 2px solid var(--gray-200);
+	}
+
 	.history-table td {
-		border-bottom: 1px solid #f3f4f6;
-		padding: 0.75rem;
-		color: #111827;
-		vertical-align: top;
+		padding: 0.4rem 0.5rem;
+		border-bottom: 1px solid var(--gray-100);
+		color: var(--gray-700);
 	}
 
-	.history-table tbody tr:hover {
-		background: #f9fafb;
+	.history-table th.num,
+	.history-table td.num {
+		text-align: right;
 	}
 
-	.history-table tbody tr:last-child td {
-		border-bottom: none;
-	}
-
-	.date-range {
-		font-size: 0.75rem;
-		color: #6b7280;
-		margin-top: 0.25rem;
-	}
-
-	.history-placeholder {
+	.history-table .accepted {
 		text-align: center;
-		padding: 2rem;
-		color: #6b7280;
-		font-style: italic;
+		color: var(--success-dark);
+		font-weight: var(--font-weight-bold);
 	}
 
-	@media (max-width: 768px) {
-		.custom-dates {
-			grid-template-columns: 1fr;
+	/* ---- States ---- */
+	.empty-note {
+		font-size: var(--text-sm);
+		color: var(--gray-400);
+		margin: 0;
+	}
+
+	.tank-link {
+		display: inline-block;
+		margin-top: 0.5rem;
+		font-size: var(--text-sm);
+		color: var(--brand);
+		text-decoration: none;
+		font-weight: 500;
+	}
+
+	.status-banner {
+		background: #f0fdf4;
+		border: 1px solid #bbf7d0;
+		color: var(--success-dark);
+		border-radius: var(--radius-md);
+		padding: 0.5rem 0.75rem;
+		font-size: var(--text-sm);
+	}
+
+	.error-banner {
+		background: #fef2f2;
+		border: 1px solid #fecaca;
+		color: #991b1b;
+		border-radius: var(--radius-md);
+		padding: 0.5rem 0.75rem;
+		font-size: var(--text-sm);
+	}
+
+	.skeleton {
+		background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%);
+		background-size: 200% 100%;
+		animation: shimmer 1.5s infinite;
+		border-radius: var(--radius-lg);
+	}
+
+	@keyframes shimmer {
+		0% {
+			background-position: 200% 0;
 		}
-		
-		.reconciliation-sections {
-			grid-template-columns: 1fr;
-		}
-		
-		.date-presets {
-			flex-direction: column;
-		}
-		
-		.header h1 {
-			font-size: 1.5rem;
-		}
-		
-		.history-section .section-header {
-			flex-direction: column;
-			align-items: stretch;
-			gap: 1rem;
-		}
-		
-		.history-table th,
-		.history-table td {
-			padding: 0.5rem;
-			font-size: 0.75rem;
-		}
-		
-		.reconcile-actions {
-			flex-direction: column;
-			align-items: stretch;
+		100% {
+			background-position: -200% 0;
 		}
 	}
 </style>
