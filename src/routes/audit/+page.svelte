@@ -83,7 +83,8 @@
 
 			let entriesQ = client
 				.from('fuel_entries')
-				.select('entry_date, litres_dispensed, activities(name)');
+				.select('entry_date, litres_dispensed, activities(name)')
+				.is('deleted_at', null);
 			let refillsQ = client
 				.from('tank_refills')
 				.select('litres_added, delivery_date, invoice_number');

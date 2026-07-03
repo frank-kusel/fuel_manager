@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import supabaseService from '$lib/services/supabase';
+	import FuelEntryEditModal from '$lib/components/fuel/FuelEntryEditModal.svelte';
 	import { summaryCacheStore } from '$lib/stores/summary-cache';
 
 	interface FuelSummaryEntry {
@@ -352,6 +353,27 @@
 		}
 	}
 
+	// ---- Edit entry (reuses the full edit modal; litres changes cascade) ----
+	let editingEntry = $state<FuelSummaryEntry | null>(null);
+	let isEditModalOpen = $state(false);
+
+	function openEditModal(entry: FuelSummaryEntry) {
+		editingEntry = entry;
+		isEditModalOpen = true;
+	}
+
+	function closeEditModal() {
+		isEditModalOpen = false;
+		editingEntry = null;
+	}
+
+	async function handleEntrySaved() {
+		closeEditModal();
+		summaryCacheStore.invalidate();
+		await loadEntries();
+		setActionStatus('Entry updated — changes cascaded to later readings.');
+	}
+
 	// ---- Drag-to-reorder within a day (Todoist-style) ----
 	// The dragged card follows the pointer 1:1; the other cards in the day
 	// slide up/down in real time to open the gap where it will land. On drop,
@@ -590,18 +612,6 @@
 									</div>
 								</div>
 								<div class="entry-card-details">
-									<button
-										class="entry-delete-x"
-										title="Delete entry"
-										aria-label="Delete entry"
-										disabled={actingEntryId === entry.id}
-										onclick={(e) => {
-											e.stopPropagation();
-											handleDeleteEntry(entry);
-										}}
-									>
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-									</button>
 									<!-- Compact metrics layout -->
 									<div class="metrics-compact">
 										<!-- Odometer row -->
@@ -653,6 +663,26 @@
 										>
 											Move Down
 										</button>
+										<button
+											class="entry-action-btn"
+											disabled={actingEntryId === entry.id}
+											onclick={(e) => {
+												e.stopPropagation();
+												openEditModal(entry);
+											}}
+										>
+											Edit
+										</button>
+										<button
+											class="entry-action-btn danger"
+											disabled={actingEntryId === entry.id}
+											onclick={(e) => {
+												e.stopPropagation();
+												handleDeleteEntry(entry);
+											}}
+										>
+											Delete
+										</button>
 									</div>
 								</div>
 							</div>
@@ -663,6 +693,14 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Full entry edit modal (litres changes cascade to later readings) -->
+<FuelEntryEditModal
+	entry={editingEntry}
+	isOpen={isEditModalOpen}
+	on:close={closeEditModal}
+	on:saved={handleEntrySaved}
+/>
 
 <style>
 	/* Body styles now handled globally in app.css */
@@ -1045,33 +1083,6 @@
 		border-top: 1px solid #e5e7eb;
 	}
 
-	/* Small delete affordance, tucked into the expanded card's corner */
-	.entry-delete-x {
-		position: absolute;
-		top: 0.5rem;
-		right: 0.5rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 1.75rem;
-		height: 1.75rem;
-		background: none;
-		border: none;
-		border-radius: var(--radius-md);
-		color: var(--gray-400);
-		cursor: pointer;
-		transition: color 0.15s ease, background-color 0.15s ease;
-	}
-
-	.entry-delete-x:hover:not(:disabled) {
-		color: var(--error);
-		background: #fee2e2;
-	}
-
-	.entry-delete-x:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
 
 	/* Ultra-compact metrics layout */
 	.metrics-compact {

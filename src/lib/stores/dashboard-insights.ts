@@ -133,6 +133,7 @@ function createInsightsStore() {
 			let entriesRes = await client
 				.from('fuel_entries')
 				.select(ENTRY_COLS)
+				.is('deleted_at', null)
 				.gte('entry_date', isoDate(win.start))
 				.lte('entry_date', isoDate(win.end));
 			if (entriesRes.error) throw new Error(entriesRes.error.message);
@@ -141,6 +142,7 @@ function createInsightsStore() {
 				entriesRes = await client
 					.from('fuel_entries')
 					.select(ENTRY_COLS)
+					.is('deleted_at', null)
 					.gte('entry_date', isoDate(win.start))
 					.lte('entry_date', isoDate(win.end));
 				if (entriesRes.error) throw new Error(entriesRes.error.message);
@@ -153,6 +155,7 @@ function createInsightsStore() {
 				client
 					.from('fuel_entries')
 					.select('entry_date, litres_dispensed')
+					.is('deleted_at', null)
 					.gte('entry_date', isoDate(win.prevStart))
 					.lte('entry_date', isoDate(win.prevEnd)),
 				client
@@ -169,6 +172,7 @@ function createInsightsStore() {
 				client
 					.from('fuel_entries')
 					.select('id, entry_date, vehicles(code)')
+					.is('deleted_at', null)
 					.gt('entry_date', isoDate(now))
 			]);
 
@@ -276,7 +280,7 @@ function createInsightsStore() {
 				const dipDate = lastDip.reading_date as string;
 				const [refillsRes, dispensedRes] = await Promise.all([
 					client.from('tank_refills').select('litres_added').gt('delivery_date', dipDate),
-					client.from('fuel_entries').select('litres_dispensed').gt('entry_date', dipDate)
+					client.from('fuel_entries').select('litres_dispensed').is('deleted_at', null).gt('entry_date', dipDate)
 				]);
 				const refillsSinceDip = (refillsRes.data || []).reduce(
 					(s, r) => s + (r.litres_added || 0),

@@ -101,6 +101,7 @@ class SupabaseService {
 			const { data } = await client
 				.from('fuel_entries')
 				.select('vehicle_id, odometer_end, entry_date, time')
+				.is('deleted_at', null)
 				.not('odometer_end', 'is', null)
 				.order('entry_date', { ascending: false })
 				.order('time', { ascending: false })
@@ -124,6 +125,7 @@ class SupabaseService {
 			const { data } = await client
 				.from('fuel_entries')
 				.select('bowser_id, bowser_reading_end, entry_date, time')
+				.is('deleted_at', null)
 				.not('bowser_reading_end', 'is', null)
 				.order('entry_date', { ascending: false })
 				.order('time', { ascending: false })
