@@ -293,28 +293,6 @@
 		await loadEntries();
 	}
 
-	async function handleMoveEntry(entryId: string, direction: 'up' | 'down') {
-		try {
-			setActionStatus(null, null);
-			actingEntryId = entryId;
-			await supabaseService.init();
-
-			const result = await supabaseService.moveFuelEntryWithinDay(entryId, direction);
-			if (result.error) {
-				throw new Error(result.error);
-			}
-
-			summaryCacheStore.invalidate();
-			await loadEntries();
-			setActionStatus(`Entry moved ${direction}.`);
-		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to move entry';
-			setActionStatus(null, message);
-		} finally {
-			actingEntryId = null;
-		}
-	}
-
 	async function handleDeleteEntry(entry: FuelSummaryEntry) {
 		const vehicleLabel = entry.vehicles?.code || entry.vehicles?.name || 'this entry';
 		const litres = entry.litres_dispensed?.toFixed(1) ?? '?';
@@ -645,26 +623,6 @@
 									<div class="entry-actions">
 										<button
 											class="entry-action-btn"
-											disabled={index === 0 || actingEntryId === entry.id}
-											onclick={(e) => {
-												e.stopPropagation();
-												handleMoveEntry(entry.id, 'up');
-											}}
-										>
-											Move Up
-										</button>
-										<button
-											class="entry-action-btn"
-											disabled={index === daySummary.entries.length - 1 || actingEntryId === entry.id}
-											onclick={(e) => {
-												e.stopPropagation();
-												handleMoveEntry(entry.id, 'down');
-											}}
-										>
-											Move Down
-										</button>
-										<button
-											class="entry-action-btn"
 											disabled={actingEntryId === entry.id}
 											onclick={(e) => {
 												e.stopPropagation();
@@ -911,7 +869,9 @@
 	}
 
 	.entry-card {
-		background-color: #f1f5f9;
+		/* Same warm-grey family as the daily summary (#f9fafb), a touch
+		   lighter — replaces the old bluish slate-100 leftover. */
+		background-color: #fbfbfa;
 		border-radius: 1rem;
 		transition: all 0.3s ease;
 	}
@@ -1011,10 +971,10 @@
 	}
 
 	.entry-actions {
-		display: flex;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
 		gap: 0.5rem;
 		margin-top: 0.875rem;
-		flex-wrap: wrap;
 	}
 
 	.entry-action-btn {
