@@ -431,6 +431,35 @@ class SupabaseService {
 	}
 
 	/**
+	 * Move an entry to an arbitrary 1-based CHRONOLOGICAL position within its
+	 * day (drag-and-drop reorder). The RPC positionally reassigns the day's
+	 * existing time values and rebuilds all affected bowser meter chains.
+	 */
+	async reorderFuelEntry(
+		id: string,
+		position: number
+	): Promise<ApiResponse<{
+		moved: boolean;
+		reason?: string;
+		new_time?: string;
+		times_adjusted?: number;
+		bowsers_recalculated?: number;
+	}>> {
+		const client = this.ensureInitialized();
+		return this.query(async () => {
+			const result = await client.rpc('reorder_fuel_entry', {
+				p_entry_id: id,
+				p_position: position
+			});
+
+			return {
+				data: result.data ?? null,
+				error: result.error
+			};
+		});
+	}
+
+	/**
 	 * Update a fuel entry and automatically cascade corrections to all subsequent entries.
 	 * This maintains data integrity by recalculating bowser readings for all entries that come after.
 	 */

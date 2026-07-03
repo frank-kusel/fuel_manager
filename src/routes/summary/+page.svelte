@@ -346,6 +346,101 @@
 			actingEntryId = null;
 		}
 	}
+
+	// ---- Drag-to-reorder within a day ----
+	// The attendant back-fills entries and occasionally gets two swapped.
+	// Dragging a card to its correct place calls reorder_fuel_entry, which
+	// positionally reassigns the day's times and rebuilds the bowser chains.
+	let dragging = $state<{ entryId: string; date: string; listEl: HTMLElement } | null>(null);
+	let dropSlot = $state<number | null>(null); // insertion slot among the OTHER cards (0..n-1)
+	let dropBeforeEntryId = $state<string | null>(null); // card the indicator sits above; null = end
+
+	function startDrag(e: PointerEvent, entryId: string, date: string) {
+		if (actingEntryId) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const listEl = (e.currentTarget as HTMLElement).closest('.entries-list') as HTMLElement | null;
+		if (!listEl) return;
+		dragging = { entryId, date, listEl };
+		dropSlot = null;
+		dropBeforeEntryId = null;
+		window.addEventListener('pointermove', onDragMove);
+		window.addEventListener('pointerup', onDragEnd);
+		window.addEventListener('pointercancel', cancelDrag);
+	}
+
+	function onDragMove(e: PointerEvent) {
+		if (!dragging) return;
+		e.preventDefault();
+		const others = [...dragging.listEl.querySelectorAll<HTMLElement>('.entry-card')].filter(
+			(c) => c.dataset.entryId !== dragging!.entryId
+		);
+		let slot = others.length;
+		for (let i = 0; i < others.length; i++) {
+			const r = others[i].getBoundingClientRect();
+			if (e.clientY < r.top + r.height / 2) {
+				slot = i;
+				break;
+			}
+		}
+		dropSlot = slot;
+		dropBeforeEntryId = others[slot]?.dataset.entryId ?? null;
+	}
+
+	function cancelDrag() {
+		dragging = null;
+		dropSlot = null;
+		dropBeforeEntryId = null;
+		window.removeEventListener('pointermove', onDragMove);
+		window.removeEventListener('pointerup', onDragEnd);
+		window.removeEventListener('pointercancel', cancelDrag);
+	}
+
+	async function onDragEnd() {
+		const drag = dragging;
+		const slot = dropSlot;
+		cancelDrag();
+		if (!drag || slot === null) return;
+
+		const day = dailySummaries.find((d) => d.date === drag.date);
+		if (!day) return;
+		const count = day.entries.length;
+		const currentVisual = day.entries.findIndex((en) => en.id === drag.entryId);
+		if (currentVisual === -1 || slot === currentVisual) return;
+
+		// Insertion at slot s among the other cards = final visual index s.
+		// Visual list is newest-first, so chronological position = count - s.
+		const chronologicalPos = count - slot;
+
+		try {
+			setActionStatus(null, null);
+			actingEntryId = drag.entryId;
+			await supabaseService.init();
+
+			const result = await supabaseService.reorderFuelEntry(drag.entryId, chronologicalPos);
+			if (result.error) {
+				throw new Error(result.error);
+			}
+
+			summaryCacheStore.invalidate();
+			await loadEntries();
+
+			const info = result.data;
+			if (info?.moved) {
+				const chains = info.bowsers_recalculated || 0;
+				setActionStatus(
+					`Entry moved to #${chronologicalPos} — ${chains} bowser chain${chains === 1 ? '' : 's'} recalculated.`
+				);
+			} else {
+				setActionStatus('Entry already in that position.');
+			}
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to move entry';
+			setActionStatus(null, message);
+		} finally {
+			actingEntryId = null;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -418,10 +513,26 @@
 					<!-- Entries for this day -->
 					<div class="entries-list">
 						{#each daySummary.entries as entry, index (entry.id)}
-							<div class="entry-card" class:expanded={expandedEntry === entry.id}>
+							<div
+								class="entry-card"
+								class:expanded={expandedEntry === entry.id}
+								class:dragging={dragging?.entryId === entry.id}
+								class:drop-before={dragging && dragging.entryId !== entry.id && dropBeforeEntryId === entry.id}
+								class:drop-after={dragging && dropBeforeEntryId === null && index === daySummary.entries.length - 1 && dragging.entryId !== entry.id}
+								data-entry-id={entry.id}
+							>
 								<div class="entry-card-header" onclick={() => expandedEntry = expandedEntry === entry.id ? null : entry.id}>
 									<div class="entry-vehicle-info">
 										<div class="vehicle-code-container">
+											<button
+												class="drag-handle"
+												title="Drag to reorder"
+												aria-label="Drag to reorder entry"
+												onpointerdown={(e) => startDrag(e, entry.id, daySummary.date)}
+												onclick={(e) => e.stopPropagation()}
+											>
+												<svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor" aria-hidden="true"><circle cx="4" cy="3" r="1.5"/><circle cx="10" cy="3" r="1.5"/><circle cx="4" cy="9" r="1.5"/><circle cx="10" cy="9" r="1.5"/><circle cx="4" cy="15" r="1.5"/><circle cx="10" cy="15" r="1.5"/></svg>
+											</button>
 											<span class="entry-number">#{daySummary.entries.length - index}</span>
 											<div class="vehicle-info-main">
 												<p class="entry-vehicle-name">{entry.vehicles?.name || 'Vehicle'}</p>
@@ -465,28 +576,28 @@
 										</div>
 										<div class="entry-time-expanded">{entry.time}</div>
 									</div>
-									{#if isToday(daySummary.date)}
-										<div class="entry-actions">
-											<button
-												class="entry-action-btn"
-												disabled={index === 0 || actingEntryId === entry.id}
-												onclick={(e) => {
-													e.stopPropagation();
-													handleMoveEntry(entry.id, 'up');
-												}}
-											>
-												Move Up
-											</button>
-											<button
-												class="entry-action-btn"
-												disabled={index === daySummary.entries.length - 1 || actingEntryId === entry.id}
-												onclick={(e) => {
-													e.stopPropagation();
-													handleMoveEntry(entry.id, 'down');
-												}}
-											>
-												Move Down
-											</button>
+									<div class="entry-actions">
+										<button
+											class="entry-action-btn"
+											disabled={index === 0 || actingEntryId === entry.id}
+											onclick={(e) => {
+												e.stopPropagation();
+												handleMoveEntry(entry.id, 'up');
+											}}
+										>
+											Move Up
+										</button>
+										<button
+											class="entry-action-btn"
+											disabled={index === daySummary.entries.length - 1 || actingEntryId === entry.id}
+											onclick={(e) => {
+												e.stopPropagation();
+												handleMoveEntry(entry.id, 'down');
+											}}
+										>
+											Move Down
+										</button>
+										{#if isToday(daySummary.date)}
 											<button
 												class="entry-action-btn danger"
 												disabled={actingEntryId === entry.id}
@@ -497,8 +608,8 @@
 											>
 												Delete
 											</button>
-										</div>
-									{/if}
+										{/if}
+									</div>
 								</div>
 							</div>
 						{/each}
@@ -721,6 +832,41 @@
 		background-color: #f1f5f9;
 		border-radius: 1rem;
 		transition: all 0.3s ease;
+	}
+
+	/* Drag-to-reorder */
+	.drag-handle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: none;
+		border: none;
+		padding: 0.35rem 0.3rem;
+		margin: -0.25rem 0 0 -0.35rem;
+		color: var(--gray-300);
+		cursor: grab;
+		touch-action: none; /* the handle is the drag surface — never scroll from it */
+	}
+
+	.drag-handle:hover {
+		color: var(--gray-500);
+	}
+
+	.drag-handle:active {
+		cursor: grabbing;
+	}
+
+	.entry-card.dragging {
+		opacity: 0.45;
+		box-shadow: var(--shadow-lg);
+	}
+
+	.entry-card.drop-before {
+		box-shadow: 0 -3px 0 0 var(--brand);
+	}
+
+	.entry-card.drop-after {
+		box-shadow: 0 3px 0 0 var(--brand);
 	}
 
 	.entry-card-header {
