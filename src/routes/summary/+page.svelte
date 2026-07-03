@@ -316,7 +316,12 @@
 
 	async function handleDeleteEntry(entry: FuelSummaryEntry) {
 		const vehicleLabel = entry.vehicles?.code || entry.vehicles?.name || 'this entry';
-		const confirmed = window.confirm(`Delete ${vehicleLabel}? This will remove it from Summary but keep it for audit history.`);
+		const litres = entry.litres_dispensed?.toFixed(1) ?? '?';
+		const confirmed = window.confirm(
+			`Delete ${vehicleLabel} (${litres} L on ${entry.entry_date})?\n\n` +
+				`The entry is removed from the log (kept for audit history) and the ` +
+				`bowser readings of all later entries are recalculated automatically.`
+		);
 
 		if (!confirmed) {
 			return;
@@ -338,7 +343,7 @@
 
 			summaryCacheStore.invalidate();
 			await loadEntries();
-			setActionStatus('Entry deleted.');
+			setActionStatus('Entry deleted — bowser chain recalculated.');
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to delete entry';
 			setActionStatus(null, message);
@@ -585,6 +590,18 @@
 									</div>
 								</div>
 								<div class="entry-card-details">
+									<button
+										class="entry-delete-x"
+										title="Delete entry"
+										aria-label="Delete entry"
+										disabled={actingEntryId === entry.id}
+										onclick={(e) => {
+											e.stopPropagation();
+											handleDeleteEntry(entry);
+										}}
+									>
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+									</button>
 									<!-- Compact metrics layout -->
 									<div class="metrics-compact">
 										<!-- Odometer row -->
@@ -636,18 +653,6 @@
 										>
 											Move Down
 										</button>
-										{#if isToday(daySummary.date)}
-											<button
-												class="entry-action-btn danger"
-												disabled={actingEntryId === entry.id}
-												onclick={(e) => {
-													e.stopPropagation();
-													handleDeleteEntry(entry);
-												}}
-											>
-												Delete
-											</button>
-										{/if}
 									</div>
 								</div>
 							</div>
@@ -1031,12 +1036,41 @@
 		overflow: hidden;
 		transition: max-height 0.15s ease-out, padding 0.15s ease-out;
 		padding: 0 1rem;
+		position: relative;
 	}
 
 	.entry-card.expanded .entry-card-details {
 		max-height: 520px;
 		padding: 1rem;
 		border-top: 1px solid #e5e7eb;
+	}
+
+	/* Small delete affordance, tucked into the expanded card's corner */
+	.entry-delete-x {
+		position: absolute;
+		top: 0.5rem;
+		right: 0.5rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		background: none;
+		border: none;
+		border-radius: var(--radius-md);
+		color: var(--gray-400);
+		cursor: pointer;
+		transition: color 0.15s ease, background-color 0.15s ease;
+	}
+
+	.entry-delete-x:hover:not(:disabled) {
+		color: var(--error);
+		background: #fee2e2;
+	}
+
+	.entry-delete-x:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
 	}
 
 	/* Ultra-compact metrics layout */
