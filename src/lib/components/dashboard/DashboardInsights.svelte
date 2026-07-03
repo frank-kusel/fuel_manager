@@ -5,11 +5,13 @@
 		insightsLoading,
 		insightsError
 	} from '$lib/stores/dashboard-insights';
+	import { referenceDataStore, activeVehicles } from '$lib/stores/reference-data';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
 	onMount(() => {
 		dashboardInsightsStore.load();
+		referenceDataStore.loadAllData(); // cached — powers the vehicle lookup
 	});
 
 	function openVehicle(vehicleId: string) {
@@ -40,6 +42,28 @@
 		const d = new Date(date + 'T12:00:00').getDay();
 		return d === 0 || d === 6;
 	}
+
+	function isAxisTick(date: string): boolean {
+		const day = Number(date.slice(8, 10));
+		return day === 1 || day % 5 === 0;
+	}
+
+	let selectedDay = $state<string | null>(null);
+
+	function toggleDay(date: string) {
+		selectedDay = selectedDay === date ? null : date;
+	}
+
+	let selectedDayInfo = $derived.by(() => {
+		if (!selectedDay || !$insightsData) return null;
+		const day = $insightsData.daily.find((x) => x.date === selectedDay);
+		if (!day) return null;
+		const dt = new Date(day.date + 'T12:00:00');
+		return {
+			label: dt.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' }),
+			litres: day.litres
+		};
+	});
 </script>
 
 <div class="insights">
@@ -160,6 +184,21 @@
 				{#if d.fleet.length === 0}
 					<p class="empty-note">No fuel entries yet this month.</p>
 				{/if}
+				{#if $activeVehicles.length > 0}
+					<select
+						class="vehicle-lookup"
+						aria-label="Look up a vehicle's fuel history"
+						onchange={(e) => {
+							const id = e.currentTarget.value;
+							if (id) openVehicle(id);
+						}}
+					>
+						<option value="">Look up a vehicle…</option>
+						{#each $activeVehicles as v}
+							<option value={v.id}>{v.code} — {v.name}</option>
+						{/each}
+					</select>
+				{/if}
 			</section>
 
 			<!-- Needs attention -->
@@ -178,21 +217,38 @@
 
 		<!-- Daily usage -->
 		<section class="panel">
-			<h2 class="panel-title">Daily usage · {d.monthLabel}</h2>
+			<div class="daily-head">
+				<h2 class="panel-title daily-title">Daily usage · {d.monthLabel}</h2>
+				{#if selectedDayInfo}
+					<span class="daily-selected">{selectedDayInfo.label} — {nf1.format(selectedDayInfo.litres)} L</span>
+				{/if}
+			</div>
 			<div class="daily-bars">
 				{#each d.daily as day}
-					<div
-						class="daily-bar"
-						class:weekend={isWeekend(day.date)}
-						class:peak={day.litres === maxDaily && day.litres > 0}
-						style="height: {Math.max((day.litres / maxDaily) * 100, day.litres > 0 ? 4 : 2)}%"
+					<button
+						class="daily-cell"
+						class:selected={selectedDay === day.date}
+						onclick={() => toggleDay(day.date)}
 						title="{day.date}: {nf1.format(day.litres)} L"
-					></div>
+					>
+						{#if day.litres > 0}
+							<span class="daily-value" class:peak-value={day.litres === maxDaily}>
+								{nf.format(Math.round(day.litres))}
+							</span>
+						{/if}
+						<span
+							class="daily-bar"
+							class:weekend={isWeekend(day.date)}
+							class:peak={day.litres === maxDaily && day.litres > 0}
+							style="height: {Math.max((day.litres / maxDaily) * 75, day.litres > 0 ? 3 : 1.5)}%"
+						></span>
+					</button>
 				{/each}
 			</div>
 			<div class="daily-axis">
-				<span>{dayLabel(d.daily[0]?.date || '')} {d.monthLabel.split(' ')[0]}</span>
-				<span>{dayLabel(d.daily[d.daily.length - 1]?.date || '')} {d.monthLabel.split(' ')[0]}</span>
+				{#each d.daily as day}
+					<span class="axis-cell">{isAxisTick(day.date) ? dayLabel(day.date) : ''}</span>
+				{/each}
 			</div>
 		</section>
 	{/if}
@@ -441,6 +497,23 @@
 		margin: 0;
 	}
 
+	.vehicle-lookup {
+		width: 100%;
+		margin-top: 0.625rem;
+		padding: 0.45rem 0.6rem;
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-md);
+		background: var(--gray-50);
+		font-size: var(--text-sm);
+		color: var(--gray-600);
+		cursor: pointer;
+	}
+
+	.vehicle-lookup:focus {
+		outline: none;
+		border-color: var(--brand-ring);
+	}
+
 	/* ---- Attention list ---- */
 	.attention-list {
 		list-style: none;
@@ -481,15 +554,66 @@
 	}
 
 	/* ---- Daily bars ---- */
+	.daily-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 0.75rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.daily-title {
+		margin: 0;
+	}
+
+	.daily-selected {
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		color: var(--brand);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
 	.daily-bars {
 		display: flex;
-		align-items: flex-end;
 		gap: 3px;
-		height: 72px;
+		height: 160px;
+	}
+
+	/* Whole-column tap target: value label rides the bar top */
+	.daily-cell {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-end;
+		align-items: center;
+		padding: 0;
+		border: none;
+		background: none;
+		cursor: pointer;
+		border-radius: 2px;
+	}
+
+	.daily-value {
+		writing-mode: vertical-rl;
+		transform: rotate(180deg);
+		font-size: 0.625rem;
+		line-height: 1;
+		color: var(--gray-500);
+		font-variant-numeric: tabular-nums;
+		margin-bottom: 3px;
+		max-height: 44px;
+		overflow: hidden;
+	}
+
+	.daily-value.peak-value {
+		color: var(--brand);
+		font-weight: var(--font-weight-semibold);
 	}
 
 	.daily-bar {
-		flex: 1;
+		width: 100%;
 		background: #cf96a0;
 		border-radius: 2px 2px 0 0;
 		min-height: 2px;
@@ -504,12 +628,30 @@
 		background: var(--brand-hover);
 	}
 
+	.daily-cell.selected .daily-bar {
+		background: var(--brand);
+	}
+
+	.daily-cell.selected .daily-value {
+		color: var(--brand);
+		font-weight: var(--font-weight-semibold);
+	}
+
 	.daily-axis {
 		display: flex;
-		justify-content: space-between;
+		gap: 3px;
 		font-size: var(--text-xs);
 		color: var(--gray-400);
 		margin-top: 0.375rem;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.axis-cell {
+		flex: 1;
+		min-width: 0;
+		text-align: center;
+		white-space: nowrap;
+		overflow: visible;
 	}
 
 	/* ---- States ---- */
@@ -576,7 +718,16 @@
 
 		.daily-bars {
 			gap: 2px;
-			height: 56px;
+			height: 130px;
+		}
+
+		.daily-axis {
+			gap: 2px;
+		}
+
+		.daily-value {
+			font-size: 0.5625rem;
+			max-height: 38px;
 		}
 	}
 </style>

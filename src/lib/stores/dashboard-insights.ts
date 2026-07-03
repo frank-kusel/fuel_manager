@@ -81,7 +81,9 @@ const DIP_STALE_DAYS = 14;
 const BURN_WINDOW_DAYS = 14;
 
 function isoDate(d: Date): string {
-	return d.toISOString().split('T')[0];
+	// Local date, not UTC — toISOString() shifts SAST dates back a day,
+	// which mislabels the daily chart and drops today's entries from it.
+	return d.toLocaleDateString('en-CA');
 }
 
 function createInsightsStore() {
@@ -278,9 +280,20 @@ function createInsightsStore() {
 			let tank: TankInsight | null = null;
 			if (lastDip) {
 				const dipDate = lastDip.reading_date as string;
-				const [refillsRes, dispensedRes] = await Promise.all([
+				// Burn window must span the real trailing 14 days — the month-scoped
+				// `entries` array can't reach past the 1st, which understated the
+				// burn rate (and overstated runway) early in a month.
+				const burnStart = new Date(now);
+				burnStart.setDate(burnStart.getDate() - BURN_WINDOW_DAYS);
+				const [refillsRes, dispensedRes, burnRes] = await Promise.all([
 					client.from('tank_refills').select('litres_added').gt('delivery_date', dipDate),
-					client.from('fuel_entries').select('litres_dispensed').is('deleted_at', null).gt('entry_date', dipDate)
+					client.from('fuel_entries').select('litres_dispensed').is('deleted_at', null).gt('entry_date', dipDate),
+					client
+						.from('fuel_entries')
+						.select('litres_dispensed')
+						.is('deleted_at', null)
+						.gte('entry_date', isoDate(burnStart))
+						.lte('entry_date', isoDate(now))
 				]);
 				const refillsSinceDip = (refillsRes.data || []).reduce(
 					(s, r) => s + (r.litres_added || 0),
@@ -293,11 +306,10 @@ function createInsightsStore() {
 				const derivedLevel = (lastDip.reading_value || 0) + refillsSinceDip - dispensedSinceDip;
 
 				// Burn rate over the trailing window
-				const windowStart = new Date(now);
-				windowStart.setDate(windowStart.getDate() - BURN_WINDOW_DAYS);
-				const windowStartIso = isoDate(windowStart);
-				const recent = entries.filter((e) => e.entry_date >= windowStartIso);
-				const recentLitres = recent.reduce((s, e) => s + (e.litres_dispensed || 0), 0);
+				const recentLitres = (burnRes.data || []).reduce(
+					(s, e) => s + (e.litres_dispensed || 0),
+					0
+				);
 				const dailyBurn = recentLitres / BURN_WINDOW_DAYS;
 				const runwayDays =
 					derivedLevel > 0 && dailyBurn > 0 ? Math.floor(derivedLevel / dailyBurn) : null;

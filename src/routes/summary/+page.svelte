@@ -374,36 +374,89 @@
 	let dragStartPointerY = 0;
 	let dragShift = 0; // distance neighbours slide: card height + list gap
 
-	function startDrag(e: PointerEvent, entryId: string, date: string) {
+	// A touch drag must be deliberate: the handle arms on pointerdown, and the
+	// drag only activates after a short hold (fidgets/accidental brushes do
+	// nothing). Mouse drags activate on first real movement instead — no delay.
+	const TOUCH_HOLD_MS = 300;
+	const TOUCH_SLOP_PX = 8; // movement before the hold elapses = not a drag
+	const MOUSE_SLOP_PX = 4; // a plain click on the handle never shifts cards
+
+	let pendingDrag: {
+		entryId: string;
+		date: string;
+		listEl: HTMLElement;
+		pointerX: number;
+		pointerY: number;
+		timer: number | null;
+		isTouch: boolean;
+	} | null = null;
+
+	function armDrag(e: PointerEvent, entryId: string, date: string) {
 		if (actingEntryId) return;
 		e.preventDefault();
 		e.stopPropagation();
 		const listEl = (e.currentTarget as HTMLElement).closest('.entries-list') as HTMLElement | null;
 		if (!listEl) return;
 
-		const els = [...listEl.querySelectorAll<HTMLElement>('.entry-card')];
-		dragCards = els.map((el) => {
-			const r = el.getBoundingClientRect();
-			return { id: el.dataset.entryId || '', top: r.top, height: r.height, mid: r.top + r.height / 2 };
-		});
-		dragIndex = dragCards.findIndex((c) => c.id === entryId);
-		if (dragIndex === -1) return;
-
-		const self = dragCards[dragIndex];
-		const neighbour = dragCards[dragIndex + 1] ?? dragCards[dragIndex - 1];
-		const gap = neighbour ? Math.max(Math.abs(neighbour.top - self.top) - self.height, 0) : 8;
-		dragShift = self.height + gap;
-		dragStartPointerY = e.clientY;
-
-		dragging = { entryId, date };
-		dropSlot = null;
-		dragTransforms = {};
+		const isTouch = e.pointerType !== 'mouse';
+		pendingDrag = {
+			entryId,
+			date,
+			listEl,
+			pointerX: e.clientX,
+			pointerY: e.clientY,
+			timer: null,
+			isTouch
+		};
+		if (isTouch) {
+			pendingDrag.timer = window.setTimeout(() => {
+				if (pendingDrag) activateDrag(pendingDrag.pointerY);
+			}, TOUCH_HOLD_MS);
+		}
 		window.addEventListener('pointermove', onDragMove);
 		window.addEventListener('pointerup', onDragEnd);
 		window.addEventListener('pointercancel', cancelDrag);
 	}
 
+	function activateDrag(pointerY: number) {
+		const pending = pendingDrag;
+		if (!pending) return;
+		if (pending.timer) clearTimeout(pending.timer);
+		pendingDrag = null;
+
+		const els = [...pending.listEl.querySelectorAll<HTMLElement>('.entry-card')];
+		dragCards = els.map((el) => {
+			const r = el.getBoundingClientRect();
+			return { id: el.dataset.entryId || '', top: r.top, height: r.height, mid: r.top + r.height / 2 };
+		});
+		dragIndex = dragCards.findIndex((c) => c.id === pending.entryId);
+		if (dragIndex === -1) {
+			cancelDrag();
+			return;
+		}
+
+		const self = dragCards[dragIndex];
+		const neighbour = dragCards[dragIndex + 1] ?? dragCards[dragIndex - 1];
+		const gap = neighbour ? Math.max(Math.abs(neighbour.top - self.top) - self.height, 0) : 8;
+		dragShift = self.height + gap;
+		dragStartPointerY = pointerY;
+
+		dragging = { entryId: pending.entryId, date: pending.date };
+		dropSlot = null;
+		dragTransforms = {};
+	}
+
 	function onDragMove(e: PointerEvent) {
+		if (pendingDrag) {
+			const dist = Math.hypot(e.clientX - pendingDrag.pointerX, e.clientY - pendingDrag.pointerY);
+			if (pendingDrag.isTouch) {
+				// Finger moved before the hold elapsed — treat as a fidget, not a drag.
+				if (dist > TOUCH_SLOP_PX) cancelDrag();
+				return;
+			}
+			if (dist < MOUSE_SLOP_PX) return;
+			activateDrag(e.clientY);
+		}
 		if (!dragging) return;
 		e.preventDefault();
 		const dy = e.clientY - dragStartPointerY;
@@ -432,6 +485,8 @@
 	}
 
 	function cancelDrag() {
+		if (pendingDrag?.timer) clearTimeout(pendingDrag.timer);
+		pendingDrag = null;
 		teardownDragListeners();
 		dragging = null;
 		dropSlot = null;
@@ -579,7 +634,7 @@
 												class="drag-handle"
 												title="Drag to reorder"
 												aria-label="Drag to reorder entry"
-												onpointerdown={(e) => startDrag(e, entry.id, daySummary.date)}
+												onpointerdown={(e) => armDrag(e, entry.id, daySummary.date)}
 												onclick={(e) => e.stopPropagation()}
 											>
 												<svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor" aria-hidden="true"><circle cx="4" cy="3" r="1.5"/><circle cx="10" cy="3" r="1.5"/><circle cx="4" cy="9" r="1.5"/><circle cx="10" cy="9" r="1.5"/><circle cx="4" cy="15" r="1.5"/><circle cx="10" cy="15" r="1.5"/></svg>

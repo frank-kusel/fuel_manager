@@ -180,7 +180,7 @@
 	{#if showActionMenu}
 		<div class="action-overlay" onclick={closeActionMenu}></div>
 		<div class="action-menu">
-			<button class="action-menu-item" onclick={() => handleAction('fuel')}>
+			<button class="action-menu-item primary" onclick={() => handleAction('fuel')}>
 				<div class="action-menu-icon">
 					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg>
 				</div>
@@ -537,6 +537,36 @@
 
 	.action-menu-item:active {
 		background: #f3dee1;
+	}
+
+	/* Primary workflow: flat maroon block, colour weight carries the hierarchy */
+	.action-menu-item.primary {
+		background: var(--brand);
+		border-bottom: none;
+	}
+
+	.action-menu-item.primary:hover {
+		background: var(--brand-hover);
+	}
+
+	.action-menu-item.primary:active {
+		background: var(--brand-active);
+	}
+
+	.action-menu-item.primary .action-menu-icon {
+		background: rgba(255, 255, 255, 0.15);
+	}
+
+	.action-menu-item.primary .action-menu-icon svg {
+		color: white;
+	}
+
+	.action-menu-item.primary .action-menu-title {
+		color: white;
+	}
+
+	.action-menu-item.primary .action-menu-desc {
+		color: rgba(255, 255, 255, 0.85);
 	}
 
 	.action-menu-icon {
