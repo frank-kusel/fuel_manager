@@ -217,7 +217,7 @@
 				{vehicle.type || 'Vehicle'}{vehicle.registration ? ` · ${vehicle.registration}` : ''}
 			</div>
 		</div>
-		<a class="edit-link" href="/fleet?edit={vehicle.id}">Edit</a>
+		<a class="edit-link" href="/tools/database?entity=vehicles&edit={vehicle.id}">Edit</a>
 	</div>
 
 	<!-- Vital stats -->

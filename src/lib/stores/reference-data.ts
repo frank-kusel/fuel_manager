@@ -48,13 +48,14 @@ function createReferenceDataStore() {
 			return isValid;
 		},
 
-		// Load all reference data in parallel
-		loadAllData: async () => {
+		// Load all reference data in parallel. force=true bypasses the cache —
+		// used after CRUD edits so pickers refresh immediately.
+		loadAllData: async (force = false) => {
 			// Check if we have valid cached data
 			let currentState: ReferenceDataState = initialState;
 			subscribe(state => { currentState = state; })();
 
-			if (currentState.timestamp) {
+			if (!force && currentState.timestamp) {
 				const now = Date.now();
 				const age = now - currentState.timestamp;
 				if (age < CACHE_DURATION) {
@@ -243,12 +244,12 @@ export const referenceDataTimestamp = derived(referenceDataStore, $store => $sto
 
 // Helper: Get active vehicles only
 export const activeVehicles = derived(vehicles, $vehicles =>
-	$vehicles.filter(v => v.is_active !== false)
+	$vehicles.filter(v => v.active !== false)
 );
 
 // Helper: Get active drivers only
 export const activeDrivers = derived(drivers, $drivers =>
-	$drivers.filter(d => d.is_active !== false)
+	$drivers.filter(d => d.active !== false)
 );
 
 // Helper: Get active bowsers only

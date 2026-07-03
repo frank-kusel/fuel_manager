@@ -1,411 +1,551 @@
 <script lang="ts">
-	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
-	import { formatDate, formatNumber } from '$lib/utils/formatting';
-	import Chart from '$lib/components/charts/Chart.svelte';
-	
-	let { data }: { data: PageData } = $props();
-	
-	const { driver, performanceStats, recentEntries, vehicleUsageData, activityData, weeklyData, metrics } = data;
-	
-	// Prepare vehicle usage chart
-	const vehicleUsageChartData = $derived(() => {
-		return {
-			labels: vehicleUsageData.map(v => v.name),
-			datasets: [{
-				label: 'Times Used',
-				data: vehicleUsageData.map(v => v.count),
-				backgroundColor: [
-					'rgba(59, 130, 246, 0.5)',
-					'rgba(34, 197, 94, 0.5)',
-					'rgba(251, 191, 36, 0.5)',
-					'rgba(239, 68, 68, 0.5)',
-					'rgba(168, 85, 247, 0.5)',
-				],
-				borderColor: [
-					'rgb(59, 130, 246)',
-					'rgb(34, 197, 94)',
-					'rgb(251, 191, 36)',
-					'rgb(239, 68, 68)',
-					'rgb(168, 85, 247)',
-				],
-				borderWidth: 1
-			}]
-		};
+
+	let { data } = $props();
+
+	const driver = $derived(data.driver);
+	const entries = $derived(data.entries as any[]); // newest first
+
+	const nf = new Intl.NumberFormat('en-ZA');
+	const nf1 = new Intl.NumberFormat('en-ZA', {
+		minimumFractionDigits: 1,
+		maximumFractionDigits: 1
 	});
-	
-	// Prepare weekly trend chart
-	const weeklyTrendChartData = $derived(() => {
-		return {
-			labels: weeklyData.map(w => {
-				const date = new Date(w.week);
-				return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-			}),
-			datasets: [
-				{
-					label: 'Fuel Used (L)',
-					data: weeklyData.map(w => w.fuel),
-					borderColor: 'rgb(59, 130, 246)',
-					backgroundColor: 'rgba(59, 130, 246, 0.1)',
-					yAxisID: 'y',
-				},
-				{
-					label: 'Distance (km)',
-					data: weeklyData.map(w => w.distance),
-					borderColor: 'rgb(34, 197, 94)',
-					backgroundColor: 'rgba(34, 197, 94, 0.1)',
-					yAxisID: 'y1',
-				}
-			]
-		};
-	});
-	
-	// Activity fuel consumption chart
-	const activityFuelChartData = $derived(() => {
-		const topActivities = activityData.slice(0, 6);
-		return {
-			labels: topActivities.map(a => a.name),
-			datasets: [{
-				label: 'Fuel Used (L)',
-				data: topActivities.map(a => a.fuel),
-				backgroundColor: 'rgba(251, 191, 36, 0.5)',
-				borderColor: 'rgb(251, 191, 36)',
-				borderWidth: 1
-			}]
-		};
-	});
-	
-	function getCategoryColor(category: string): string {
-		const colors: Record<string, string> = {
-			planting: 'bg-green-100 text-green-800',
-			harvesting: 'bg-yellow-100 text-yellow-800',
-			spraying: 'bg-blue-100 text-blue-800',
-			fertilizing: 'bg-purple-100 text-purple-800',
-			maintenance: 'bg-gray-100 text-gray-800',
-			field_prep: 'bg-orange-100 text-orange-800',
-			transport: 'bg-indigo-100 text-indigo-800',
-			monitoring: 'bg-teal-100 text-teal-800',
-			other: 'bg-pink-100 text-pink-800'
-		};
-		return colors[category] || 'bg-gray-100 text-gray-800';
+
+	function goBack() {
+		if (history.length > 1) history.back();
+		else goto('/tools/database?entity=drivers');
 	}
-	
-	// Pagination
-	let currentPage = $state(1);
-	const itemsPerPage = 10;
-	const totalPages = Math.ceil(recentEntries.length / itemsPerPage);
-	
-	const paginatedEntries = $derived(() => {
-		const start = (currentPage - 1) * itemsPerPage;
-		const end = start + itemsPerPage;
-		return recentEntries.slice(start, end);
+
+	function localMonthKey(monthsBack: number): string {
+		const now = new Date();
+		const d = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+	}
+
+	function monthLitres(key: string): number {
+		return entries
+			.filter((e) => e.entry_date.startsWith(key))
+			.reduce((s, e) => s + (e.litres_dispensed || 0), 0);
+	}
+
+	function fmtDate(date: string): string {
+		return new Date(date + 'T12:00:00').toLocaleDateString('en-ZA', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		});
+	}
+
+	function fmtDay(date: string): string {
+		return new Date(date + 'T12:00:00').toLocaleDateString('en-ZA', {
+			weekday: 'short',
+			day: 'numeric'
+		});
+	}
+
+	// ---- Vital stats ----
+	const monthStat = $derived.by(() => {
+		const now = new Date();
+		let litres = monthLitres(localMonthKey(0));
+		let label = now.toLocaleDateString('en-ZA', { month: 'long' });
+		if (litres === 0 && entries.length > 0) {
+			const latestKey = entries[0].entry_date.slice(0, 7);
+			litres = monthLitres(latestKey);
+			label = new Date(latestKey + '-01T12:00:00').toLocaleDateString('en-ZA', {
+				month: 'short',
+				year: 'numeric'
+			});
+		}
+		return { litres, label };
+	});
+
+	const vehiclesDriven = $derived.by(() => {
+		const map = new Map<string, { code: string; name: string; count: number; litres: number }>();
+		for (const e of entries) {
+			const v = e.vehicles;
+			if (!v?.code) continue;
+			const g = map.get(v.code) || { code: v.code, name: v.name || '', count: 0, litres: 0 };
+			g.count += 1;
+			g.litres += e.litres_dispensed || 0;
+			map.set(v.code, g);
+		}
+		return [...map.values()].sort((a, b) => b.litres - a.litres);
+	});
+
+	const lastEntry = $derived(entries[0] ?? null);
+
+	// ---- Monthly usage, last 6 months ----
+	const monthlyBars = $derived.by(() => {
+		const bars: { label: string; litres: number }[] = [];
+		for (let i = 5; i >= 0; i--) {
+			const key = localMonthKey(i);
+			bars.push({
+				label: new Date(key + '-01T12:00:00').toLocaleDateString('en-ZA', { month: 'short' }),
+				litres: monthLitres(key)
+			});
+		}
+		const max = Math.max(1, ...bars.map((b) => b.litres));
+		return bars.map((b) => ({ ...b, pct: Math.max((b.litres / max) * 100, b.litres > 0 ? 3 : 1.5) }));
+	});
+
+	// ---- History grouped by month with subtotals ----
+	const monthGroups = $derived.by(() => {
+		const map = new Map<string, { label: string; litres: number; entries: any[] }>();
+		for (const e of entries) {
+			const key = e.entry_date.slice(0, 7);
+			let g = map.get(key);
+			if (!g) {
+				g = {
+					label: new Date(key + '-01T12:00:00').toLocaleDateString('en-ZA', {
+						month: 'long',
+						year: 'numeric'
+					}),
+					litres: 0,
+					entries: []
+				};
+				map.set(key, g);
+			}
+			g.litres += e.litres_dispensed || 0;
+			g.entries.push(e);
+		}
+		return [...map.values()];
 	});
 </script>
 
-<div class="container mx-auto px-4 py-8 max-w-7xl">
+<svelte:head>
+	<title>{driver.employee_code} · {driver.name}</title>
+</svelte:head>
+
+<div class="driver-page">
 	<!-- Header -->
-	<div class="flex items-center justify-between mb-8">
-		<div>
-			<button 
-				onclick={() => goto('/fleet')}
-				class="text-gray-500 hover:text-gray-700 mb-2 inline-flex items-center"
-			>
-				← Back to Fleet
-			</button>
-			<h1 class="text-3xl font-bold text-gray-900">
-				{driver.name}
-				<span class="text-gray-500 text-xl ml-2">({driver.employee_code})</span>
-			</h1>
-			<div class="flex items-center gap-4 mt-2 text-gray-600">
-				{#if driver.phone}
-					<span>📞 {driver.phone}</span>
-				{/if}
-				{#if driver.email}
-					<span>✉️ {driver.email}</span>
-				{/if}
-				{#if driver.default_vehicle}
-					<span>🚛 Default: {driver.default_vehicle.name}</span>
-				{/if}
-			</div>
-			{#if driver.license_number}
-				<div class="text-sm text-gray-500 mt-1">
-					License: {driver.license_number} 
-					{#if driver.license_expiry}
-						(Expires: {formatDate(driver.license_expiry)})
-					{/if}
-				</div>
-			{/if}
-		</div>
-		<button 
-			onclick={() => goto(`/fleet?edit-driver=${driver.id}`)}
-			class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-		>
-			Edit Driver
+	<div class="page-head">
+		<button class="back-btn" onclick={goBack} aria-label="Go back">
+			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
 		</button>
-	</div>
-	
-	<!-- Key Metrics -->
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-		<div class="bg-white rounded-lg shadow p-6">
-			<div class="text-sm text-gray-600">Entries</div>
-			<div class="text-2xl font-bold text-gray-900">{metrics.entriesThisMonth}</div>
-			<div class="text-xs text-gray-500">This month</div>
-		</div>
-		
-		<div class="bg-white rounded-lg shadow p-6">
-			<div class="text-sm text-gray-600">Fuel Used</div>
-			<div class="text-2xl font-bold text-gray-900">{formatNumber(metrics.totalFuel)} L</div>
-			<div class="text-xs text-gray-500">This month</div>
-		</div>
-		
-		<div class="bg-white rounded-lg shadow p-6">
-			<div class="text-sm text-gray-600">Distance</div>
-			<div class="text-2xl font-bold text-gray-900">{formatNumber(metrics.totalDistance)} km</div>
-			<div class="text-xs text-gray-500">This month</div>
-		</div>
-		
-		<div class="bg-white rounded-lg shadow p-6">
-			<div class="text-sm text-gray-600">Avg L/100km</div>
-			<div class="text-2xl font-bold text-gray-900">
-				{#if metrics.avgConsumption}
-					{metrics.avgConsumption.toFixed(1)}
-				{:else}
-					-
-				{/if}
+		<div class="head-titles">
+			<h1 class="driver-title"><span class="driver-code">{driver.employee_code}</span> {driver.name}</h1>
+			<div class="driver-sub">
+				{[driver.phone, driver.default_vehicle ? `usually ${driver.default_vehicle.code} ${driver.default_vehicle.name}` : null]
+					.filter(Boolean)
+					.join(' · ') || 'Driver'}
 			</div>
-			<div class="text-xs text-gray-500">This month</div>
 		</div>
-		
-		<div class="bg-white rounded-lg shadow p-6">
-			<div class="text-sm text-gray-600">Vehicles</div>
-			<div class="text-2xl font-bold text-gray-900">{metrics.vehiclesUsed}</div>
-			<div class="text-xs text-gray-500">Used this month</div>
+		<a class="edit-link" href="/tools/database?entity=drivers&edit={driver.id}">Edit</a>
+	</div>
+
+	<!-- Vital stats -->
+	<div class="stat-grid">
+		<div class="stat-card">
+			<div class="stat-label">Fuel · {monthStat.label}</div>
+			<div class="stat-value">{nf.format(Math.round(monthStat.litres))}<span class="stat-unit"> L</span></div>
+			<div class="stat-meta">{entries.length >= 500 ? 'last 500 entries' : `${entries.length} entries total`}</div>
 		</div>
-		
-		<div class="bg-white rounded-lg shadow p-6">
-			<div class="text-sm text-gray-600">Activities</div>
-			<div class="text-2xl font-bold text-gray-900">{metrics.activitiesPerformed}</div>
-			<div class="text-xs text-gray-500">Types performed</div>
+		<div class="stat-card">
+			<div class="stat-label">Vehicles driven</div>
+			<div class="stat-value">{vehiclesDriven.length}</div>
+			<div class="stat-meta">across recorded entries</div>
+		</div>
+		<div class="stat-card">
+			<div class="stat-label">Last entry</div>
+			<div class="stat-value stat-value-sm">{lastEntry ? fmtDate(lastEntry.entry_date) : '—'}</div>
+			<div class="stat-meta">
+				{lastEntry
+					? `${nf1.format(lastEntry.litres_dispensed)} L · ${lastEntry.vehicles?.code || ''}`
+					: 'no entries yet'}
+			</div>
 		</div>
 	</div>
-	
-	<!-- Charts Row 1 -->
-	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-		<!-- Vehicle Usage -->
-		<div class="bg-white rounded-lg shadow p-6">
-			<h2 class="text-lg font-semibold mb-4">Vehicle Usage</h2>
-			{#if vehicleUsageData.length > 0}
-				<Chart 
-					type="doughnut" 
-					data={vehicleUsageChartData()} 
-					options={{
-						responsive: true,
-						maintainAspectRatio: false,
-						plugins: {
-							legend: { position: 'bottom' }
-						}
-					}}
-					height="250px"
-				/>
-			{:else}
-				<p class="text-gray-500 text-center py-8">No vehicle usage data</p>
-			{/if}
-		</div>
-		
-		<!-- Weekly Trend -->
-		<div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
-			<h2 class="text-lg font-semibold mb-4">Weekly Performance</h2>
-			{#if weeklyData.length > 0}
-				<Chart 
-					type="line" 
-					data={weeklyTrendChartData()} 
-					options={{
-						responsive: true,
-						maintainAspectRatio: false,
-						interaction: {
-							mode: 'index',
-							intersect: false,
-						},
-						plugins: {
-							legend: { position: 'bottom' }
-						},
-						scales: {
-							y: {
-								type: 'linear',
-								display: true,
-								position: 'left',
-								title: { display: true, text: 'Fuel (L)' }
-							},
-							y1: {
-								type: 'linear',
-								display: true,
-								position: 'right',
-								title: { display: true, text: 'Distance (km)' },
-								grid: { drawOnChartArea: false }
-							}
-						}
-					}}
-					height="250px"
-				/>
-			{:else}
-				<p class="text-gray-500 text-center py-8">No weekly data available</p>
-			{/if}
-		</div>
-	</div>
-	
-	<!-- Activity Breakdown -->
-	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-		<!-- Activity Fuel Chart -->
-		<div class="bg-white rounded-lg shadow p-6">
-			<h2 class="text-lg font-semibold mb-4">Activity Fuel Consumption</h2>
-			{#if activityData.length > 0}
-				<Chart 
-					type="bar" 
-					data={activityFuelChartData()} 
-					options={{
-						responsive: true,
-						maintainAspectRatio: false,
-						plugins: {
-							legend: { display: false }
-						},
-						scales: {
-							y: {
-								beginAtZero: true,
-								title: { display: true, text: 'Litres' }
-							}
-						}
-					}}
-					height="250px"
-				/>
-			{:else}
-				<p class="text-gray-500 text-center py-8">No activity data available</p>
-			{/if}
-		</div>
-		
-		<!-- Activity Details -->
-		<div class="bg-white rounded-lg shadow p-6">
-			<h2 class="text-lg font-semibold mb-4">Activity Details</h2>
-			{#if activityData.length > 0}
-				<div class="space-y-3">
-					{#each activityData.slice(0, 6) as activity}
-						<div class="flex items-center justify-between p-3 border rounded-lg">
-							<div class="flex items-center gap-3">
-								<span class="text-2xl">{activity.icon || '📋'}</span>
-								<div>
-									<div class="font-medium">{activity.name}</div>
-									<span class={`text-xs px-2 py-1 rounded ${getCategoryColor(activity.category)}`}>
-										{activity.category}
-									</span>
-								</div>
-							</div>
-							<div class="text-right">
-								<div class="font-medium">{activity.count} times</div>
-								<div class="text-sm text-gray-600">{formatNumber(activity.fuel)} L</div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			{:else}
-				<p class="text-gray-500 text-center py-8">No activity data available</p>
-			{/if}
-		</div>
-	</div>
-	
-	<!-- Recent Entries Table -->
-	<div class="bg-white rounded-lg shadow">
-		<div class="px-6 py-4 border-b">
-			<h2 class="text-lg font-semibold">Recent Fuel Entries</h2>
-		</div>
-		
-		{#if recentEntries.length > 0}
-			<div class="overflow-x-auto">
-				<table class="w-full">
-					<thead class="bg-gray-50 border-b">
+
+	<!-- Vehicles driven -->
+	{#if vehiclesDriven.length > 0}
+		<section class="panel">
+			<h2 class="panel-title">Vehicles driven · by fuel drawn</h2>
+			<table class="mini-table">
+				<tbody>
+					{#each vehiclesDriven.slice(0, 5) as v}
 						<tr>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-							<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Distance</th>
-							<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Fuel</th>
-							<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">L/100km</th>
+							<td class="mini-vehicle">
+								<span class="mini-code">{v.code}</span>
+								<span class="mini-name">{v.name}</span>
+							</td>
+							<td class="num">{v.count} {v.count === 1 ? 'entry' : 'entries'}</td>
+							<td class="num litres">{nf.format(Math.round(v.litres))} L</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+			{#if vehiclesDriven.length > 5}
+				<p class="more-note">+ {vehiclesDriven.length - 5} more</p>
+			{/if}
+		</section>
+	{/if}
+
+	<!-- Monthly usage -->
+	<section class="panel">
+		<h2 class="panel-title">Monthly fuel drawn · last 6 months</h2>
+		<div class="month-bars">
+			{#each monthlyBars as bar}
+				<div class="month-cell">
+					<span class="month-value">{bar.litres > 0 ? nf.format(Math.round(bar.litres)) : ''}</span>
+					<span class="month-bar" style="height: {bar.pct}%"></span>
+					<span class="month-label">{bar.label}</span>
+				</div>
+			{/each}
+		</div>
+	</section>
+
+	<!-- Fuel history -->
+	<section class="panel">
+		<h2 class="panel-title">Fuel history</h2>
+		{#if entries.length === 0}
+			<p class="empty-note">No fuel entries recorded for this driver.</p>
+		{:else}
+			<div class="table-wrap">
+				<table class="history-table">
+					<thead>
+						<tr>
+							<th>Date</th>
+							<th>Vehicle</th>
+							<th class="num">Litres</th>
+							<th>Activity</th>
+							<th>Field</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y">
-						{#each paginatedEntries() as entry}
-							<tr class="hover:bg-gray-50">
-								<td class="px-4 py-3 text-sm">
-									{formatDate(entry.entry_date)} {entry.time}
-								</td>
-								<td class="px-4 py-3 text-sm">
-									{entry.vehicle?.name || 'Unknown'}
-									{#if entry.vehicle?.registration}
-										<span class="text-gray-500 text-xs">({entry.vehicle.registration})</span>
-									{/if}
-								</td>
-								<td class="px-4 py-3 text-sm">
-									<span class="inline-flex items-center">
-										{entry.activity?.icon || '📋'}
-										<span class="ml-1">{entry.activity?.name || 'Unknown'}</span>
-									</span>
-								</td>
-								<td class="px-4 py-3 text-sm">
-									{entry.field?.name || entry.zone?.name || '-'}
-								</td>
-								<td class="px-4 py-3 text-sm text-right">
-									{#if entry.odometer_end && entry.odometer_start}
-										{entry.odometer_end - entry.odometer_start} km
-									{:else}
-										-
-									{/if}
-								</td>
-								<td class="px-4 py-3 text-sm text-right">
-									{formatNumber(entry.litres_used)} L
-								</td>
-								<td class="px-4 py-3 text-sm text-right">
-									{#if entry.fuel_consumption_l_per_100km}
-										{entry.fuel_consumption_l_per_100km.toFixed(1)}
-									{:else}
-										-
-									{/if}
-								</td>
+					<tbody>
+						{#each monthGroups as group}
+							<tr class="month-row">
+								<td colspan="2">{group.label}</td>
+								<td colspan="3" class="num month-total">{nf1.format(group.litres)} L</td>
 							</tr>
+							{#each group.entries as e}
+								<tr>
+									<td class="cell-date">{fmtDay(e.entry_date)}</td>
+									<td class="cell-text">{e.vehicles?.code || '—'}</td>
+									<td class="num cell-litres">{nf1.format(e.litres_dispensed)}</td>
+									<td class="cell-text">{e.activities?.name || '—'}</td>
+									<td class="cell-text">{e.fields?.name || '—'}</td>
+								</tr>
+							{/each}
 						{/each}
 					</tbody>
 				</table>
 			</div>
-			
-			<!-- Pagination -->
-			{#if totalPages > 1}
-				<div class="px-6 py-4 border-t flex items-center justify-between">
-					<div class="text-sm text-gray-600">
-						Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, recentEntries.length)} of {recentEntries.length} entries
-					</div>
-					<div class="flex gap-2">
-						<button 
-							onclick={() => currentPage = Math.max(1, currentPage - 1)}
-							disabled={currentPage === 1}
-							class="px-3 py-1 rounded border {currentPage === 1 ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50'}"
-						>
-							Previous
-						</button>
-						<span class="px-3 py-1">
-							Page {currentPage} of {totalPages}
-						</span>
-						<button 
-							onclick={() => currentPage = Math.min(totalPages, currentPage + 1)}
-							disabled={currentPage === totalPages}
-							class="px-3 py-1 rounded border {currentPage === totalPages ? 'bg-gray-100 text-gray-400' : 'bg-white hover:bg-gray-50'}"
-						>
-							Next
-						</button>
-					</div>
-				</div>
+			{#if entries.length >= 500}
+				<p class="more-note">Showing the most recent 500 entries.</p>
 			{/if}
-		{:else}
-			<div class="px-6 py-12 text-center text-gray-500">
-				No fuel entries found for this driver
-			</div>
 		{/if}
-	</div>
+	</section>
 </div>
+
+<style>
+	.driver-page {
+		max-width: 800px;
+		margin: 0 auto;
+		padding: 0 0.25rem 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.875rem;
+	}
+
+	/* ---- Header ---- */
+	.page-head {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		padding: 0.25rem 0.25rem 0;
+	}
+
+	.back-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 34px;
+		height: 34px;
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-md);
+		background: var(--white);
+		color: var(--gray-600);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.back-btn:hover {
+		background: var(--gray-50);
+	}
+
+	.head-titles {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.driver-title {
+		font-size: var(--text-lg);
+		font-weight: var(--font-weight-bold);
+		color: var(--gray-900);
+		margin: 0;
+		line-height: 1.2;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.driver-code {
+		color: var(--brand);
+	}
+
+	.driver-sub {
+		font-size: var(--text-sm);
+		color: var(--gray-500);
+		margin-top: 0.125rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.edit-link {
+		font-size: var(--text-sm);
+		color: var(--gray-500);
+		text-decoration: none;
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-md);
+		padding: 0.3rem 0.7rem;
+		flex-shrink: 0;
+	}
+
+	.edit-link:hover {
+		background: var(--gray-50);
+		color: var(--gray-700);
+	}
+
+	/* ---- Stats ---- */
+	.stat-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: 0.625rem;
+	}
+
+	.stat-card {
+		background: var(--white);
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-lg);
+		padding: 0.75rem 0.875rem;
+	}
+
+	.stat-label {
+		font-size: var(--text-xs);
+		color: var(--gray-500);
+		margin-bottom: 0.25rem;
+	}
+
+	.stat-value {
+		font-size: 1.35rem;
+		font-weight: var(--font-weight-bold);
+		color: var(--gray-900);
+		font-variant-numeric: tabular-nums;
+		line-height: 1.15;
+	}
+
+	.stat-value-sm {
+		font-size: 1.05rem;
+	}
+
+	.stat-unit {
+		font-size: 0.8rem;
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-400);
+	}
+
+	.stat-meta {
+		font-size: var(--text-xs);
+		color: var(--gray-400);
+		margin-top: 0.25rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* ---- Panels ---- */
+	.panel {
+		background: var(--white);
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-lg);
+		padding: 1rem 1.125rem;
+	}
+
+	.panel-title {
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-600);
+		margin: 0 0 0.75rem;
+	}
+
+	/* ---- Vehicles driven ---- */
+	.mini-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--text-sm);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.mini-table td {
+		padding: 0.375rem 0;
+		border-bottom: 1px solid var(--gray-100);
+	}
+
+	.mini-table tr:last-child td {
+		border-bottom: none;
+	}
+
+	.mini-vehicle {
+		display: flex;
+		gap: 0.5rem;
+		align-items: baseline;
+		min-width: 0;
+	}
+
+	.mini-code {
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-900);
+		flex-shrink: 0;
+	}
+
+	.mini-name {
+		color: var(--gray-500);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.mini-table .num {
+		text-align: right;
+		color: var(--gray-500);
+		white-space: nowrap;
+	}
+
+	.mini-table .litres {
+		color: var(--gray-800);
+		font-weight: var(--font-weight-semibold);
+	}
+
+	.more-note {
+		font-size: var(--text-xs);
+		color: var(--gray-400);
+		margin: 0.5rem 0 0;
+	}
+
+	/* ---- Monthly bars ---- */
+	.month-bars {
+		display: flex;
+		gap: 0.75rem;
+		height: 120px;
+	}
+
+	.month-cell {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-end;
+		align-items: center;
+		min-width: 0;
+	}
+
+	.month-value {
+		font-size: var(--text-xs);
+		color: var(--gray-500);
+		font-variant-numeric: tabular-nums;
+		margin-bottom: 3px;
+		white-space: nowrap;
+	}
+
+	.month-bar {
+		width: 100%;
+		max-width: 64px;
+		background: #cf96a0;
+		border-radius: 2px 2px 0 0;
+		min-height: 2px;
+	}
+
+	.month-cell:last-child .month-bar {
+		background: var(--brand-hover);
+	}
+
+	.month-label {
+		font-size: var(--text-xs);
+		color: var(--gray-400);
+		margin-top: 0.3rem;
+	}
+
+	/* ---- History table ---- */
+	.table-wrap {
+		overflow-x: auto;
+		margin: 0 -0.25rem;
+	}
+
+	.history-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--text-xs);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	.history-table th {
+		text-align: left;
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-500);
+		padding: 0.3rem 0.5rem;
+		border-bottom: 2px solid var(--gray-200);
+	}
+
+	.history-table td {
+		padding: 0.3rem 0.5rem;
+		border-bottom: 1px solid var(--gray-100);
+		color: var(--gray-700);
+	}
+
+	.history-table th.num,
+	.history-table td.num {
+		text-align: right;
+	}
+
+	.month-row td {
+		background: var(--gray-50);
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-600);
+		border-bottom: 1px solid var(--gray-200);
+		padding-top: 0.45rem;
+		padding-bottom: 0.45rem;
+	}
+
+	.month-total {
+		font-variant-numeric: tabular-nums;
+	}
+
+	.cell-date {
+		color: var(--gray-500);
+	}
+
+	.cell-litres {
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-900);
+	}
+
+	.cell-text {
+		max-width: 140px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.empty-note {
+		font-size: var(--text-sm);
+		color: var(--gray-400);
+		margin: 0;
+	}
+
+	@media (max-width: 768px) {
+		.month-bars {
+			height: 100px;
+		}
+	}
+</style>
