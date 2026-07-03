@@ -347,13 +347,20 @@
 		}
 	}
 
-	// ---- Drag-to-reorder within a day ----
-	// The attendant back-fills entries and occasionally gets two swapped.
-	// Dragging a card to its correct place calls reorder_fuel_entry, which
-	// positionally reassigns the day's times and rebuilds the bowser chains.
-	let dragging = $state<{ entryId: string; date: string; listEl: HTMLElement } | null>(null);
+	// ---- Drag-to-reorder within a day (Todoist-style) ----
+	// The dragged card follows the pointer 1:1; the other cards in the day
+	// slide up/down in real time to open the gap where it will land. On drop,
+	// reorder_fuel_entry positionally reassigns the day's times and rebuilds
+	// the bowser chains.
+	let dragging = $state<{ entryId: string; date: string } | null>(null);
+	let dragTransforms = $state<Record<string, number>>({}); // px translateY per entry id
 	let dropSlot = $state<number | null>(null); // insertion slot among the OTHER cards (0..n-1)
-	let dropBeforeEntryId = $state<string | null>(null); // card the indicator sits above; null = end
+
+	// Non-reactive drag geometry, cached at drag start (visual DOM order)
+	let dragCards: { id: string; top: number; height: number; mid: number }[] = [];
+	let dragIndex = 0;
+	let dragStartPointerY = 0;
+	let dragShift = 0; // distance neighbours slide: card height + list gap
 
 	function startDrag(e: PointerEvent, entryId: string, date: string) {
 		if (actingEntryId) return;
@@ -361,9 +368,24 @@
 		e.stopPropagation();
 		const listEl = (e.currentTarget as HTMLElement).closest('.entries-list') as HTMLElement | null;
 		if (!listEl) return;
-		dragging = { entryId, date, listEl };
+
+		const els = [...listEl.querySelectorAll<HTMLElement>('.entry-card')];
+		dragCards = els.map((el) => {
+			const r = el.getBoundingClientRect();
+			return { id: el.dataset.entryId || '', top: r.top, height: r.height, mid: r.top + r.height / 2 };
+		});
+		dragIndex = dragCards.findIndex((c) => c.id === entryId);
+		if (dragIndex === -1) return;
+
+		const self = dragCards[dragIndex];
+		const neighbour = dragCards[dragIndex + 1] ?? dragCards[dragIndex - 1];
+		const gap = neighbour ? Math.max(Math.abs(neighbour.top - self.top) - self.height, 0) : 8;
+		dragShift = self.height + gap;
+		dragStartPointerY = e.clientY;
+
+		dragging = { entryId, date };
 		dropSlot = null;
-		dropBeforeEntryId = null;
+		dragTransforms = {};
 		window.addEventListener('pointermove', onDragMove);
 		window.addEventListener('pointerup', onDragEnd);
 		window.addEventListener('pointercancel', cancelDrag);
@@ -372,41 +394,55 @@
 	function onDragMove(e: PointerEvent) {
 		if (!dragging) return;
 		e.preventDefault();
-		const others = [...dragging.listEl.querySelectorAll<HTMLElement>('.entry-card')].filter(
-			(c) => c.dataset.entryId !== dragging!.entryId
-		);
-		let slot = others.length;
-		for (let i = 0; i < others.length; i++) {
-			const r = others[i].getBoundingClientRect();
-			if (e.clientY < r.top + r.height / 2) {
-				slot = i;
-				break;
-			}
+		const dy = e.clientY - dragStartPointerY;
+		const center = dragCards[dragIndex].mid + dy;
+
+		const next: Record<string, number> = { [dragging.entryId]: dy };
+		let slot = 0;
+		for (let i = 0; i < dragCards.length; i++) {
+			if (i === dragIndex) continue;
+			const card = dragCards[i];
+			// A card below slides up once the dragged centre passes its midpoint;
+			// a card above slides down once the centre rises past its midpoint.
+			if (i > dragIndex && center > card.mid) next[card.id] = -dragShift;
+			if (i < dragIndex && center < card.mid) next[card.id] = dragShift;
+			// Others that remain visually above the dragged card define the slot
+			if (card.mid < center) slot++;
 		}
+		dragTransforms = next;
 		dropSlot = slot;
-		dropBeforeEntryId = others[slot]?.dataset.entryId ?? null;
 	}
 
-	function cancelDrag() {
-		dragging = null;
-		dropSlot = null;
-		dropBeforeEntryId = null;
+	function teardownDragListeners() {
 		window.removeEventListener('pointermove', onDragMove);
 		window.removeEventListener('pointerup', onDragEnd);
 		window.removeEventListener('pointercancel', cancelDrag);
 	}
 
+	function cancelDrag() {
+		teardownDragListeners();
+		dragging = null;
+		dropSlot = null;
+		dragTransforms = {};
+	}
+
 	async function onDragEnd() {
+		teardownDragListeners();
 		const drag = dragging;
 		const slot = dropSlot;
-		cancelDrag();
-		if (!drag || slot === null) return;
+
+		if (!drag || slot === null) {
+			cancelDrag();
+			return;
+		}
 
 		const day = dailySummaries.find((d) => d.date === drag.date);
-		if (!day) return;
-		const count = day.entries.length;
-		const currentVisual = day.entries.findIndex((en) => en.id === drag.entryId);
-		if (currentVisual === -1 || slot === currentVisual) return;
+		const count = day?.entries.length ?? 0;
+		const currentVisual = day?.entries.findIndex((en) => en.id === drag.entryId) ?? -1;
+		if (!day || currentVisual === -1 || slot === currentVisual) {
+			cancelDrag();
+			return;
+		}
 
 		// Insertion at slot s among the other cards = final visual index s.
 		// Visual list is newest-first, so chronological position = count - s.
@@ -424,6 +460,9 @@
 
 			summaryCacheStore.invalidate();
 			await loadEntries();
+			// Clear transforms only once the DOM holds the new order, so the
+			// cards the user arranged never visibly snap back.
+			cancelDrag();
 
 			const info = result.data;
 			if (info?.moved) {
@@ -435,6 +474,7 @@
 				setActionStatus('Entry already in that position.');
 			}
 		} catch (err) {
+			cancelDrag();
 			const message = err instanceof Error ? err.message : 'Failed to move entry';
 			setActionStatus(null, message);
 		} finally {
@@ -511,14 +551,13 @@
 					</div>
 
 					<!-- Entries for this day -->
-					<div class="entries-list">
+					<div class="entries-list" class:reordering={dragging?.date === daySummary.date}>
 						{#each daySummary.entries as entry, index (entry.id)}
 							<div
 								class="entry-card"
 								class:expanded={expandedEntry === entry.id}
-								class:dragging={dragging?.entryId === entry.id}
-								class:drop-before={dragging && dragging.entryId !== entry.id && dropBeforeEntryId === entry.id}
-								class:drop-after={dragging && dropBeforeEntryId === null && index === daySummary.entries.length - 1 && dragging.entryId !== entry.id}
+								class:drag-active={dragging?.entryId === entry.id}
+								style:transform={dragTransforms[entry.id] ? `translateY(${dragTransforms[entry.id]}px)` : undefined}
 								data-entry-id={entry.id}
 							>
 								<div class="entry-card-header" onclick={() => expandedEntry = expandedEntry === entry.id ? null : entry.id}>
@@ -856,17 +895,20 @@
 		cursor: grabbing;
 	}
 
-	.entry-card.dragging {
-		opacity: 0.45;
-		box-shadow: var(--shadow-lg);
+	/* While a drag is live, neighbours animate into their new slots… */
+	.entries-list.reordering .entry-card {
+		transition: transform 160ms ease;
 	}
 
-	.entry-card.drop-before {
-		box-shadow: 0 -3px 0 0 var(--brand);
-	}
-
-	.entry-card.drop-after {
-		box-shadow: 0 3px 0 0 var(--brand);
+	/* …but the dragged card itself tracks the pointer 1:1 (no easing lag) */
+	.entries-list.reordering .entry-card.drag-active {
+		transition: none;
+		position: relative;
+		z-index: 30;
+		scale: 1.02;
+		background-color: var(--white);
+		box-shadow: var(--shadow-xl);
+		cursor: grabbing;
 	}
 
 	.entry-card-header {
