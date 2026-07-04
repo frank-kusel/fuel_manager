@@ -587,13 +587,21 @@ function createFuelEntryWorkflowStore() {
 				// No need to update bowser reading or vehicle odometer separately
 				// These are now automatically derived from the fuel_entries table via views
 
-				update(state => ({ 
-					...state, 
-					isSubmitting: false, 
+				// The new entry must show up on the Log/Dashboard without a manual
+				// refresh — mark those caches stale (they keep rendering the old
+				// data and silently refetch).
+				if (!isOffline) {
+					const { markFuelDataStale } = await import('./freshness');
+					markFuelDataStale();
+				}
+
+				update(state => ({
+					...state,
+					isSubmitting: false,
 					loading: 'success',
 					error: null
 				}));
-				
+
 				// Return success result
 				return { success: true, data: result.data };
 				

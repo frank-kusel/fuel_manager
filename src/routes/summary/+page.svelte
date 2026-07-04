@@ -4,6 +4,7 @@
 	import supabaseService from '$lib/services/supabase';
 	import FuelEntryEditModal from '$lib/components/fuel/FuelEntryEditModal.svelte';
 	import { summaryCacheStore } from '$lib/stores/summary-cache';
+	import { markFuelDataStale, onVisible } from '$lib/stores/freshness';
 
 	interface FuelSummaryEntry {
 		id: string;
@@ -48,6 +49,10 @@
 			} else {
 				loadEntries();
 			}
+			// Coming back to a stale tab/phone: refresh quietly in the background
+			return onVisible(() => {
+				if (!summaryCacheStore.isCacheValid()) loadEntries(true);
+			});
 		}
 	});
 
@@ -327,7 +332,7 @@
 				expandedEntry = null;
 			}
 
-			summaryCacheStore.invalidate();
+			markFuelDataStale();
 			await loadEntries();
 			setActionStatus('Entry deleted — bowser chain recalculated.');
 		} catch (err) {
@@ -354,7 +359,7 @@
 
 	async function handleEntrySaved() {
 		closeEditModal();
-		summaryCacheStore.invalidate();
+		markFuelDataStale();
 		await loadEntries();
 		setActionStatus('Entry updated — changes cascaded to later readings.');
 	}
@@ -525,7 +530,7 @@
 				throw new Error(result.error);
 			}
 
-			summaryCacheStore.invalidate();
+			markFuelDataStale();
 			await loadEntries();
 			// Clear transforms only once the DOM holds the new order, so the
 			// cards the user arranged never visibly snap back.

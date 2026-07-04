@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import supabaseService from '$lib/services/supabase';
+	import { markFuelDataStale } from '$lib/stores/freshness';
 
 	/**
 	 * Month-end close — the monthly reconciliation ritual, dip-to-dip:
@@ -227,6 +228,7 @@
 			if (result.error) throw new Error(result.error);
 
 			const doneMsg = `${selected.label} ${isUpdate ? 'close updated' : 'closed'} — leak check ${signed(leakVariance)} L recorded.`;
+			markFuelDataStale(); // audit checklist + sidebar strip pick it up
 			await Promise.all([loadMonth(), loadHistory()]);
 			statusMsg = doneMsg; // loadMonth clears it, so set after the reload
 		} catch (err) {

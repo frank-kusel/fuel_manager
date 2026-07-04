@@ -22,6 +22,9 @@ interface SummaryCacheState {
 	entries: FuelSummaryEntry[];
 	fieldNamesMap: Record<string, string>;
 	timestamp: number | null;
+	/** Set by mutations: data is outdated but still renderable (SWR) —
+	 * pages keep showing it and refresh silently. */
+	stale: boolean;
 	loading: boolean;
 	error: string | null;
 }
@@ -33,6 +36,7 @@ const initialState: SummaryCacheState = {
 	entries: [],
 	fieldNamesMap: {},
 	timestamp: null,
+	stale: false,
 	loading: false,
 	error: null
 };
@@ -51,7 +55,8 @@ function loadPersisted(): SummaryCacheState {
 			...initialState,
 			entries: parsed.entries,
 			fieldNamesMap: parsed.fieldNamesMap || {},
-			timestamp: parsed.timestamp || null
+			timestamp: parsed.timestamp || null,
+			stale: !!parsed.stale
 		};
 	} catch {
 		return initialState;
@@ -66,7 +71,8 @@ function persist(state: SummaryCacheState) {
 			JSON.stringify({
 				entries: state.entries,
 				fieldNamesMap: state.fieldNamesMap,
-				timestamp: state.timestamp
+				timestamp: state.timestamp,
+				stale: state.stale
 			})
 		);
 	} catch {
@@ -80,11 +86,11 @@ function createSummaryCacheStore() {
 	return {
 		subscribe,
 
-		// Check if cache is still valid
+		// Check if cache is still valid (fresh and not marked stale by a mutation)
 		isCacheValid: (): boolean => {
 			let isValid = false;
 			subscribe(state => {
-				if (!state.timestamp) {
+				if (!state.timestamp || state.stale) {
 					isValid = false;
 					return;
 				}
@@ -99,7 +105,7 @@ function createSummaryCacheStore() {
 		getCachedData: (): { entries: FuelSummaryEntry[]; fieldNamesMap: Record<string, string> } | null => {
 			let result: { entries: FuelSummaryEntry[]; fieldNamesMap: Record<string, string> } | null = null;
 			subscribe(state => {
-				if (!state.timestamp) {
+				if (!state.timestamp || state.stale) {
 					result = null;
 					return;
 				}
@@ -145,7 +151,7 @@ function createSummaryCacheStore() {
 				result = {
 					entries: state.entries,
 					fieldNamesMap: state.fieldNamesMap,
-					fresh: Date.now() - state.timestamp < CACHE_DURATION
+					fresh: !state.stale && Date.now() - state.timestamp < CACHE_DURATION
 				};
 			})();
 			return result;
@@ -159,6 +165,7 @@ function createSummaryCacheStore() {
 					entries,
 					fieldNamesMap,
 					timestamp: Date.now(),
+					stale: false,
 					loading: false,
 					error: null
 				};
@@ -175,12 +182,14 @@ function createSummaryCacheStore() {
 			}));
 		},
 
-		// Invalidate cache (force reload)
+		// Mark stale: the next load refetches, but pages keep rendering the
+		// old data meanwhile (never a spinner over a populated list).
 		invalidate: () => {
-			update(state => ({
-				...state,
-				timestamp: null
-			}));
+			update(state => {
+				const next = { ...state, stale: true };
+				persist(next);
+				return next;
+			});
 		},
 
 		// Clear all data

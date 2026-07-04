@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import supabaseService from '$lib/services/supabase';
 	import FuelEntryEditModal from '$lib/components/fuel/FuelEntryEditModal.svelte';
-	import { summaryCacheStore } from '$lib/stores/summary-cache';
+	import { markFuelDataStale, onVisible } from '$lib/stores/freshness';
 	import {
 		referenceDataStore,
 		activeVehicles,
@@ -67,6 +67,8 @@
 		return { start: iso(start), end: iso(now) };
 	}
 
+	let lastLoadedAt = 0;
+
 	async function load(silent = false) {
 		if (!silent) loading = true;
 		error = null;
@@ -97,12 +99,17 @@
 			error = err instanceof Error ? err.message : 'Failed to load entries';
 		} finally {
 			loading = false;
+			lastLoadedAt = Date.now();
 		}
 	}
 
 	onMount(() => {
 		referenceDataStore.loadAllData();
 		load();
+		// Returning to a stale tab: silent refetch if the table is >3 min old
+		return onVisible(() => {
+			if (Date.now() - lastLoadedAt > 3 * 60 * 1000) load(true);
+		});
 	});
 
 	function setPeriod(p: PeriodKey) {
@@ -155,7 +162,7 @@
 		try {
 			const result = await supabaseService.reorderFuelEntry(e.id, targetPos);
 			if (result.error) throw new Error(result.error);
-			summaryCacheStore.invalidate();
+			markFuelDataStale();
 			await load(true);
 			showToast('ok', `Moved to #${targetPos} — bowser chains recalculated.`);
 		} catch (err) {
@@ -313,7 +320,7 @@
 				}
 				cancelEdit();
 			}
-			summaryCacheStore.invalidate();
+			markFuelDataStale();
 			flashRow(e.id, 'ok');
 		} catch (err) {
 			cancelEdit();
@@ -337,7 +344,7 @@
 
 	async function handleModalSaved() {
 		closeModal();
-		summaryCacheStore.invalidate();
+		markFuelDataStale();
 		await load(true);
 		showToast('ok', 'Entry updated.');
 	}
@@ -350,7 +357,7 @@
 		try {
 			const result = await supabaseService.softDeleteFuelEntry(e.id);
 			if (result.error) throw new Error(result.error);
-			summaryCacheStore.invalidate();
+			markFuelDataStale();
 			await load(true);
 			showToast('ok', 'Entry deleted — bowser chain recalculated.');
 		} catch (err) {

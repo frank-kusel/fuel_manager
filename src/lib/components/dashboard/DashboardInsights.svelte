@@ -6,12 +6,15 @@
 		insightsError
 	} from '$lib/stores/dashboard-insights';
 	import { referenceDataStore, activeVehicles, activeDrivers } from '$lib/stores/reference-data';
+	import { onVisible } from '$lib/stores/freshness';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
 	onMount(() => {
 		dashboardInsightsStore.load();
 		referenceDataStore.loadAllData(); // cached — powers the vehicle lookup
+		// Returning to a stale tab: TTL-respecting silent refresh
+		return onVisible(() => dashboardInsightsStore.load());
 	});
 
 	function openVehicle(vehicleId: string) {

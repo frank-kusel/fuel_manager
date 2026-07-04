@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/Button.svelte';
 	import supabaseService from '$lib/services/supabase';
+	import { markFuelDataStale } from '$lib/stores/freshness';
 
 	interface Props {
 		show: boolean;
@@ -38,6 +39,10 @@
 				dipstickReading = '';
 				dipstickNotes = '';
 				dipstickDate = new Date().toISOString().split('T')[0];
+
+				// Dips move the derived tank level everywhere — modal-level so
+				// FAB/sidebar launches count, not just the Tank page's onSuccess.
+				markFuelDataStale();
 
 				// Call success callback
 				if (onSuccess) onSuccess();

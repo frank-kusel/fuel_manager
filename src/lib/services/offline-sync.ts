@@ -143,19 +143,28 @@ class OfflineSyncService {
 		
 		try {
 			const entries = await this.getUnsyncedEntries();
-			
+
 			// Sort by timestamp for proper order
 			entries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-			
+
+			let syncedCount = 0;
 			for (const entry of entries) {
 				try {
 					await this.syncSingleEntry(entry);
 					await this.markAsSynced(entry.id);
+					syncedCount++;
 				} catch (error) {
 					console.error('Failed to sync entry:', entry.id, error);
 					// Create conflict resolution record
 					await this.createSyncConflict(entry, error);
 				}
+			}
+
+			// Freshly synced entries must show up on Log/Dashboard without a
+			// manual refresh.
+			if (syncedCount > 0) {
+				const { markFuelDataStale } = await import('$lib/stores/freshness');
+				markFuelDataStale();
 			}
 			
 			syncStatus.update(status => ({ 

@@ -1,8 +1,11 @@
-import type { PageServerLoad } from './$types';
+import type { PageLoad } from './$types';
 import supabaseService from '$lib/services/supabase';
 import { error } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ params }) => {
+// Universal load: runs in the browser on client-side navigation (direct
+// Supabase query, one hop) instead of round-tripping through a Netlify
+// function; still runs server-side for the first SSR render.
+export const load: PageLoad = async ({ params }) => {
 	const { id } = params;
 
 	await supabaseService.init();

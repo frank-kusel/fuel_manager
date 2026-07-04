@@ -7,6 +7,7 @@
 		insightsData,
 		insightsLoading
 	} from '$lib/stores/dashboard-insights';
+	import { onVisible } from '$lib/stores/freshness';
 
 	let showDipModal = $state(false);
 	let showRefillModal = $state(false);
@@ -41,6 +42,8 @@
 	onMount(() => {
 		dashboardInsightsStore.load();
 		loadHistory();
+		// Returning to a stale tab: TTL-respecting silent refresh
+		return onVisible(() => dashboardInsightsStore.load());
 	});
 
 	function refreshAll() {

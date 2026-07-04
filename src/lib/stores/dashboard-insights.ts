@@ -73,9 +73,36 @@ interface InsightsState {
 	loading: boolean;
 	error: string | null;
 	timestamp: number | null;
+	/** Set by mutations: data is outdated but still renderable (SWR). */
+	stale: boolean;
 }
 
 const CACHE_MS = 5 * 60 * 1000;
+const STORAGE_KEY = 'farmtrack_insights_cache_v1';
+
+// Hydrate from localStorage so a cold app-open paints the dashboard (and the
+// sidebar tank strip) instantly; fresh data replaces it silently.
+function loadPersisted(): { data: DashboardInsights | null; timestamp: number | null; stale: boolean } {
+	try {
+		if (typeof localStorage === 'undefined') return { data: null, timestamp: null, stale: false };
+		const raw = localStorage.getItem(STORAGE_KEY);
+		if (!raw) return { data: null, timestamp: null, stale: false };
+		const parsed = JSON.parse(raw);
+		if (!parsed.data) return { data: null, timestamp: null, stale: false };
+		return { data: parsed.data, timestamp: parsed.timestamp || null, stale: !!parsed.stale };
+	} catch {
+		return { data: null, timestamp: null, stale: false };
+	}
+}
+
+function persistInsights(data: DashboardInsights | null, timestamp: number | null, stale: boolean) {
+	try {
+		if (typeof localStorage === 'undefined') return;
+		localStorage.setItem(STORAGE_KEY, JSON.stringify({ data, timestamp, stale }));
+	} catch {
+		// Quota/private mode — cache stays in-memory only.
+	}
+}
 const OUTLIER_THRESHOLD_PCT = 15;
 const DIP_STALE_DAYS = 14;
 const BURN_WINDOW_DAYS = 14;
@@ -87,17 +114,25 @@ function isoDate(d: Date): string {
 }
 
 function createInsightsStore() {
+	const persisted = loadPersisted();
 	const { subscribe, update } = writable<InsightsState>({
-		data: null,
+		data: persisted.data,
 		loading: false,
 		error: null,
-		timestamp: null
+		timestamp: persisted.timestamp,
+		stale: persisted.stale
 	});
 
 	async function load(forceRefresh = false) {
 		let cached: InsightsState | undefined;
 		subscribe((s) => (cached = s))();
-		if (!forceRefresh && cached?.timestamp && Date.now() - cached.timestamp < CACHE_MS && cached.data) {
+		if (
+			!forceRefresh &&
+			!cached?.stale &&
+			cached?.timestamp &&
+			Date.now() - cached.timestamp < CACHE_MS &&
+			cached.data
+		) {
 			return;
 		}
 
@@ -384,25 +419,29 @@ function createInsightsStore() {
 
 			const monthLabel = monthStart.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
 
+			const freshData: DashboardInsights = {
+				monthLabel,
+				monthStart: monthStartIso,
+				totalLitres,
+				entryCount: entries.length,
+				prevMonthLitres,
+				momPct,
+				byActivity,
+				fleet,
+				attention,
+				tank,
+				daily,
+				brokenGaugeCount
+			};
+			const now2 = Date.now();
+			persistInsights(freshData, now2, false);
 			update((s) => ({
 				...s,
-				data: {
-					monthLabel,
-					monthStart: monthStartIso,
-					totalLitres,
-					entryCount: entries.length,
-					prevMonthLitres,
-					momPct,
-					byActivity,
-					fleet,
-					attention,
-					tank,
-					daily,
-					brokenGaugeCount
-				},
+				data: freshData,
 				loading: false,
 				error: null,
-				timestamp: Date.now()
+				timestamp: now2,
+				stale: false
 			}));
 		} catch (err) {
 			update((s) => ({
@@ -413,7 +452,16 @@ function createInsightsStore() {
 		}
 	}
 
-	return { subscribe, load };
+	/** Mark stale: pages keep rendering the cached insights, and the next
+	 * load() (mount or visibility) refetches in the background. */
+	function invalidate() {
+		update((s) => {
+			persistInsights(s.data, s.timestamp, true);
+			return { ...s, stale: true };
+		});
+	}
+
+	return { subscribe, load, invalidate };
 }
 
 export const dashboardInsightsStore = createInsightsStore();
