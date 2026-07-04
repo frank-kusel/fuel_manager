@@ -428,8 +428,9 @@
 					{#each displayRows as { e, num, dayCount, band } (e.id)}
 						<tr class:band class:flash-ok={rowFlash[e.id] === 'ok'} class:flash-err={rowFlash[e.id] === 'err'}>
 							<td class="cell-date" title={e.entry_date}>
-								{#if dayCount > 1}
-									<span class="order-btns">
+								<!-- Always rendered so single-entry days keep the same indent -->
+								<span class="order-btns">
+									{#if dayCount > 1}
 										<button
 											class="ord"
 											title="Move up (later in the day)"
@@ -442,8 +443,8 @@
 											disabled={num <= 1 || reordering}
 											onclick={() => reorder(e, num - 1, dayCount)}
 										>▼</button>
-									</span>
-								{/if}
+									{/if}
+								</span>
 								{fmtDay(e.entry_date)} <span class="day-num">#{num}</span>
 							</td>
 
@@ -766,6 +767,7 @@
 		display: inline-flex;
 		flex-direction: column;
 		vertical-align: middle;
+		width: 14px;
 		margin-right: 0.25rem;
 		opacity: 0;
 		transition: opacity 0.12s ease;
