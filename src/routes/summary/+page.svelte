@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
 	import supabaseService from '$lib/services/supabase';
 	import FuelEntryEditModal from '$lib/components/fuel/FuelEntryEditModal.svelte';
 	import { summaryCacheStore } from '$lib/stores/summary-cache';
@@ -35,6 +36,12 @@
 
 	onMount(() => {
 		if (browser) {
+			// Desktop reads the Log as the editable table — the card view is
+			// the phone experience (matches the ≥1024px sidebar breakpoint).
+			if (window.matchMedia('(min-width: 1024px)').matches) {
+				goto('/entries', { replaceState: true });
+				return;
+			}
 			// Stale-while-revalidate: render whatever cache exists (persisted
 			// across app opens via localStorage) instantly, then refresh in
 			// the background unless it's fresh (<5 min).

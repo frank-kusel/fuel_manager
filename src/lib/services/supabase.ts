@@ -354,7 +354,7 @@ class SupabaseService {
 			.from('fuel_entries')
 			.select(`
 				*,
-				vehicles!left (code, name, registration),
+				vehicles!left (code, name, registration, odometer_unit),
 				drivers!left (employee_code, name),
 				activities!left (code, name),
 				fields!left (code, name),

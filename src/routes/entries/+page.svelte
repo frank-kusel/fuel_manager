@@ -193,6 +193,17 @@
 		return nf1.format(v);
 	}
 
+	/** Odometer movement in the vehicle's own unit (km or hr). */
+	function usage(e: any): string {
+		if (e.gauge_working === false || e.odometer_start === null || e.odometer_end === null)
+			return '—';
+		const diff = e.odometer_end - e.odometer_start;
+		if (diff <= 0) return '—';
+		const unit = e.vehicles?.odometer_unit || 'km';
+		const isHours = unit === 'hours' || unit === 'hr';
+		return `${isHours ? nf1.format(diff) : nf.format(Math.round(diff))} ${isHours ? 'hr' : 'km'}`;
+	}
+
 	// Junction-first: multi-field entries have field_id = null, so the fields
 	// join is empty — the junction table is the source of truth.
 	function fieldCell(e: any): { text: string; multi: boolean } {
@@ -425,6 +436,7 @@
 						<th>Zone</th>
 						<th class="num">Odo start</th>
 						<th class="num">Odo end</th>
+						<th class="num">Usage</th>
 						<th class="num">Litres</th>
 						<th class="num">L/100</th>
 						<th class="num">Bowser</th>
@@ -554,6 +566,8 @@
 									{fmtNum(e.odometer_end)}
 								{/if}
 							</td>
+
+							<td class="num cell-ro">{usage(e)}</td>
 
 							<td class="ed num cell-litres" onclick={() => startEdit(e, 'litres_dispensed')}>
 								{#if isEditing(e.id, 'litres_dispensed')}
