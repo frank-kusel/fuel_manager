@@ -350,6 +350,7 @@
 		<!-- Manage -->
 		<h2 class="section-heading">Manage</h2>
 		<div class="manage-links">
+			<a href="/entries" class="manage-link">All entries</a>
 			<a href="/tools/database" class="manage-link">Database management</a>
 			<a href="/tools/reconciliations" class="manage-link">Month-end close</a>
 			<a href="/menu" class="manage-link">System settings</a>

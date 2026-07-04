@@ -5,6 +5,27 @@
 
 	const driver = $derived(data.driver);
 	const entries = $derived(data.entries as any[]); // newest first
+	const fieldNamesByEntry = $derived((data.fieldNamesByEntry || {}) as Record<string, string[]>);
+
+	// Junction fields first (multi-field entries have no field_id), then the
+	// direct field join, then the zone.
+	function location(e: any): string {
+		const junction = fieldNamesByEntry[e.id];
+		if (junction?.length) return junction.join(', ');
+		return e.fields?.name || e.zones?.name || '—';
+	}
+
+	/** Odometer movement for the entry, in the vehicle's own unit —
+	 * how long the machine actually ran that day. */
+	function usage(e: any): string {
+		if (e.gauge_working === false || e.odometer_start === null || e.odometer_end === null)
+			return '—';
+		const diff = e.odometer_end - e.odometer_start;
+		if (diff <= 0) return '—';
+		const unit = e.vehicles?.odometer_unit || 'km';
+		const isHours = unit === 'hours' || unit === 'hr';
+		return `${isHours ? nf1.format(diff) : nf.format(Math.round(diff))} ${isHours ? 'hr' : 'km'}`;
+	}
 
 	const nf = new Intl.NumberFormat('en-ZA');
 	const nf1 = new Intl.NumberFormat('en-ZA', {
@@ -208,23 +229,25 @@
 							<th>Date</th>
 							<th>Vehicle</th>
 							<th class="num">Litres</th>
+							<th class="num">Usage</th>
 							<th>Activity</th>
-							<th>Field</th>
+							<th>Location</th>
 						</tr>
 					</thead>
 					<tbody>
 						{#each monthGroups as group}
 							<tr class="month-row">
 								<td colspan="2">{group.label}</td>
-								<td colspan="3" class="num month-total">{nf1.format(group.litres)} L</td>
+								<td colspan="4" class="num month-total">{nf1.format(group.litres)} L</td>
 							</tr>
 							{#each group.entries as e}
 								<tr>
 									<td class="cell-date">{fmtDay(e.entry_date)}</td>
 									<td class="cell-text">{e.vehicles?.code || '—'}</td>
 									<td class="num cell-litres">{nf1.format(e.litres_dispensed)}</td>
+									<td class="num">{usage(e)}</td>
 									<td class="cell-text">{e.activities?.name || '—'}</td>
-									<td class="cell-text">{e.fields?.name || '—'}</td>
+									<td class="cell-text">{location(e)}</td>
 								</tr>
 							{/each}
 						{/each}

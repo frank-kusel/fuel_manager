@@ -20,9 +20,11 @@
 
 	interface CloseData {
 		closingDip: { reading_value: number; reading_date: string } | null;
-		openingDip: { reading_value: number; reading_date: string } | null;
-		deliveries: number;
-		dispensed: number;
+		opening: { value: number; source: 'close' | 'dip'; date: string } | null;
+		deliveriesToDip: number;
+		dispensedToDip: number;
+		deliveriesAfterDip: number;
+		dispensedAfterDip: number;
 		bowserStart: number;
 		bowserEnd: number;
 		monthDispensed: number;
@@ -112,25 +114,36 @@
 		loadMonth();
 	}
 
-	// ---- Derivation ----
-	let book = $derived.by(() => {
-		if (!data?.closingDip || !data?.openingDip) return null;
-		return data.openingDip.reading_value + data.deliveries - data.dispensed;
+	// ---- Derivation (running tally) ----
+	// Opening = previous month's carried-forward balance. Book at the dip
+	// date is compared against the dip (the leak check); movements after the
+	// dip carry into the month-end balance that next month opens from.
+	let bookAtDip = $derived.by(() => {
+		if (!data?.opening) return null;
+		return data.opening.value + data.deliveriesToDip - data.dispensedToDip;
 	});
 
-	let variance = $derived.by(() => {
-		if (book === null || !data?.closingDip) return null;
-		return book - data.closingDip.reading_value;
+	let leakVariance = $derived.by(() => {
+		if (bookAtDip === null || !data?.closingDip) return null;
+		return bookAtDip - data.closingDip.reading_value;
 	});
 
-	let variancePct = $derived.by(() => {
-		if (variance === null || !data?.closingDip || data.closingDip.reading_value === 0) return null;
-		return (variance / data.closingDip.reading_value) * 100;
+	let leakPct = $derived.by(() => {
+		if (leakVariance === null || !data?.closingDip || data.closingDip.reading_value === 0)
+			return null;
+		return (leakVariance / data.closingDip.reading_value) * 100;
+	});
+
+	let netAfterDip = $derived(data ? data.deliveriesAfterDip - data.dispensedAfterDip : 0);
+
+	let bookMonthEnd = $derived.by(() => {
+		if (bookAtDip === null) return null;
+		return bookAtDip + netAfterDip;
 	});
 
 	let varianceStatus = $derived.by(() => {
-		if (variancePct === null) return null;
-		const abs = Math.abs(variancePct);
+		if (leakPct === null) return null;
+		const abs = Math.abs(leakPct);
 		if (abs <= 2) return { key: 'good', label: 'Good' };
 		if (abs <= 5) return { key: 'acceptable', label: 'Acceptable' };
 		return { key: 'high', label: 'High variance' };
@@ -165,29 +178,46 @@
 	}
 
 	async function closeMonth() {
-		if (!data?.closingDip || !data?.openingDip || book === null || variance === null) return;
+		if (
+			!data?.closingDip ||
+			!data?.opening ||
+			bookAtDip === null ||
+			leakVariance === null ||
+			bookMonthEnd === null
+		)
+			return;
 
 		const isUpdate = !!data.existingClose;
 		const confirmed = confirm(
-			`${isUpdate ? 'Update the close for' : 'Close'} ${selected.label} with a variance of ` +
-				`${signed(variance)} L (${variancePct !== null ? signed(Math.round(variancePct * 100) / 100) : '—'}%)?\n\n` +
-				`Book ${nf1.format(book)} L vs dip ${nf1.format(data.closingDip.reading_value)} L.`
+			`${isUpdate ? 'Update the close for' : 'Close'} ${selected.label}?\n\n` +
+				`Leak check at dip (${data.closingDip.reading_date}): book ${nf1.format(bookAtDip)} L vs dip ${nf1.format(data.closingDip.reading_value)} L ` +
+				`= ${signed(leakVariance)} L (${leakPct !== null ? signed(Math.round(leakPct * 100) / 100) : '—'}%).\n\n` +
+				`Month-end balance carried forward: ${nf1.format(bookMonthEnd)} L.`
 		);
 		if (!confirmed) return;
 
 		closing = true;
 		error = null;
 		try {
+			const openingDesc =
+				data.opening.source === 'close'
+					? `opening carried from ${data.opening.date} close: ${nf1.format(data.opening.value)} L`
+					: `opening from dip ${data.opening.date}: ${nf1.format(data.opening.value)} L (no earlier close)`;
 			const composedNote =
-				`${selected.label} close · dips ${data.openingDip.reading_date} → ${data.closingDip.reading_date}` +
-				` · deliveries ${nf1.format(data.deliveries)} L · dispensed ${nf1.format(data.dispensed)} L` +
+				`${selected.label} close · ${openingDesc}` +
+				` · leak check at dip ${data.closingDip.reading_date}: ${signed(leakVariance)} L (${leakPct !== null ? signed(Math.round(leakPct * 100) / 100) : '—'}%)` +
+				` · deliveries ${nf1.format(data.deliveriesToDip + data.deliveriesAfterDip)} L` +
+				` · dispensed ${nf1.format(data.dispensedToDip + data.dispensedAfterDip)} L` +
 				` · meter ${nf1.format(data.bowserStart)} → ${nf1.format(data.bowserEnd)} L` +
 				(note.trim() ? ` · ${note.trim()}` : '');
 
 			const payload = {
 				reconciliationDate: selected.monthEnd,
-				calculatedLevel: Math.round(book * 10) / 10,
+				// The carried-forward balance — next month opens from this
+				calculatedLevel: Math.round(bookMonthEnd * 10) / 10,
 				measuredLevel: data.closingDip.reading_value,
+				// Sign-off judged on the leak check, not the month-end delta
+				accepted: leakPct !== null && Math.abs(leakPct) <= 5,
 				notes: composedNote
 			};
 
@@ -196,7 +226,7 @@
 				: await supabaseService.createTankReconciliation(payload);
 			if (result.error) throw new Error(result.error);
 
-			const doneMsg = `${selected.label} ${isUpdate ? 'close updated' : 'closed'} — variance ${signed(variance)} L recorded.`;
+			const doneMsg = `${selected.label} ${isUpdate ? 'close updated' : 'closed'} — leak check ${signed(leakVariance)} L recorded.`;
 			await Promise.all([loadMonth(), loadHistory()]);
 			statusMsg = doneMsg; // loadMonth clears it, so set after the reload
 		} catch (err) {
@@ -255,48 +285,66 @@
 				</div>
 			{/if}
 
-			{#if !data.closingDip}
+			{#if !data.opening}
+				<p class="empty-note">
+					Nothing to open from — no earlier close and no dipstick reading before
+					{selected.label}.
+				</p>
+			{:else if !data.closingDip}
 				<p class="empty-note">
 					No dipstick reading recorded in {selected.label} — a physical dip is needed to close
 					the month.
 				</p>
-				<a class="tank-link" href="/tank">Record a dip on the Tank page →</a>
-			{:else if !data.openingDip}
-				<p class="empty-note">
-					No earlier dipstick reading to open from — the first-ever dip can't be reconciled
-					against anything.
+				<p class="running-note">
+					Running book so far: {nf1.format(data.opening.value + data.deliveriesToDip - data.dispensedToDip)} L
+					(opening {nf1.format(data.opening.value)} L {data.opening.source === 'close' ? 'carried forward' : `from dip ${fmtDate(data.opening.date)}`})
 				</p>
+				<a class="tank-link" href="/tank">Record a dip on the Tank page →</a>
 			{:else}
 				<table class="ledger">
 					<tbody>
 						<tr>
-							<td>Opening — dip on {fmtDate(data.openingDip.reading_date)}</td>
-							<td class="val">{nf1.format(data.openingDip.reading_value)} L</td>
+							<td>
+								Opening — {data.opening.source === 'close'
+									? `carried from ${fmtDate(data.opening.date)} close`
+									: `dip on ${fmtDate(data.opening.date)} (no earlier close)`}
+							</td>
+							<td class="val">{nf1.format(data.opening.value)} L</td>
 						</tr>
 						<tr>
-							<td>+ Deliveries</td>
-							<td class="val">{nf1.format(data.deliveries)} L</td>
+							<td>+ Deliveries (to {fmtDate(data.closingDip.reading_date)})</td>
+							<td class="val">{nf1.format(data.deliveriesToDip)} L</td>
 						</tr>
 						<tr>
-							<td>− Dispensed</td>
-							<td class="val">{nf1.format(data.dispensed)} L</td>
+							<td>− Dispensed (to {fmtDate(data.closingDip.reading_date)})</td>
+							<td class="val">{nf1.format(data.dispensedToDip)} L</td>
 						</tr>
 						<tr class="ledger-total">
-							<td>= Book balance at {fmtDate(data.closingDip.reading_date)}</td>
-							<td class="val">{book !== null ? nf1.format(book) : '—'} L</td>
+							<td>= Book at dip, {fmtDate(data.closingDip.reading_date)}</td>
+							<td class="val">{bookAtDip !== null ? nf1.format(bookAtDip) : '—'} L</td>
 						</tr>
 						<tr>
 							<td>Dip on {fmtDate(data.closingDip.reading_date)}</td>
 							<td class="val">{nf1.format(data.closingDip.reading_value)} L</td>
 						</tr>
 						<tr class="ledger-variance {varianceStatus?.key || ''}">
-							<td>Variance</td>
+							<td>Variance — leak check</td>
 							<td class="val">
-								{variance !== null ? signed(variance) : '—'} L
-								{#if variancePct !== null}
-									({signed(Math.round(variancePct * 100) / 100)}%)
+								{leakVariance !== null ? signed(leakVariance) : '—'} L
+								{#if leakPct !== null}
+									({signed(Math.round(leakPct * 100) / 100)}%)
 								{/if}
 							</td>
+						</tr>
+						{#if data.deliveriesAfterDip > 0 || data.dispensedAfterDip > 0}
+							<tr>
+								<td>± Movements after dip ({fmtDate(data.closingDip.reading_date)} → month end)</td>
+								<td class="val">{signed(netAfterDip)} L</td>
+							</tr>
+						{/if}
+						<tr class="ledger-carry">
+							<td>= Month-end balance carried forward</td>
+							<td class="val">{bookMonthEnd !== null ? nf1.format(bookMonthEnd) : '—'} L</td>
 						</tr>
 					</tbody>
 				</table>
@@ -518,6 +566,19 @@
 
 	.ledger-variance.high td {
 		color: var(--error);
+	}
+
+	.ledger-carry td {
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-900);
+		border-top: 2px solid var(--gray-200);
+		border-bottom: none;
+	}
+
+	.running-note {
+		font-size: var(--text-xs);
+		color: var(--gray-400);
+		margin: 0.5rem 0 0;
 	}
 
 	.meter-line {

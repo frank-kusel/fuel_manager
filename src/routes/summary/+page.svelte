@@ -559,6 +559,7 @@
 		<div class="header-content">
 			<h1>Summary</h1>
 		</div>
+		<a class="table-view-link" href="/entries">Table view</a>
 		<button class="refresh-btn" onclick={handleRefresh} disabled={loading} title="Refresh data" aria-label="Refresh summary">
 			<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 				<path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
@@ -749,6 +750,30 @@
 		color: var(--color-text-primary);
 		margin: 0 0 0.5rem 0;
 		line-height: 1.2;
+	}
+
+	/* Desktop-only jump to the editable table view */
+	.table-view-link {
+		display: none;
+		font-size: var(--text-sm);
+		font-weight: 500;
+		color: var(--gray-500);
+		text-decoration: none;
+		border: 1px solid #e5e7eb;
+		border-radius: 0.5rem;
+		padding: 0.5rem 0.875rem;
+		margin-right: 0.5rem;
+	}
+
+	.table-view-link:hover {
+		color: var(--brand);
+		border-color: var(--brand-ring);
+	}
+
+	@media (min-width: 768px) {
+		.table-view-link {
+			display: inline-block;
+		}
 	}
 
 	.refresh-btn {

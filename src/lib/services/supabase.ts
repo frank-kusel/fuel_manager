@@ -358,10 +358,12 @@ class SupabaseService {
 				drivers!left (employee_code, name),
 				activities!left (code, name),
 				fields!left (code, name),
+				zones!left (code, name),
 				bowsers!left (name)
 			`)
 			.is('deleted_at', null)
-			.order('entry_date', { ascending: false });
+			.order('entry_date', { ascending: false })
+			.order('time', { ascending: false });
 
 		if (startDate) {
 			query = query.gte('entry_date', startDate);
@@ -1391,10 +1393,13 @@ class SupabaseService {
 
 	// variance and variance_percentage are GENERATED columns in the live table
 	// (calculated − measured, % relative to the measured dip) — never insert them.
+	// `accepted` can be passed in when the sign-off judgement is based on a
+	// different figure than calculated−measured (the leak check at dip date).
 	private tankReconciliationFields(data: {
 		reconciliationDate: string;
 		calculatedLevel: number;
 		measuredLevel: number;
+		accepted?: boolean;
 		notes?: string;
 	}) {
 		const variance = data.calculatedLevel - data.measuredLevel;
@@ -1404,7 +1409,7 @@ class SupabaseService {
 			reconciliation_date: data.reconciliationDate,
 			calculated_level: data.calculatedLevel,
 			measured_level: data.measuredLevel,
-			accepted: Math.abs(variancePct) <= 5,
+			accepted: data.accepted ?? Math.abs(variancePct) <= 5,
 			notes: data.notes
 		};
 	}
@@ -1413,6 +1418,7 @@ class SupabaseService {
 		reconciliationDate: string;
 		calculatedLevel: number;
 		measuredLevel: number;
+		accepted?: boolean;
 		notes?: string;
 	}): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();
@@ -1431,6 +1437,7 @@ class SupabaseService {
 			reconciliationDate: string;
 			calculatedLevel: number;
 			measuredLevel: number;
+			accepted?: boolean;
 			notes?: string;
 		}
 	): Promise<ApiResponse<any>> {
@@ -1519,16 +1526,22 @@ class SupabaseService {
 	}
 
 	/**
-	 * Everything the Month-end close screen needs for one month, dip-to-dip:
-	 * book = opening dip + deliveries − dispensed over (openingDate, closingDate].
-	 * Deliberately does NOT read tank_status (its snapshot row is broken) or
-	 * fuel_reconciliations (superseded — the bowser chain makes it tautological).
+	 * Everything the Month-end close screen needs for one month, as a RUNNING
+	 * TALLY: opening = previous month's carried-forward close balance, then
+	 * the month's movements, with the month's last dip as the leak check —
+	 * NOT the reference (a dip taken near month end would trivially agree
+	 * with a dip-anchored book). Movements are split at the dip date so the
+	 * leak check compares like with like, and the month-end balance carries
+	 * the post-dip movements forward. Deliberately does NOT read tank_status
+	 * (its snapshot row is broken) or fuel_reconciliations (superseded).
 	 */
 	async getMonthCloseData(monthStart: string, monthEnd: string): Promise<ApiResponse<{
 		closingDip: { reading_value: number; reading_date: string } | null;
-		openingDip: { reading_value: number; reading_date: string } | null;
-		deliveries: number;
-		dispensed: number;
+		opening: { value: number; source: 'close' | 'dip'; date: string } | null;
+		deliveriesToDip: number;
+		dispensedToDip: number;
+		deliveriesAfterDip: number;
+		dispensedAfterDip: number;
 		bowserStart: number;
 		bowserEnd: number;
 		monthDispensed: number;
@@ -1537,69 +1550,93 @@ class SupabaseService {
 		const client = this.ensureInitialized();
 
 		try {
-			const [closingRes, existingRes, meterRes] = await Promise.all([
-				client
-					.from('tank_readings')
-					.select('reading_value, reading_date')
-					.eq('reading_type', 'dipstick')
-					.gte('reading_date', monthStart)
-					.lte('reading_date', monthEnd)
-					.order('reading_date', { ascending: false })
-					.limit(1),
-				client
-					.from('tank_reconciliations')
-					.select('*')
-					.eq('reconciliation_date', monthEnd)
-					.order('created_at', { ascending: false })
-					.limit(1),
-				this.getDateRangeReconciliationData(monthStart, monthEnd)
-			]);
-			if (closingRes.error) throw new Error(closingRes.error.message);
-			if (existingRes.error) throw new Error(existingRes.error.message);
+			const [y, m] = monthStart.split('-').map(Number);
+			const prevEndDate = new Date(y, m - 1, 0); // last day of previous month
+			const prevEnd = `${prevEndDate.getFullYear()}-${String(prevEndDate.getMonth() + 1).padStart(2, '0')}-${String(prevEndDate.getDate()).padStart(2, '0')}`;
+
+			const [closingRes, existingRes, prevCloseRes, refillsRes, dispensedRes, meterRes] =
+				await Promise.all([
+					client
+						.from('tank_readings')
+						.select('reading_value, reading_date')
+						.eq('reading_type', 'dipstick')
+						.gte('reading_date', monthStart)
+						.lte('reading_date', monthEnd)
+						.order('reading_date', { ascending: false })
+						.limit(1),
+					client
+						.from('tank_reconciliations')
+						.select('*')
+						.eq('reconciliation_date', monthEnd)
+						.order('created_at', { ascending: false })
+						.limit(1),
+					client
+						.from('tank_reconciliations')
+						.select('calculated_level, reconciliation_date')
+						.eq('reconciliation_date', prevEnd)
+						.order('created_at', { ascending: false })
+						.limit(1),
+					client
+						.from('tank_refills')
+						.select('litres_added, delivery_date')
+						.gte('delivery_date', monthStart)
+						.lte('delivery_date', monthEnd),
+					client
+						.from('fuel_entries')
+						.select('litres_dispensed, entry_date')
+						.is('deleted_at', null)
+						.gte('entry_date', monthStart)
+						.lte('entry_date', monthEnd),
+					this.getDateRangeReconciliationData(monthStart, monthEnd)
+				]);
+			const firstError =
+				closingRes.error || existingRes.error || prevCloseRes.error || refillsRes.error || dispensedRes.error;
+			if (firstError) throw new Error(firstError.message);
 
 			const closingDip = closingRes.data?.[0] || null;
-			let openingDip: { reading_value: number; reading_date: string } | null = null;
-			let deliveries = 0;
-			let dispensed = 0;
 
-			if (closingDip) {
-				const openingRes = await client
+			// Opening balance: carried forward from the previous close; before
+			// the chain existed, fall back to the last dip before month start.
+			let opening: { value: number; source: 'close' | 'dip'; date: string } | null = null;
+			const prevClose = prevCloseRes.data?.[0] || null;
+			if (prevClose) {
+				opening = { value: prevClose.calculated_level || 0, source: 'close', date: prevEnd };
+			} else {
+				const fallbackRes = await client
 					.from('tank_readings')
 					.select('reading_value, reading_date')
 					.eq('reading_type', 'dipstick')
-					.lt('reading_date', closingDip.reading_date)
+					.lt('reading_date', monthStart)
 					.order('reading_date', { ascending: false })
 					.limit(1);
-				if (openingRes.error) throw new Error(openingRes.error.message);
-				openingDip = openingRes.data?.[0] || null;
+				if (fallbackRes.error) throw new Error(fallbackRes.error.message);
+				const dip = fallbackRes.data?.[0];
+				if (dip) opening = { value: dip.reading_value || 0, source: 'dip', date: dip.reading_date };
+			}
 
-				if (openingDip) {
-					const [refillsRes, dispensedRes] = await Promise.all([
-						client
-							.from('tank_refills')
-							.select('litres_added')
-							.gt('delivery_date', openingDip.reading_date)
-							.lte('delivery_date', closingDip.reading_date),
-						client
-							.from('fuel_entries')
-							.select('litres_dispensed')
-							.is('deleted_at', null)
-							.gt('entry_date', openingDip.reading_date)
-							.lte('entry_date', closingDip.reading_date)
-					]);
-					if (refillsRes.error) throw new Error(refillsRes.error.message);
-					if (dispensedRes.error) throw new Error(dispensedRes.error.message);
-					deliveries = (refillsRes.data || []).reduce((s, r) => s + (r.litres_added || 0), 0);
-					dispensed = (dispensedRes.data || []).reduce((s, e) => s + (e.litres_dispensed || 0), 0);
-				}
+			// Split the month's movements at the dip date (dip day inclusive)
+			const splitDate = closingDip?.reading_date ?? monthEnd;
+			let deliveriesToDip = 0;
+			let dispensedToDip = 0;
+			let deliveriesAfterDip = 0;
+			let dispensedAfterDip = 0;
+			for (const r of refillsRes.data || []) {
+				if (r.delivery_date <= splitDate) deliveriesToDip += r.litres_added || 0;
+				else deliveriesAfterDip += r.litres_added || 0;
+			}
+			for (const e of dispensedRes.data || []) {
+				if (e.entry_date <= splitDate) dispensedToDip += e.litres_dispensed || 0;
+				else dispensedAfterDip += e.litres_dispensed || 0;
 			}
 
 			return {
 				data: {
 					closingDip,
-					openingDip,
-					deliveries,
-					dispensed,
+					opening,
+					deliveriesToDip,
+					dispensedToDip,
+					deliveriesAfterDip,
+					dispensedAfterDip,
 					bowserStart: meterRes.data?.bowserStart ?? 0,
 					bowserEnd: meterRes.data?.bowserEnd ?? 0,
 					monthDispensed: meterRes.data?.fuelDispensed ?? 0,

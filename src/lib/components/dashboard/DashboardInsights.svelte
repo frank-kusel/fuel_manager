@@ -5,7 +5,7 @@
 		insightsLoading,
 		insightsError
 	} from '$lib/stores/dashboard-insights';
-	import { referenceDataStore, activeVehicles } from '$lib/stores/reference-data';
+	import { referenceDataStore, activeVehicles, activeDrivers } from '$lib/stores/reference-data';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
@@ -16,6 +16,10 @@
 
 	function openVehicle(vehicleId: string) {
 		goto(`/tools/database/vehicles/${vehicleId}`);
+	}
+
+	function openDriver(driverId: string) {
+		goto(`/tools/database/drivers/${driverId}`);
 	}
 
 	const nf = new Intl.NumberFormat('en-ZA');
@@ -184,21 +188,38 @@
 				{#if d.fleet.length === 0}
 					<p class="empty-note">No fuel entries yet this month.</p>
 				{/if}
-				{#if $activeVehicles.length > 0}
-					<select
-						class="vehicle-lookup"
-						aria-label="Look up a vehicle's fuel history"
-						onchange={(e) => {
-							const id = e.currentTarget.value;
-							if (id) openVehicle(id);
-						}}
-					>
-						<option value="">Look up a vehicle…</option>
-						{#each $activeVehicles as v}
-							<option value={v.id}>{v.code} — {v.name}</option>
-						{/each}
-					</select>
-				{/if}
+				<div class="lookup-row">
+					{#if $activeVehicles.length > 0}
+						<select
+							class="lookup-select"
+							aria-label="Look up a vehicle's fuel history"
+							onchange={(e) => {
+								const id = e.currentTarget.value;
+								if (id) openVehicle(id);
+							}}
+						>
+							<option value="">Vehicle history…</option>
+							{#each $activeVehicles as v}
+								<option value={v.id}>{v.code} — {v.name}</option>
+							{/each}
+						</select>
+					{/if}
+					{#if $activeDrivers.length > 0}
+						<select
+							class="lookup-select"
+							aria-label="Look up a driver's fuel history"
+							onchange={(e) => {
+								const id = e.currentTarget.value;
+								if (id) openDriver(id);
+							}}
+						>
+							<option value="">Driver history…</option>
+							{#each $activeDrivers as d}
+								<option value={d.id}>{d.employee_code} — {d.name}</option>
+							{/each}
+						</select>
+					{/if}
+				</div>
 			</section>
 
 			<!-- Needs attention -->
@@ -497,9 +518,23 @@
 		margin: 0;
 	}
 
-	.vehicle-lookup {
-		width: 100%;
+	.lookup-row {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
 		margin-top: 0.625rem;
+	}
+
+	@media (min-width: 480px) {
+		.lookup-row {
+			flex-direction: row;
+		}
+	}
+
+	.lookup-select {
+		flex: 1;
+		min-width: 0;
+		width: 100%;
 		padding: 0.45rem 0.6rem;
 		border: 1px solid var(--gray-200);
 		border-radius: var(--radius-md);
@@ -509,7 +544,7 @@
 		cursor: pointer;
 	}
 
-	.vehicle-lookup:focus {
+	.lookup-select:focus {
 		outline: none;
 		border-color: var(--brand-ring);
 	}

@@ -5,6 +5,15 @@
 
 	const vehicle = $derived(data.vehicle);
 	const entries = $derived(data.entries as any[]); // newest first
+	const fieldNamesByEntry = $derived((data.fieldNamesByEntry || {}) as Record<string, string[]>);
+
+	// Junction fields first (multi-field entries have no field_id), then the
+	// direct field join, then the zone.
+	function location(e: any): string {
+		const junction = fieldNamesByEntry[e.id];
+		if (junction?.length) return junction.join(', ');
+		return e.fields?.name || e.zones?.name || '—';
+	}
 
 	const nf = new Intl.NumberFormat('en-ZA');
 	const nf1 = new Intl.NumberFormat('en-ZA', {
@@ -296,7 +305,7 @@
 							<th class="num">{isHours ? 'Hours' : 'Odometer'}</th>
 							<th class="num">Usage</th>
 							<th>Activity</th>
-							<th>Field</th>
+							<th>Location</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -318,7 +327,7 @@
 									</td>
 									<td class="num">{usage(e)}</td>
 									<td class="cell-text">{e.activities?.name || '—'}</td>
-									<td class="cell-text">{e.fields?.name || '—'}</td>
+									<td class="cell-text">{location(e)}</td>
 								</tr>
 							{/each}
 						{/each}
