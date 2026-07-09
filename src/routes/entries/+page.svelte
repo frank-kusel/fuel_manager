@@ -121,9 +121,62 @@
 		if (customStart && customEnd) load();
 	}
 
-	// ---- Display rows: vehicle filter, per-day numbers, day banding ----
+	// ---- Excel-style column filters (checkbox popovers in the header) ----
+	type FilterCol = 'vehicle' | 'driver' | 'activity' | 'field';
+	const FILTER_COLS: FilterCol[] = ['vehicle', 'driver', 'activity', 'field'];
+
+	// null = no filter (everything shown); otherwise the checked values
+	let colFilters = $state<Record<FilterCol, string[] | null>>({
+		vehicle: null,
+		driver: null,
+		activity: null,
+		field: null
+	});
+	let openFilter = $state<FilterCol | null>(null);
+
+	function cellValueFor(col: FilterCol, e: any): string {
+		if (col === 'vehicle') return e.vehicles?.code || '—';
+		if (col === 'driver') return e.drivers?.name || '—';
+		if (col === 'activity') return e.activities?.name || '—';
+		return fieldCell(e).text; // field
+	}
+
+	/** Distinct values for a column's popover, from the period's entries
+	 * (respecting the toolbar vehicle filter but not this column's own). */
+	function filterOptions(col: FilterCol): string[] {
+		const base = vehicleFilter ? entries.filter((e) => e.vehicle_id === vehicleFilter) : entries;
+		return [...new Set(base.map((e) => cellValueFor(col, e)))].sort();
+	}
+
+	function isChecked(col: FilterCol, val: string): boolean {
+		return colFilters[col] === null || colFilters[col]!.includes(val);
+	}
+
+	function toggleFilterValue(col: FilterCol, val: string) {
+		const options = filterOptions(col);
+		const current = colFilters[col] ?? options; // null = all checked
+		const next = current.includes(val) ? current.filter((v) => v !== val) : [...current, val];
+		colFilters = { ...colFilters, [col]: next.length >= options.length ? null : next };
+	}
+
+	function setAll(col: FilterCol, checked: boolean) {
+		colFilters = { ...colFilters, [col]: checked ? null : [] };
+	}
+
+	let anyColFilter = $derived(FILTER_COLS.some((c) => colFilters[c] !== null));
+
+	function clearAllFilters() {
+		colFilters = { vehicle: null, driver: null, activity: null, field: null };
+		openFilter = null;
+	}
+
+	// ---- Display rows: filters, per-day numbers, day banding ----
 	const displayRows = $derived.by(() => {
-		const list = vehicleFilter ? entries.filter((e) => e.vehicle_id === vehicleFilter) : entries;
+		let list = vehicleFilter ? entries.filter((e) => e.vehicle_id === vehicleFilter) : entries;
+		for (const col of FILTER_COLS) {
+			const f = colFilters[col];
+			if (f !== null) list = list.filter((e) => f.includes(cellValueFor(col, e)));
+		}
 
 		// Chronological number within each day (list is date desc, time desc)
 		const numById = new Map<string, number>();
@@ -412,8 +465,20 @@
 			<span class="totals">
 				{displayRows.length} {displayRows.length === 1 ? 'entry' : 'entries'} · {nf.format(Math.round(totalLitres))} L
 			</span>
+			{#if anyColFilter}
+				<button class="clear-filters" onclick={clearAllFilters}>✕ Clear filters</button>
+			{/if}
 		</div>
 	</div>
+
+	{#if openFilter}
+		<!-- click-away for the open column filter -->
+		<div
+			class="flt-overlay"
+			onclick={() => (openFilter = null)}
+			role="presentation"
+		></div>
+	{/if}
 
 	{#if error}
 		<div class="error-banner">{error}</div>
@@ -421,18 +486,57 @@
 
 	{#if loading && entries.length === 0}
 		<div class="skeleton" style="height: 20rem"></div>
-	{:else if displayRows.length === 0}
+	{:else if displayRows.length === 0 && !anyColFilter}
 		<div class="panel"><p class="empty-note">No entries in this period.</p></div>
 	{:else}
+		{#snippet filterTh(label: string, col: FilterCol)}
+			<th class="filterable">
+				<span class="th-wrap">
+					{label}
+					<button
+						class="flt-btn"
+						class:on={colFilters[col] !== null}
+						title="Filter {label.toLowerCase()}"
+						onclick={(ev) => {
+							ev.stopPropagation();
+							openFilter = openFilter === col ? null : col;
+						}}
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill={colFilters[col] !== null ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+					</button>
+				</span>
+				{#if openFilter === col}
+					<div class="flt-menu" role="menu">
+						<div class="flt-actions">
+							<button onclick={() => setAll(col, true)}>All</button>
+							<button onclick={() => setAll(col, false)}>None</button>
+						</div>
+						<div class="flt-list">
+							{#each filterOptions(col) as val}
+								<label class="flt-opt">
+									<input
+										type="checkbox"
+										checked={isChecked(col, val)}
+										onchange={() => toggleFilterValue(col, val)}
+									/>
+									<span>{val}</span>
+								</label>
+							{/each}
+						</div>
+					</div>
+				{/if}
+			</th>
+		{/snippet}
+
 		<div class="table-wrap panel">
 			<table class="grid">
 				<thead>
 					<tr>
 						<th>Date</th>
-						<th>Vehicle</th>
-						<th>Driver</th>
-						<th>Activity</th>
-						<th>Field</th>
+						{@render filterTh('Vehicle', 'vehicle')}
+						{@render filterTh('Driver', 'driver')}
+						{@render filterTh('Activity', 'activity')}
+						{@render filterTh('Field', 'field')}
 						<th>Zone</th>
 						<th class="num">Odo start</th>
 						<th class="num">Odo end</th>
@@ -444,6 +548,9 @@
 					</tr>
 				</thead>
 				<tbody>
+					{#if displayRows.length === 0}
+						<tr><td colspan="13" class="no-match">No entries match the filters.</td></tr>
+					{/if}
 					{#each displayRows as { e, num, dayCount, band } (e.id)}
 						<tr class:band class:flash-ok={rowFlash[e.id] === 'ok'} class:flash-err={rowFlash[e.id] === 'err'}>
 							<td class="cell-date" title={e.entry_date}>
@@ -468,71 +575,80 @@
 							</td>
 
 							<td class="ed" onclick={() => startEdit(e, 'vehicle_id')}>
+								<span class="cell-val" class:under-editor={isEditing(e.id, 'vehicle_id')}>
+									<span class="v-code">{e.vehicles?.code || '—'}</span>
+									<span class="v-name">{e.vehicles?.name || ''}</span>
+								</span>
 								{#if isEditing(e.id, 'vehicle_id')}
-									<select bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
+									<select class="cell-editor" bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
 										{#each $activeVehicles as v}
 											<option value={v.id}>{v.code} — {v.name}</option>
 										{/each}
 									</select>
-								{:else}
-									<span class="v-code">{e.vehicles?.code || '—'}</span>
-									<span class="v-name">{e.vehicles?.name || ''}</span>
 								{/if}
 							</td>
 
 							<td class="ed" onclick={() => startEdit(e, 'driver_id')}>
+								<span class="cell-val" class:under-editor={isEditing(e.id, 'driver_id')}>
+									{e.drivers?.name || '—'}
+								</span>
 								{#if isEditing(e.id, 'driver_id')}
-									<select bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
+									<select class="cell-editor" bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
 										{#each $activeDrivers as d}
 											<option value={d.id}>{d.name}</option>
 										{/each}
 									</select>
-								{:else}
-									{e.drivers?.name || '—'}
 								{/if}
 							</td>
 
 							<td class="ed" onclick={() => startEdit(e, 'activity_id')}>
+								<span class="cell-val" class:under-editor={isEditing(e.id, 'activity_id')}>
+									{e.activities?.name || '—'}
+								</span>
 								{#if isEditing(e.id, 'activity_id')}
-									<select bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
+									<select class="cell-editor" bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
 										{#each activeActivities as a}
 											<option value={a.id}>{a.name}</option>
 										{/each}
 									</select>
-								{:else}
-									{e.activities?.name || '—'}
 								{/if}
 							</td>
 
 							<td class="ed" onclick={() => startEdit(e, 'field')}>
+								<span class="cell-val" class:under-editor={isEditing(e.id, 'field')}>
+									<span class:multi-field={fieldCell(e).multi}>{fieldCell(e).text}</span>
+								</span>
 								{#if isEditing(e.id, 'field')}
-									<select bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
+									<select class="cell-editor" bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
 										{#each activeFields as f}
 											<option value={f.id}>{f.name}</option>
 										{/each}
 									</select>
-								{:else}
-									{@const fc = fieldCell(e)}
-									<span class:multi-field={fc.multi}>{fc.text}</span>
 								{/if}
 							</td>
 
 							<td class="ed" onclick={() => startEdit(e, 'zone_id')}>
+								<span class="cell-val" class:under-editor={isEditing(e.id, 'zone_id')}>
+									{e.zones?.name || '—'}
+								</span>
 								{#if isEditing(e.id, 'zone_id')}
-									<select bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
+									<select class="cell-editor" bind:value={editValue} onchange={() => commitEdit(e)} onblur={cancelEdit} use:focusInput>
 										<option value="">—</option>
 										{#each activeZones as z}
 											<option value={z.id}>{z.name}</option>
 										{/each}
 									</select>
-								{:else}
-									{e.zones?.name || '—'}
 								{/if}
 							</td>
 
 							<td class="ed num" class:gauge-bad={e.gauge_working === false} onclick={() => startEdit(e, 'odometer_start')}>
+								<span class="cell-val" class:under-editor={isEditing(e.id, 'odometer_start')}>
+									{fmtNum(e.odometer_start)}
+									{#if e.gauge_working === false}<span class="gauge-warn" title="Gauge broken">⚠</span>{/if}
+								</span>
 								{#if isEditing(e.id, 'odometer_start')}
 									<input
+										class="cell-editor"
 										type="number"
 										step="any"
 										bind:value={editValue}
@@ -543,15 +659,16 @@
 										}}
 										onblur={() => commitEdit(e)}
 									/>
-								{:else}
-									{fmtNum(e.odometer_start)}
-									{#if e.gauge_working === false}<span class="gauge-warn" title="Gauge broken">⚠</span>{/if}
 								{/if}
 							</td>
 
 							<td class="ed num" class:gauge-bad={e.gauge_working === false} onclick={() => startEdit(e, 'odometer_end')}>
+								<span class="cell-val" class:under-editor={isEditing(e.id, 'odometer_end')}>
+									{fmtNum(e.odometer_end)}
+								</span>
 								{#if isEditing(e.id, 'odometer_end')}
 									<input
+										class="cell-editor"
 										type="number"
 										step="any"
 										bind:value={editValue}
@@ -562,16 +679,18 @@
 										}}
 										onblur={() => commitEdit(e)}
 									/>
-								{:else}
-									{fmtNum(e.odometer_end)}
 								{/if}
 							</td>
 
 							<td class="num cell-ro">{usage(e)}</td>
 
 							<td class="ed num cell-litres" onclick={() => startEdit(e, 'litres_dispensed')}>
+								<span class="cell-val" class:under-editor={isEditing(e.id, 'litres_dispensed')}>
+									{nf1.format(e.litres_dispensed)}
+								</span>
 								{#if isEditing(e.id, 'litres_dispensed')}
 									<input
+										class="cell-editor"
 										type="number"
 										step="any"
 										min="0"
@@ -583,8 +702,6 @@
 										}}
 										onblur={() => commitEdit(e)}
 									/>
-								{:else}
-									{nf1.format(e.litres_dispensed)}
 								{/if}
 							</td>
 
@@ -873,6 +990,7 @@
 	td.ed {
 		cursor: pointer;
 		color: var(--gray-800);
+		position: relative;
 	}
 
 	td.ed:hover {
@@ -880,12 +998,20 @@
 		border-radius: 3px;
 	}
 
-	td.ed select,
-	td.ed input {
-		width: 100%;
-		min-width: 90px;
-		padding: 0.2rem 0.3rem;
-		border: 1px solid var(--brand-ring);
+	/* The display value stays in the flow (keeps the column width stable);
+	 * the editor floats over it, so nothing jumps while editing. */
+	.cell-val.under-editor {
+		visibility: hidden;
+	}
+
+	.cell-editor {
+		position: absolute;
+		inset: 2px;
+		width: calc(100% - 4px);
+		height: calc(100% - 4px);
+		box-sizing: border-box;
+		padding: 0 0.3rem;
+		border: 1px solid var(--brand);
 		border-radius: 3px;
 		font-size: var(--text-sm);
 		font-family: inherit;
@@ -893,13 +1019,134 @@
 		color: var(--gray-800);
 	}
 
-	td.ed input[type='number'] {
+	td.ed input.cell-editor[type='number'] {
 		text-align: right;
 	}
 
-	td.ed select:focus,
-	td.ed input:focus {
+	.cell-editor:focus {
 		outline: none;
+	}
+
+	/* ---- Column filters (Excel-style header popovers) ---- */
+	th.filterable {
+		position: relative;
+	}
+
+	.th-wrap {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.flt-btn {
+		border: none;
+		background: none;
+		color: var(--gray-300);
+		cursor: pointer;
+		padding: 0.1rem 0.2rem;
+		line-height: 1;
+	}
+
+	.flt-btn:hover {
+		color: var(--gray-600);
+	}
+
+	.flt-btn.on {
+		color: var(--brand);
+	}
+
+	.flt-menu {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		z-index: 20;
+		min-width: 200px;
+		max-width: 280px;
+		background: var(--white);
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-md);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+		font-weight: 400;
+		text-transform: none;
+	}
+
+	.flt-actions {
+		display: flex;
+		gap: 0.375rem;
+		padding: 0.45rem 0.6rem;
+		border-bottom: 1px solid var(--gray-100);
+	}
+
+	.flt-actions button {
+		border: 1px solid var(--gray-200);
+		background: var(--white);
+		border-radius: var(--radius-full);
+		font-size: var(--text-xs);
+		color: var(--gray-600);
+		padding: 0.15rem 0.6rem;
+		cursor: pointer;
+	}
+
+	.flt-actions button:hover {
+		border-color: var(--brand-ring);
+		color: var(--brand);
+	}
+
+	.flt-list {
+		max-height: 260px;
+		overflow-y: auto;
+		padding: 0.25rem 0;
+	}
+
+	.flt-opt {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.25rem 0.6rem;
+		font-size: var(--text-sm);
+		color: var(--gray-700);
+		cursor: pointer;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.flt-opt:hover {
+		background: var(--gray-50);
+	}
+
+	.flt-opt input {
+		accent-color: var(--brand);
+		flex-shrink: 0;
+	}
+
+	.flt-overlay {
+		/* Below the sticky header (z 2) so the open menu inside a th stays
+		 * clickable, above the static table body so any other click closes. */
+		position: fixed;
+		inset: 0;
+		z-index: 1;
+		background: transparent;
+	}
+
+	.no-match {
+		text-align: center;
+		color: var(--gray-400);
+		padding: 1.25rem !important;
+	}
+
+	.clear-filters {
+		border: 1px solid var(--gray-200);
+		background: var(--white);
+		border-radius: var(--radius-full);
+		font-size: var(--text-xs);
+		color: var(--brand);
+		padding: 0.25rem 0.7rem;
+		cursor: pointer;
+	}
+
+	.clear-filters:hover {
+		border-color: var(--brand-ring);
 	}
 
 	.cell-actions {
