@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { formatNumber } from '$lib/utils/formatting';
+	const formatNumber1 = (n: number) => formatNumber(n, 1);
 	import { onMount } from 'svelte';
 	import VehicleSelection from './steps/VehicleSelection.svelte';
 	import DriverSelection from './steps/DriverSelection.svelte';
@@ -363,20 +365,20 @@
 					{#if $workflowData.odometerStart !== null}
 						<div class="review-row">
 							<span class="review-label">ODO Start</span>
-							<span class="review-value">{new Intl.NumberFormat('en-US').format($workflowData.odometerStart)} km</span>
+							<span class="review-value">{formatNumber($workflowData.odometerStart)} km</span>
 						</div>
 					{/if}
 					
 					{#if $workflowData.gaugeWorking && $workflowData.odometerEnd !== null}
 						<div class="review-row">
 							<span class="review-label">ODO End</span>
-							<span class="review-value">{new Intl.NumberFormat('en-US').format($workflowData.odometerEnd)} km</span>
+							<span class="review-value">{formatNumber($workflowData.odometerEnd)} km</span>
 						</div>
 						
 						{#if $workflowData.odometerStart !== null}
 							<div class="review-row">
 								<span class="review-label">Distance</span>
-								<span class="review-value">{new Intl.NumberFormat('en-US').format($workflowData.odometerEnd - $workflowData.odometerStart)} km</span>
+								<span class="review-value">{formatNumber($workflowData.odometerEnd - $workflowData.odometerStart)} km</span>
 							</div>
 						{/if}
 					{:else if !$workflowData.gaugeWorking}
@@ -391,14 +393,14 @@
 						{#if $workflowData.bowserReadingStart !== null}
 							<div class="review-row">
 								<span class="review-label">Bowser Start</span>
-								<span class="review-value">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format($workflowData.bowserReadingStart)} L</span>
+								<span class="review-value">{formatNumber1($workflowData.bowserReadingStart)} L</span>
 							</div>
 						{/if}
 						
 						{#if $workflowData.bowserReadingEnd !== null}
 							<div class="review-row">
 								<span class="review-label">Bowser End</span>
-								<span class="review-value">{new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format($workflowData.bowserReadingEnd)} L</span>
+								<span class="review-value">{formatNumber1($workflowData.bowserReadingEnd)} L</span>
 							</div>
 						{/if}
 					{/if}
@@ -406,7 +408,7 @@
 					<!-- Fuel Info - Highlighted -->
 					{#if $workflowData.bowser && $workflowData.litresDispensed}
 						<div class="fuel-total">
-							<span class="fuel-amount">{new Intl.NumberFormat('en-US').format($workflowData.litresDispensed)}</span>
+							<span class="fuel-amount">{formatNumber($workflowData.litresDispensed)}</span>
 							<span class="fuel-unit">L</span>
 						</div>
 					{/if}

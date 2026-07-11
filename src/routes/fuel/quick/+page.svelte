@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '$lib/utils/formatting';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import type { Vehicle, Driver, Activity, Field, Zone, Bowser } from '$lib/types';
@@ -437,7 +438,7 @@
 				</div>
 				{#if distance !== null}
 					<p class="computed-note" class:negative={distance <= 0}>
-						Distance: <strong>{new Intl.NumberFormat('en-US').format(distance)} km</strong>
+						Distance: <strong>{formatNumber(distance)} km</strong>
 					</p>
 				{/if}
 			{:else}

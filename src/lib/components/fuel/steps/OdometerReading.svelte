@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber as fmtNumber } from '$lib/utils/formatting';
 	import type { Vehicle } from '$lib/types';
 	
 	interface Props {
@@ -104,11 +105,9 @@
 		updateParent();
 	}
 
-	// Number formatting function - spaces for thousands, period for decimal
 	function formatNumber(num: number | null): string {
 		if (num === null || num === undefined || isNaN(num)) return 'No reading';
-		// Format with US locale to ensure period for decimal, then replace commas with spaces
-		return new Intl.NumberFormat('en-US').format(num).replace(/,/g, ' ');
+		return fmtNumber(num);
 	}
 </script>
 
@@ -162,7 +161,7 @@
 				<!-- Distance Display - below new input -->
 				{#if distance && distance > 0}
 					<div class="distance-stat">
-						+{new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(distance).replace(/,/g, ' ')}
+						+{fmtNumber(distance, 1)}
 					</div>
 				{/if}
 			</div>

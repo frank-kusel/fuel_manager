@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber as fmtNumber } from '$lib/utils/formatting';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
@@ -217,18 +218,12 @@
 	function formatOdometerValue(value: number | null, gaugeWorking: boolean | null): string {
 		if (gaugeWorking === false) return 'Broken';
 		if (value === null || value === undefined) return 'N/A';
-		return value.toLocaleString('en-US', {
-			minimumFractionDigits: 1,
-			maximumFractionDigits: 1
-		}).replace(/,/g, ' ');
+		return fmtNumber(value, 1);
 	}
 
 	function formatNumber(value: number | null): string {
 		if (value === null || value === undefined) return '-';
-		return value.toLocaleString('en-US', {
-			minimumFractionDigits: 1,
-			maximumFractionDigits: 1
-		}).replace(/,/g, ' ');
+		return fmtNumber(value, 1);
 	}
 
 	// Get location display for an entry (prioritizes junction table since field_id is deprecated)
@@ -620,11 +615,11 @@
 							<div class="bowser-readings">
 								<div class="bowser-reading">
 									<span class="bowser-label">Opening</span>
-									<span class="bowser-value">{daySummary.openingReading.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, ' ')}</span>
+									<span class="bowser-value">{fmtNumber(daySummary.openingReading, 1)}</span>
 								</div>
 								<div class="bowser-reading">
 									<span class="bowser-label">Closing</span>
-									<span class="bowser-value">{daySummary.closingReading.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).replace(/,/g, ' ')}</span>
+									<span class="bowser-value">{fmtNumber(daySummary.closingReading, 1)}</span>
 								</div>
 							</div>
 						{/if}

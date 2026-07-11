@@ -2,6 +2,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import supabaseService from '$lib/services/supabase';
 	import { markFuelDataStale } from '$lib/stores/freshness';
+	import { toast } from '$lib/stores/toast';
 
 	interface Props {
 		show: boolean;
@@ -24,7 +25,7 @@
 		if (!refillLitres) return;
 		// Never allow a future delivery date (month-flip mistake in the picker)
 		if (refillDate > new Date().toLocaleDateString('en-CA')) {
-			alert('Delivery date cannot be in the future — check the month on the calendar.');
+			toast.error('Delivery date cannot be in the future — check the month on the calendar.');
 			return;
 		}
 
@@ -53,16 +54,18 @@
 				// so FAB/sidebar launches count, not just the Tank page's onSuccess.
 				markFuelDataStale();
 
+				toast.success('Delivery saved');
+
 				// Call success callback
 				if (onSuccess) onSuccess();
 
 				// Close modal
 				onClose();
 			} else {
-				alert('Failed to save refill: ' + result.error);
+				toast.error('Failed to save refill: ' + result.error);
 			}
 		} catch (error) {
-			alert('Failed to save refill');
+			toast.error('Failed to save refill');
 		}
 		submitting = false;
 	}

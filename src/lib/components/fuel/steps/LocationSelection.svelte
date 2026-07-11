@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatArea as fmtArea } from '$lib/utils/formatting';
 	import Card from '$lib/components/ui/Card.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import MultiFieldSelection from './MultiFieldSelection.svelte';
@@ -108,7 +109,7 @@
 	
 	function formatArea(area: number | null): string {
 		if (area === null) return 'Not specified';
-		return `${new Intl.NumberFormat('en-US').format(area)} ha`;
+		return fmtArea(area);
 	}
 </script>
 

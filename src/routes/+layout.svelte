@@ -7,6 +7,7 @@
 	import DipstickModal from '$lib/components/modals/DipstickModal.svelte';
 	import TankRefillModal from '$lib/components/modals/TankRefillModal.svelte';
 	import FuelEntryModal from '$lib/components/modals/FuelEntryModal.svelte';
+	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
 	import { hasDraft } from '$lib/stores/fuel-entry-draft';
 	import { dashboardInsightsStore, insightsData } from '$lib/stores/dashboard-insights';
 
@@ -337,6 +338,8 @@
 		bind:show={showRefillModal}
 		onClose={() => showRefillModal = false}
 	/>
+
+	<ToastContainer />
 </div>
 
 <style>

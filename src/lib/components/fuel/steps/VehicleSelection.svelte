@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '$lib/utils/formatting';
 	import { vehicles, referenceDataLoading, referenceDataError } from '$lib/stores/reference-data';
 	import type { Vehicle } from '$lib/types';
 
@@ -63,7 +64,7 @@
 	
 	function formatOdometer(reading: number | null, unit: string | null): string {
 		if (reading === null) return 'Not set';
-		return `${new Intl.NumberFormat('en-US').format(reading)} ${unit || 'km'}`;
+		return `${formatNumber(reading)} ${unit || 'km'}`;
 	}
 	
 	function getFuelTypeIcon(fuelType: string): string {

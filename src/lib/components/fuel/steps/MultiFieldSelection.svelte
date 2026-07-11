@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatArea as fmtArea } from '$lib/utils/formatting';
 	import { fields, referenceDataLoading, referenceDataError } from '$lib/stores/reference-data';
 	import type { Field, FieldSelectionState } from '$lib/types';
 
@@ -144,7 +145,7 @@
 
 	function formatArea(area: number | null): string {
 		if (area === null) return 'Not specified';
-		return `${new Intl.NumberFormat('en-US').format(area)} ha`;
+		return fmtArea(area);
 	}
 </script>
 

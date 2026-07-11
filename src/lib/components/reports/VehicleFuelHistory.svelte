@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber as fmtNumber } from '$lib/utils/formatting';
 	import { onMount } from 'svelte';
 
 	interface Vehicle {
@@ -159,15 +160,12 @@
 
 	function formatNumber(num: number | null): string {
 		if (num === null || num === undefined) return '-';
-		return new Intl.NumberFormat('en-US').format(num);
+		return fmtNumber(num);
 	}
 
 	function formatDecimal(num: number | null, decimals: number = 1): string {
 		if (num === null || num === undefined) return '-';
-		return new Intl.NumberFormat('en-US', {
-			minimumFractionDigits: decimals,
-			maximumFractionDigits: decimals
-		}).format(num);
+		return fmtNumber(num, decimals);
 	}
 
 	function getHoursOrDistance(entry: FuelEntry): string {

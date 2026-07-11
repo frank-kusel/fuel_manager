@@ -3,6 +3,7 @@
 	import supabaseService from '$lib/services/supabase';
 	import FuelEntryEditModal from '$lib/components/fuel/FuelEntryEditModal.svelte';
 	import { markFuelDataStale, onVisible } from '$lib/stores/freshness';
+	import { toast } from '$lib/stores/toast';
 	import {
 		referenceDataStore,
 		activeVehicles,
@@ -32,8 +33,6 @@
 	let fieldIdsByEntry = $state<Record<string, string[]>>({});
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let toast = $state<{ kind: 'ok' | 'err'; text: string } | null>(null);
-	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Cell editing
 	let editingCell = $state<{ entryId: string; col: string } | null>(null);
@@ -270,9 +269,8 @@
 	}
 
 	function showToast(kind: 'ok' | 'err', text: string) {
-		toast = { kind, text };
-		if (toastTimer) clearTimeout(toastTimer);
-		toastTimer = setTimeout(() => (toast = null), kind === 'ok' ? 2500 : 6000);
+		if (kind === 'ok') toast.success(text);
+		else toast.error(text);
 	}
 
 	function flashRow(id: string, kind: 'ok' | 'err') {
@@ -722,10 +720,6 @@
 		</div>
 	{/if}
 </div>
-
-{#if toast}
-	<div class="toast {toast.kind}">{toast.text}</div>
-{/if}
 
 <FuelEntryEditModal entry={modalEntry} isOpen={modalOpen} on:close={closeModal} on:saved={handleModalSaved} />
 
@@ -1185,29 +1179,6 @@
 		border-radius: var(--radius-md);
 		padding: 0.5rem 0.75rem;
 		font-size: var(--text-sm);
-	}
-
-	.toast {
-		position: fixed;
-		bottom: 5.5rem;
-		right: 1rem;
-		z-index: 1100;
-		padding: 0.6rem 0.9rem;
-		border-radius: var(--radius-md);
-		font-size: var(--text-sm);
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-	}
-
-	.toast.ok {
-		background: #f0fdf4;
-		border: 1px solid #bbf7d0;
-		color: var(--success-dark);
-	}
-
-	.toast.err {
-		background: #fef2f2;
-		border: 1px solid #fecaca;
-		color: #991b1b;
 	}
 
 	.skeleton {

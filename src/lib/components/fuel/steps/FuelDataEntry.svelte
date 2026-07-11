@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber as fmtNumber } from '$lib/utils/formatting';
 	import { onMount } from 'svelte';
 	import { bowsers as allBowsers, referenceDataLoading } from '$lib/stores/reference-data';
 	import supabaseService from '$lib/services/supabase';
@@ -88,11 +89,7 @@
 	// Number formatting function for bowser readings (1 decimal)
 	function formatNumber(num: number | null): string {
 		if (num === null || num === undefined || isNaN(num)) return '-';
-		return new Intl.NumberFormat('en-US', {
-			minimumFractionDigits: 1,
-			maximumFractionDigits: 1,
-			useGrouping: true
-		}).format(num).replace(/,/g, ' ');
+		return fmtNumber(num, 1);
 	}
 
 	// Derived reading continuity warning
