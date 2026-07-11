@@ -10,11 +10,10 @@ node_modules
 /.vite
 .netlify
 
-# Environment variables
+# Environment variables (all variants; .env.example is the only tracked one)
 .env
-.env.local
-.env.*.local
-.env.production
+.env.*
+!.env.example
 
 # IDE
 .vscode/*
