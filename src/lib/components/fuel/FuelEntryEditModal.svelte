@@ -262,12 +262,14 @@
 	}
 </script>
 
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape' && isOpen) handleClose(); }} />
+
 {#if isOpen}
-	<div class="modal-overlay" onclick={handleClose}>
-		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+	<div class="modal-overlay" onclick={handleClose} role="presentation">
+		<div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Edit fuel entry">
 			<div class="modal-header">
 				<h2>Edit Fuel Entry</h2>
-				<button class="close-btn" onclick={handleClose}>×</button>
+				<button class="close-btn" aria-label="Close" onclick={handleClose}>×</button>
 			</div>
 
 			<div class="modal-body">

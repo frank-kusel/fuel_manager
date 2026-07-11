@@ -161,7 +161,7 @@
 					bind:value={searchTerm}
 				/>
 				{#if searchTerm}
-					<button class="clear-search" onclick={() => searchTerm = ''}>×</button>
+					<button class="clear-search" aria-label="Clear search" onclick={() => searchTerm = ''}>×</button>
 				{/if}
 			</div>
 		</div>
