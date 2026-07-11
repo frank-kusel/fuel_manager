@@ -1,8 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import exportService from '$lib/services/export';
-	import { PDFExportService } from '$lib/services/pdf-export';
 
 	// Initialize date range with current month immediately
 	const now = new Date();
@@ -26,14 +23,17 @@
 	let pdfExportError = '';
 	let pdfExportSuccess = false;
 
-	// Log initialization
-	onMount(() => {
-		console.log('DataExport initialized with dates:', { startDate, endDate });
-	});
+	// The export service pulls in SheetJS + jsPDF (~1 MB); load it only when
+	// an export button is actually clicked so the page chunk stays small.
+	async function loadExportDeps() {
+		const [{ default: exportService }, { default: supabaseService }] = await Promise.all([
+			import('$lib/services/export'),
+			import('$lib/services/supabase')
+		]);
+		return { exportService, supabaseService };
+	}
 
 	async function handleExport() {
-		console.log('Export button clicked', { startDate, endDate });
-		
 		if (!startDate || !endDate) {
 			exportError = 'Please select both start and end dates';
 			return;
@@ -49,21 +49,13 @@
 		exportSuccess = false;
 
 		try {
-			console.log('Starting export process...');
-			
-			// Import supabase service dynamically
-			const { default: supabaseService } = await import('$lib/services/supabase');
-			console.log('Supabase service imported');
-			
-			// Perform export
+			const { exportService, supabaseService } = await loadExportDeps();
 			const result = await exportService.exportToExcel(
 				startDate, 
 				endDate, 
 				supabaseService,
 				'KCT Farming (Pty) Ltd'
 			);
-
-			console.log('Export result:', result);
 
 			if (result.success) {
 				exportSuccess = true;
@@ -83,28 +75,18 @@
 	}
 
 	async function handleMonthlySummaryExport() {
-		console.log('Monthly summary export button clicked', { selectedYear, selectedMonth });
-		
 		isExportingMonthly = true;
 		monthlyExportError = '';
 		monthlyExportSuccess = false;
 
 		try {
-			console.log('Starting monthly summary export process...');
-			
-			// Import supabase service dynamically
-			const { default: supabaseService } = await import('$lib/services/supabase');
-			console.log('Supabase service imported for monthly summary');
-			
-			// Perform export
+			const { exportService, supabaseService } = await loadExportDeps();
 			const result = await exportService.exportMonthlySummary(
 				selectedYear, 
 				selectedMonth, 
 				supabaseService,
 				'KCT Farming (Pty) Ltd'
 			);
-
-			console.log('Monthly summary export result:', result);
 
 			if (result.success) {
 				monthlyExportSuccess = true;
@@ -129,27 +111,18 @@
 	}
 	
 	async function handleMonthlySummaryPDFExport() {
-		console.log('Monthly PDF export button clicked', { selectedYear, selectedMonth });
-		
 		isExportingPDF = true;
 		pdfExportError = '';
 		pdfExportSuccess = false;
 
 		try {
-			console.log('Starting enhanced PDF export with reconciliation data...');
-			
-			// Import supabase service dynamically
-			const { default: supabaseService } = await import('$lib/services/supabase');
-			
-			// Use original export service with enhancements
+			const { exportService, supabaseService } = await loadExportDeps();
 			const result = await exportService.exportMonthlySummaryPDFWithReconciliation(
 				selectedYear, 
 				selectedMonth, 
 				supabaseService,
 				'KCT Farming (Pty) Ltd'
 			);
-
-			console.log('Enhanced PDF export result:', result);
 
 			if (result.success) {
 				pdfExportSuccess = true;

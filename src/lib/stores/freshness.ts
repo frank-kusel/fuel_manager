@@ -1,5 +1,6 @@
 import { summaryCacheStore } from './summary-cache';
 import { dashboardInsightsStore } from './dashboard-insights';
+import { referenceDataStore } from './reference-data';
 
 /**
  * Central freshness hub.
@@ -16,6 +17,10 @@ import { dashboardInsightsStore } from './dashboard-insights';
 export function markFuelDataStale() {
 	summaryCacheStore.invalidate();
 	dashboardInsightsStore.invalidate();
+	// Vehicles/bowsers are enriched with current_odometer / current_reading
+	// derived from fuel_entries, so the wizard's prefills go stale on every
+	// fuel mutation too — not just the summary caches.
+	referenceDataStore.invalidate();
 }
 
 /** Run `fn` whenever the document becomes visible again (tab switch, phone

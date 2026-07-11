@@ -50,7 +50,6 @@
     "jspdf": "^3.0.2",
     "jspdf-autotable": "^5.0.2",
     "svelte": "^5.38.1",
-    "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"
   }
 }

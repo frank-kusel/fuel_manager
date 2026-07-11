@@ -72,14 +72,9 @@
 		window.scrollTo(0, 0);
 	});
 
-	// Progressive Web App Service Worker Registration
+	// Service worker: built from src/service-worker.js and registered by
+	// SvelteKit automatically.
 	onMount(() => {
-		if ('serviceWorker' in navigator) {
-			navigator.serviceWorker.register('/sw.js')
-				.then(() => console.log('Service Worker registered'))
-				.catch(err => console.error('Service Worker registration failed:', err));
-		}
-
 		// Prefetch reference data (vehicles/drivers/activities/fields/zones/
 		// bowsers) while the user is on their first screen, so the fuel-entry
 		// wizard and quick entry open instantly instead of waiting ~1s for

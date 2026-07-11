@@ -773,24 +773,18 @@ class SupabaseService {
 		const client = this.ensureInitialized();
 		
 		try {
-			// Get total fuel dispensed for the date range
-			const fuelResult = await client
-				.from('fuel_entries')
-				.select('litres_dispensed')
-				.is('deleted_at', null)
-				.gte('entry_date', startDate)
-				.lte('entry_date', endDate);
-				
-			const fuelDispensed = fuelResult.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
-			
-			// Get bowser readings for the date range
-			let bowserStart = 0;
-			let bowserEnd = 0;
-			
-			try {
-				// Opening reading: Get the last bowser_reading_end from BEFORE the start date
-				// This gives us the bowser level at the end of the previous period
-				const bowserStartResult = await client
+			// One round trip instead of three sequential ones (~350ms each).
+			const [fuelResult, bowserStartResult, bowserEndResult] = await Promise.all([
+				// Total fuel dispensed for the date range
+				client
+					.from('fuel_entries')
+					.select('litres_dispensed')
+					.is('deleted_at', null)
+					.gte('entry_date', startDate)
+					.lte('entry_date', endDate),
+				// Opening reading: last bowser_reading_end from BEFORE the start
+				// date, i.e. the bowser level at the end of the previous period
+				client
 					.from('fuel_entries')
 					.select('bowser_reading_end, entry_date, time')
 					.is('deleted_at', null)
@@ -798,10 +792,9 @@ class SupabaseService {
 					.not('bowser_reading_end', 'is', null)
 					.order('entry_date', { ascending: false })
 					.order('time', { ascending: false })
-					.limit(1);
-
-				// Closing reading: Get the last bowser_reading_end from the range
-				const bowserEndResult = await client
+					.limit(1),
+				// Closing reading: last bowser_reading_end within the range
+				client
 					.from('fuel_entries')
 					.select('bowser_reading_end, entry_date, time')
 					.is('deleted_at', null)
@@ -810,16 +803,12 @@ class SupabaseService {
 					.not('bowser_reading_end', 'is', null)
 					.order('entry_date', { ascending: false })
 					.order('time', { ascending: false })
-					.limit(1);
+					.limit(1)
+			]);
 
-				bowserStart = parseFloat(bowserStartResult.data?.[0]?.bowser_reading_end) || 0;
-				bowserEnd = parseFloat(bowserEndResult.data?.[0]?.bowser_reading_end) || 0;
-				
-			} catch (bowserError) {
-				console.warn('Could not fetch bowser readings:', bowserError);
-				bowserStart = 0;
-				bowserEnd = 0;
-			}
+			const fuelDispensed = fuelResult.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+			const bowserStart = parseFloat(bowserStartResult.data?.[0]?.bowser_reading_end) || 0;
+			const bowserEnd = parseFloat(bowserEndResult.data?.[0]?.bowser_reading_end) || 0;
 
 			return {
 				data: {

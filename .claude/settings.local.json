@@ -33,7 +33,8 @@
       "Bash(done)",
       "mcp__supabase__apply_migration",
       "Bash(find:*)",
-      "Bash(sort:*)"
+      "Bash(sort:*)",
+      "Bash(echo \"---exit $?\")"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",
