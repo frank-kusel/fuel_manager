@@ -19,6 +19,7 @@ import { calculateDieselClaim, roundClaimLitres } from '$lib/utils/diesel-claim'
 const XL_RED = 'B91C1C';
 const XL_CLAIM_GREEN = '2F7D4F';
 const XL_NONCLAIM_RED = '9B5555';
+const XL_KEY_FILL = 'F1F1EF';
 const XL_HEADER_FILL = 'F5F5F4';
 const XL_HAIRLINE = 'D6D3D1';
 
@@ -49,10 +50,16 @@ function cleanDocText(text: string | null | undefined): string {
 		.trim();
 }
 
+function cleanVehicleCategory(text: string | null | undefined): string {
+	return cleanDocText(text).replace(/^\d+\s*-\s*/, '');
+}
+
 interface LedgerColumnStyle {
 	numFmt?: string;
 	halign?: 'left' | 'right' | 'center';
 	fontColor?: string;
+	fillColor?: string;
+	bold?: boolean;
 }
 
 // Apply the clean-ledger cell styles to a worksheet built with aoa_to_sheet.
@@ -75,6 +82,7 @@ function applyLedgerStyles(
 			const addr = XLSX.utils.encode_cell({ r, c });
 			const cell: any = (worksheet as any)[addr];
 			if (!cell) continue;
+			const colStyle = columnStyles[c] || {};
 
 			if (opts.titleRows.includes(r)) {
 				// Title row: larger bold black, no fill
@@ -85,8 +93,11 @@ function applyLedgerStyles(
 			} else if (opts.headerRows.includes(r)) {
 				// Headers: bold black on very light grey, thin bottom border
 				cell.s = {
-					font: { bold: true, sz: 10, color: { rgb: '000000' } },
-					fill: { patternType: 'solid', fgColor: { rgb: XL_HEADER_FILL } },
+					font: { bold: true, sz: 10, color: { rgb: colStyle.fontColor || '000000' } },
+					fill: {
+						patternType: 'solid',
+						fgColor: { rgb: colStyle.fillColor || XL_HEADER_FILL }
+					},
 					border: {
 						...xlHairlineBorder,
 						bottom: { style: 'thin', color: { rgb: 'A8A29E' } }
@@ -95,12 +106,18 @@ function applyLedgerStyles(
 				};
 			} else if (r >= opts.dataStartRow) {
 				// Body: black text, hairline grey borders
-				const colStyle = columnStyles[c] || {};
 				const style: any = {
-					font: { sz: 10, color: { rgb: colStyle.fontColor || '000000' } },
+					font: {
+						bold: colStyle.bold || false,
+						sz: 10,
+						color: { rgb: colStyle.fontColor || '000000' }
+					},
 					border: xlHairlineBorder,
 					alignment: { horizontal: colStyle.halign || 'left', vertical: 'center' }
 				};
+				if (colStyle.fillColor) {
+					style.fill = { patternType: 'solid', fgColor: { rgb: colStyle.fillColor } };
+				}
 				if (colStyle.numFmt && typeof cell.v === 'number') {
 					style.numFmt = colStyle.numFmt;
 				}
@@ -590,7 +607,7 @@ class ExportService {
 						// which jsPDF's Helvetica cannot render — glyph widths go
 						// wrong and the text prints stretched/truncated. Strip to
 						// printable ASCII for documents.
-						category: cleanDocText(summary.type),
+						category: cleanVehicleCategory(summary.type),
 						distance: distance,
 						fuel: roundedTotal,
 						claimableFuel: roundedClaimable,
@@ -729,9 +746,20 @@ class ExportService {
 				colCount: 9,
 				columnStyles: {
 					3: { numFmt: '#,##0.00', halign: 'right' },
-					4: { numFmt: '#,##0.00', halign: 'right' },
-					5: { numFmt: '#,##0.00', halign: 'right', fontColor: XL_CLAIM_GREEN },
-					6: { numFmt: '#,##0.00', halign: 'right', fontColor: XL_NONCLAIM_RED },
+					4: { numFmt: '#,##0.00', halign: 'right', fillColor: XL_KEY_FILL },
+					5: {
+						numFmt: '#,##0.00',
+						halign: 'right',
+						fontColor: XL_CLAIM_GREEN,
+						fillColor: XL_KEY_FILL,
+						bold: true
+					},
+					6: {
+						numFmt: '#,##0.00',
+						halign: 'right',
+						fontColor: XL_NONCLAIM_RED,
+						fillColor: XL_KEY_FILL
+					},
 					7: { numFmt: '#,##0.00', halign: 'right' },
 					8: { halign: 'center' }
 				}
@@ -813,40 +841,34 @@ class ExportService {
 			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
 			const totalClaimable = data.reduce((sum, vehicle) => sum + vehicle.claimableFuel, 0);
 
-			// Minimal journal-style header: bold black title, small grey subtitle, hairline rule
-			const marginX = 20;
-			pdf.setFontSize(16);
+			const marginX = 16;
+			pdf.setFontSize(20);
 			pdf.setFont('helvetica', 'bold');
 			pdf.setTextColor(0, 0, 0);
-			pdf.text('Monthly Fuel and Diesel Claim Report', marginX, 24);
+			pdf.text(`${monthName} ${year}`, marginX, 19);
 
-			pdf.setFontSize(10);
+			pdf.setFontSize(8.5);
 			pdf.setFont('helvetica', 'normal');
 			pdf.setTextColor(...PDF_GREY);
-			pdf.text(companyName, marginX, 31);
-			pdf.text(`${monthName} ${year}`, marginX, 36.5);
+			pdf.text('Monthly fuel and diesel claim report', marginX, 26);
+			pdf.text(companyName, pageWidth - marginX, 26, { align: 'right' });
 
 			pdf.setDrawColor(...PDF_HAIRLINE);
 			pdf.setLineWidth(0.2);
-			pdf.line(marginX, 41, pageWidth - marginX, 41);
+			pdf.line(marginX, 31, pageWidth - marginX, 31);
 
-			// Summary statistics at the top
 			pdf.setFontSize(9);
-			pdf.setFont('helvetica', 'bold');
-			pdf.setTextColor(0, 0, 0);
-			pdf.text('Summary Statistics', marginX, 49);
-
 			pdf.setFont('helvetica', 'normal');
-			pdf.text(`Total Active Vehicles: ${data.length}`, marginX, 55);
-			pdf.text(`Total: ${totalFuel.toFixed(2)} L`, marginX, 60);
+			pdf.setTextColor(0, 0, 0);
+			pdf.text(`Total fuel: ${totalFuel.toFixed(2)} L`, marginX, 38);
 			pdf.setTextColor(...PDF_CLAIM_GREEN);
-			pdf.text(`Claimable: ${totalClaimable.toFixed(2)} L`, 80, 60);
+			pdf.text(`Claimable: ${totalClaimable.toFixed(2)} L`, 82, 38);
 			pdf.setTextColor(...PDF_NONCLAIM_RED);
-			pdf.text(`Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`, 135, 60);
+			pdf.text(`Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`, 142, 38);
 			pdf.setTextColor(0, 0, 0);
 
 			// Table with separate name and registration columns
-			const tableStartY = 73;
+			const tableStartY = 43;
 			const tableData = data.map((vehicle) => [
 				vehicle.code,
 				vehicle.name,
@@ -893,13 +915,15 @@ class ExportService {
 				body: tableData,
 				theme: 'grid',
 				styles: {
-					fontSize: 6.5,
-					cellPadding: 1,
+					fontSize: data.length > 25 ? 6 : 7,
+					cellPadding: data.length > 25 ? 0.55 : 0.9,
 					lineColor: PDF_HAIRLINE,
 					lineWidth: 0.1,
 					font: 'helvetica',
 					textColor: [0, 0, 0],
-					minCellHeight: 3
+					minCellHeight: 3,
+					overflow: 'linebreak',
+					valign: 'middle'
 				},
 				headStyles: {
 					fillColor: [255, 255, 255],
@@ -912,20 +936,27 @@ class ExportService {
 					lineWidth: 0.1
 				},
 				columnStyles: {
-					0: { halign: 'center' },
-					1: { halign: 'left' },
-					2: { halign: 'center' },
-					3: { halign: 'left' },
-					4: { halign: 'right' },
-					5: { halign: 'right' },
-					6: { halign: 'right', textColor: PDF_CLAIM_GREEN },
-					7: { halign: 'right', textColor: PDF_NONCLAIM_RED },
-					8: { halign: 'right' },
-					9: { halign: 'center' }
+					0: { halign: 'center', cellWidth: 12 },
+					1: { halign: 'left', cellWidth: 28, overflow: 'linebreak' },
+					2: { halign: 'center', cellWidth: 19 },
+					3: { halign: 'left', cellWidth: 24, overflow: 'linebreak' },
+					4: { halign: 'right', cellWidth: 15 },
+					5: { halign: 'right', cellWidth: 16 },
+					6: { halign: 'right', cellWidth: 18, textColor: PDF_CLAIM_GREEN },
+					7: { halign: 'right', cellWidth: 18, textColor: PDF_NONCLAIM_RED },
+					8: { halign: 'right', cellWidth: 18 },
+					9: { halign: 'center', cellWidth: 10 }
 				},
 				didParseCell: function (data: any) {
+					if ([5, 6, 7].includes(data.column.index)) {
+						data.cell.styles.fillColor =
+							data.section === 'head' ? [238, 238, 235] : [247, 247, 245];
+					}
 					if (data.column.index === 6) data.cell.styles.textColor = PDF_CLAIM_GREEN;
 					if (data.column.index === 7) data.cell.styles.textColor = PDF_NONCLAIM_RED;
+					if (data.section === 'body' && data.column.index === 6) {
+						data.cell.styles.fontStyle = 'bold';
+					}
 					// Style the subtotal row (last row): bold, no fill.
 					// The Fuel column stays black — red is reserved for tank
 					// MOVEMENTS in the reconciliation, so it keeps its meaning.
@@ -1219,23 +1250,22 @@ class ExportService {
 			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
 			const totalClaimable = data.reduce((sum, vehicle) => sum + vehicle.claimableFuel, 0);
 
-			// Minimal journal-style header: bold black title, small grey subtitle, hairline rule
-			const marginX = 20;
-			pdf.setFontSize(16);
+			const marginX = 16;
+			pdf.setFontSize(20);
 			pdf.setFont('helvetica', 'bold');
 			pdf.setTextColor(0, 0, 0);
-			pdf.text('Monthly Fuel and Diesel Claim Report', marginX, 18);
+			pdf.text(`${monthName} ${year}`, marginX, 19);
 
-			pdf.setFontSize(10);
+			pdf.setFontSize(8.5);
 			pdf.setFont('helvetica', 'normal');
 			pdf.setTextColor(...PDF_GREY);
-			pdf.text(companyName, marginX, 25);
-			pdf.text(`${monthName} ${year}`, marginX, 30.5);
+			pdf.text('Monthly fuel and diesel claim report', marginX, 26);
+			pdf.text(companyName, pageWidth - marginX, 26, { align: 'right' });
 			pdf.setTextColor(0, 0, 0);
 
 			pdf.setDrawColor(...PDF_HAIRLINE);
 			pdf.setLineWidth(0.2);
-			pdf.line(marginX, 35, pageWidth - marginX, 35);
+			pdf.line(marginX, 31, pageWidth - marginX, 31);
 
 			// Calculate variables needed for the new reconciliation sections below
 			const bowserDifference = reconciliationData.bowserEnd - reconciliationData.bowserStart;
@@ -1243,11 +1273,11 @@ class ExportService {
 
 			pdf.setFontSize(9);
 			pdf.setFont('helvetica', 'normal');
-			pdf.text(`Total fuel: ${totalFuel.toFixed(2)} L`, marginX, 42);
+			pdf.text(`Total fuel: ${totalFuel.toFixed(2)} L`, marginX, 38);
 			pdf.setTextColor(...PDF_CLAIM_GREEN);
-			pdf.text(`Claimable: ${totalClaimable.toFixed(2)} L`, 82, 42);
+			pdf.text(`Claimable: ${totalClaimable.toFixed(2)} L`, 82, 38);
 			pdf.setTextColor(...PDF_NONCLAIM_RED);
-			pdf.text(`Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`, 138, 42);
+			pdf.text(`Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`, 142, 38);
 			pdf.setTextColor(0, 0, 0);
 
 			const consumptionTable = data.map((vehicle) => [
@@ -1275,7 +1305,7 @@ class ExportService {
 				''
 			]);
 			autoTable(pdf, {
-				startY: 47,
+				startY: 43,
 				head: [
 					[
 						'Vehicle',
@@ -1299,7 +1329,9 @@ class ExportService {
 					lineWidth: 0.1,
 					font: 'helvetica',
 					textColor: [0, 0, 0],
-					minCellHeight: 3
+					minCellHeight: 3,
+					overflow: 'linebreak',
+					valign: 'middle'
 				},
 				headStyles: {
 					fillColor: [255, 255, 255],
@@ -1310,20 +1342,27 @@ class ExportService {
 					fontSize: 6.5
 				},
 				columnStyles: {
-					0: { halign: 'center', cellWidth: 11 },
-					1: { halign: 'left', cellWidth: 21 },
-					2: { halign: 'center', cellWidth: 17 },
-					3: { halign: 'left', cellWidth: 20 },
-					4: { halign: 'right', cellWidth: 13 },
-					5: { halign: 'right', cellWidth: 14 },
-					6: { halign: 'right', cellWidth: 16, textColor: PDF_CLAIM_GREEN },
-					7: { halign: 'right', cellWidth: 16, textColor: PDF_NONCLAIM_RED },
-					8: { halign: 'right', cellWidth: 13 },
-					9: { halign: 'center', cellWidth: 8 }
+					0: { halign: 'center', cellWidth: 12 },
+					1: { halign: 'left', cellWidth: 28, overflow: 'linebreak' },
+					2: { halign: 'center', cellWidth: 19 },
+					3: { halign: 'left', cellWidth: 24, overflow: 'linebreak' },
+					4: { halign: 'right', cellWidth: 15 },
+					5: { halign: 'right', cellWidth: 16 },
+					6: { halign: 'right', cellWidth: 18, textColor: PDF_CLAIM_GREEN },
+					7: { halign: 'right', cellWidth: 18, textColor: PDF_NONCLAIM_RED },
+					8: { halign: 'right', cellWidth: 18 },
+					9: { halign: 'center', cellWidth: 10 }
 				},
 				didParseCell: function (cell: any) {
+					if ([5, 6, 7].includes(cell.column.index)) {
+						cell.cell.styles.fillColor =
+							cell.section === 'head' ? [238, 238, 235] : [247, 247, 245];
+					}
 					if (cell.column.index === 6) cell.cell.styles.textColor = PDF_CLAIM_GREEN;
 					if (cell.column.index === 7) cell.cell.styles.textColor = PDF_NONCLAIM_RED;
+					if (cell.section === 'body' && cell.column.index === 6) {
+						cell.cell.styles.fontStyle = 'bold';
+					}
 					if (cell.section === 'body' && cell.row.index === consumptionTable.length - 1) {
 						cell.cell.styles.fontStyle = 'bold';
 					}
@@ -1362,7 +1401,7 @@ class ExportService {
 				bold?: boolean;
 			};
 
-			const deliveryRows = Math.ceil(reconciliationData.tankActivities.length / 2);
+			const deliveryRows = reconciliationData.tankActivities.length;
 			const reconciliationHeight = 53 + deliveryRows * 4;
 			let reconciliationY = tableEndY + 11;
 			if (reconciliationY + reconciliationHeight > pageHeight - 15) {
@@ -1383,6 +1422,7 @@ class ExportService {
 
 			const panelGap = 6;
 			const panelWidth = (pageWidth - marginX * 2 - panelGap) / 2;
+			const tankPanelX = marginX + panelWidth + panelGap;
 			const panelTop = reconciliationY + 4;
 			const panelHeight = 41;
 			const drawPanel = (
@@ -1436,7 +1476,7 @@ class ExportService {
 				}
 			]);
 
-			drawPanel(marginX + panelWidth + panelGap, panelTop, panelWidth, 'Tank balance', [
+			drawPanel(tankPanelX, panelTop, panelWidth, 'Tank balance', [
 				{
 					label: `Opening balance (1 ${shortMonth})`,
 					value: formatLitresValue(reconciliationData.tankStartCalculated)
@@ -1470,7 +1510,7 @@ class ExportService {
 				pdf.setFontSize(7);
 				pdf.setFont('helvetica', 'bold');
 				pdf.setTextColor(0, 0, 0);
-				pdf.text('Delivery and adjustment detail', marginX, deliveriesY);
+				pdf.text('Delivery and adjustment detail', tankPanelX, deliveriesY);
 
 				reconciliationData.tankActivities.forEach(
 					(
@@ -1482,17 +1522,17 @@ class ExportService {
 							day: 'numeric',
 							month: 'short'
 						});
-						const column = index % 2;
-						const row = Math.floor(index / 2);
-						const x = marginX + column * (panelWidth + panelGap);
-						const y = deliveriesY + 4.5 + row * 4;
+						const y = deliveriesY + 4.5 + index * 4;
 						const reference = cleanDocText(activity.invoice_number || 'Adjustment');
 						pdf.setFontSize(6.5);
 						pdf.setFont('helvetica', 'normal');
 						pdf.setTextColor(...(amount >= 0 ? PDF_GREEN : PDF_RED));
-						pdf.text(`${activityDate}  ${formatSignedLitres(amount)}  ${reference}`, x, y, {
-							maxWidth: panelWidth
-						});
+						pdf.text(
+							`${activityDate}  ${formatSignedLitres(amount)}  ${reference}`,
+							tankPanelX,
+							y,
+							{ maxWidth: panelWidth }
+						);
 					}
 				);
 			}
