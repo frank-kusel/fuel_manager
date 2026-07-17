@@ -1,10 +1,14 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/Button.svelte';
 
-	// Initialize date range with current month immediately
+	// Initialize date range with current month immediately.
+	// Format in LOCAL time — toISOString() is UTC and shifts the date back a
+	// day for any timezone ahead of UTC (SAST included).
 	const now = new Date();
 	const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 	const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+	const isoLocal = (d: Date) =>
+		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 	interface Props {
 		selectedYear?: number;
@@ -17,13 +21,16 @@
 	}: Props = $props();
 
 	// State management
-	let startDate = $state(monthStart.toISOString().split('T')[0]);
-	let endDate = $state(monthEnd.toISOString().split('T')[0]);
+	let startDate = $state(isoLocal(monthStart));
+	let endDate = $state(isoLocal(monthEnd));
 	let isExporting = $state(false);
 	let exportError = $state('');
 	let exportSuccess = $state(false);
 
-	// Monthly summary state
+	// Claim summary state: whole calendar month, or any custom date range
+	let claimMode = $state<'month' | 'range'>('month');
+	let claimStart = $state(isoLocal(monthStart));
+	let claimEnd = $state(isoLocal(now));
 	let isExportingMonthly = $state(false);
 	let isExportingPDF = $state(false);
 	let monthlyExportError = $state('');
@@ -81,16 +88,32 @@
 		}
 	}
 
+	function claimRange(): { start: string; end: string } | null {
+		if (claimMode === 'month') {
+			return {
+				start: new Date(Date.UTC(selectedYear, selectedMonth - 1, 1)).toISOString().split('T')[0],
+				end: new Date(Date.UTC(selectedYear, selectedMonth, 0)).toISOString().split('T')[0]
+			};
+		}
+		if (!claimStart || !claimEnd || claimStart > claimEnd) return null;
+		return { start: claimStart, end: claimEnd };
+	}
+
 	async function handleMonthlySummaryExport() {
+		const range = claimRange();
+		if (!range) {
+			monthlyExportError = 'Pick a valid period: start date must not be after end date';
+			return;
+		}
 		isExportingMonthly = true;
 		monthlyExportError = '';
 		monthlyExportSuccess = false;
 
 		try {
 			const { exportService, supabaseService } = await loadExportDeps();
-			const result = await exportService.exportMonthlySummary(
-				selectedYear,
-				selectedMonth,
+			const result = await exportService.exportClaimSummary(
+				range.start,
+				range.end,
 				supabaseService,
 				'KCT Farming (Pty) Ltd'
 			);
@@ -117,15 +140,20 @@
 	}
 
 	async function handleMonthlySummaryPDFExport() {
+		const range = claimRange();
+		if (!range) {
+			pdfExportError = 'Pick a valid period: start date must not be after end date';
+			return;
+		}
 		isExportingPDF = true;
 		pdfExportError = '';
 		pdfExportSuccess = false;
 
 		try {
 			const { exportService, supabaseService } = await loadExportDeps();
-			const result = await exportService.exportMonthlySummaryPDFWithReconciliation(
-				selectedYear,
-				selectedMonth,
+			const result = await exportService.exportClaimSummaryPDF(
+				range.start,
+				range.end,
 				supabaseService,
 				'KCT Farming (Pty) Ltd'
 			);
@@ -169,50 +197,103 @@
 				>
 			</div>
 			<div>
-				<h4 class="panel-title">Monthly vehicle summary</h4>
-				<p class="panel-sub">Per-vehicle totals for a month, as Excel or a signed PDF</p>
+				<h4 class="panel-title">Vehicle claim summary</h4>
+				<p class="panel-sub">Per-vehicle totals for a month or custom period, as Excel or a signed PDF</p>
 			</div>
 		</div>
 
 		<div class="monthly-controls">
-			<div class="month-inputs">
-				<div class="month-field">
-					<label for="export-year">Year</label>
-					<select
-						id="export-year"
-						bind:value={selectedYear}
-						disabled={isExportingMonthly}
-						onchange={clearMonthlyMessages}
-					>
-						{#each Array(5) as _, i}
-							<option value={now.getFullYear() - i}>{now.getFullYear() - i}</option>
-						{/each}
-					</select>
-				</div>
-
-				<div class="month-field">
-					<label for="export-month">Month</label>
-					<select
-						id="export-month"
-						bind:value={selectedMonth}
-						disabled={isExportingMonthly}
-						onchange={clearMonthlyMessages}
-					>
-						<option value={1}>January</option>
-						<option value={2}>February</option>
-						<option value={3}>March</option>
-						<option value={4}>April</option>
-						<option value={5}>May</option>
-						<option value={6}>June</option>
-						<option value={7}>July</option>
-						<option value={8}>August</option>
-						<option value={9}>September</option>
-						<option value={10}>October</option>
-						<option value={11}>November</option>
-						<option value={12}>December</option>
-					</select>
-				</div>
+			<div class="mode-toggle" role="group" aria-label="Period type">
+				<button
+					type="button"
+					class="mode-btn"
+					class:active={claimMode === 'month'}
+					disabled={isExportingMonthly || isExportingPDF}
+					onclick={() => {
+						claimMode = 'month';
+						clearMonthlyMessages();
+					}}
+				>
+					Month
+				</button>
+				<button
+					type="button"
+					class="mode-btn"
+					class:active={claimMode === 'range'}
+					disabled={isExportingMonthly || isExportingPDF}
+					onclick={() => {
+						claimMode = 'range';
+						clearMonthlyMessages();
+					}}
+				>
+					Custom period
+				</button>
 			</div>
+
+			{#if claimMode === 'month'}
+				<div class="month-inputs">
+					<div class="month-field">
+						<label for="export-year">Year</label>
+						<select
+							id="export-year"
+							bind:value={selectedYear}
+							disabled={isExportingMonthly}
+							onchange={clearMonthlyMessages}
+						>
+							{#each Array(5) as _, i}
+								<option value={now.getFullYear() - i}>{now.getFullYear() - i}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div class="month-field">
+						<label for="export-month">Month</label>
+						<select
+							id="export-month"
+							bind:value={selectedMonth}
+							disabled={isExportingMonthly}
+							onchange={clearMonthlyMessages}
+						>
+							<option value={1}>January</option>
+							<option value={2}>February</option>
+							<option value={3}>March</option>
+							<option value={4}>April</option>
+							<option value={5}>May</option>
+							<option value={6}>June</option>
+							<option value={7}>July</option>
+							<option value={8}>August</option>
+							<option value={9}>September</option>
+							<option value={10}>October</option>
+							<option value={11}>November</option>
+							<option value={12}>December</option>
+						</select>
+					</div>
+				</div>
+			{:else}
+				<div class="month-inputs">
+					<div class="month-field">
+						<label for="claim-start">From</label>
+						<input
+							id="claim-start"
+							type="date"
+							bind:value={claimStart}
+							disabled={isExportingMonthly || isExportingPDF}
+							onchange={clearMonthlyMessages}
+						/>
+					</div>
+
+					<div class="month-field">
+						<label for="claim-end">To</label>
+						<input
+							id="claim-end"
+							type="date"
+							bind:value={claimEnd}
+							disabled={isExportingMonthly || isExportingPDF}
+							onchange={clearMonthlyMessages}
+						/>
+					</div>
+				</div>
+			{/if}
 
 			<div class="monthly-actions">
 				<div class="export-buttons-grid">
@@ -549,6 +630,65 @@
 		background: var(--gray-50);
 		color: var(--gray-500);
 		cursor: not-allowed;
+	}
+
+	.month-field input {
+		width: 100%;
+		min-height: 2.75rem;
+		padding: 0.625rem 0.75rem;
+		border: 1px solid var(--gray-300);
+		border-radius: var(--radius-md);
+		font-size: var(--text-base);
+		background: white;
+		color: var(--gray-900);
+		box-sizing: border-box;
+		transition:
+			border-color 0.15s ease,
+			box-shadow 0.15s ease;
+	}
+
+	.month-field input:focus {
+		outline: none;
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
+	}
+
+	.month-field input:disabled {
+		background: var(--gray-50);
+		color: var(--gray-500);
+		cursor: not-allowed;
+	}
+
+	.mode-toggle {
+		display: inline-flex;
+		width: fit-content;
+		border: 1px solid var(--gray-300);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+	}
+
+	.mode-btn {
+		font-size: var(--text-sm);
+		font-weight: 500;
+		padding: 0.45rem 0.9rem;
+		background: white;
+		border: none;
+		color: var(--gray-600);
+		cursor: pointer;
+	}
+
+	.mode-btn + .mode-btn {
+		border-left: 1px solid var(--gray-300);
+	}
+
+	.mode-btn.active {
+		background: var(--primary);
+		color: white;
+	}
+
+	.mode-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.6;
 	}
 
 	.monthly-actions {

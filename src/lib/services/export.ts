@@ -29,6 +29,62 @@ const PDF_CLAIM_GREEN: [number, number, number] = [47, 125, 79];
 const PDF_NONCLAIM_RED: [number, number, number] = [155, 85, 85];
 const PDF_GREY: [number, number, number] = [120, 113, 108];
 const PDF_AMBER: [number, number, number] = [160, 94, 16];
+
+const MONTH_NAMES = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December'
+];
+
+interface ClaimPeriodLabel {
+	title: string;
+	subtitle: string;
+	fileSlug: string;
+	isFullMonth: boolean;
+}
+
+// "June 2026" for a whole calendar month, "1 Mar – 17 Jul 2026" otherwise.
+function claimPeriodLabel(startDate: string, endDate: string): ClaimPeriodLabel {
+	const start = new Date(`${startDate}T00:00:00`);
+	const end = new Date(`${endDate}T00:00:00`);
+	const lastOfEndMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+	const isFullMonth =
+		start.getFullYear() === end.getFullYear() &&
+		start.getMonth() === end.getMonth() &&
+		start.getDate() === 1 &&
+		end.getDate() === lastOfEndMonth;
+	if (isFullMonth) {
+		const monthName = MONTH_NAMES[start.getMonth()];
+		return {
+			title: `${monthName} ${start.getFullYear()}`,
+			subtitle: `1–${end.getDate()} ${monthName} ${start.getFullYear()}`,
+			fileSlug: `${monthName}_${start.getFullYear()}`,
+			isFullMonth
+		};
+	}
+	const dayMonth = (d: Date) => `${d.getDate()} ${MONTH_NAMES[d.getMonth()].slice(0, 3)}`;
+	const sameYear = start.getFullYear() === end.getFullYear();
+	const title = `${dayMonth(start)}${sameYear ? '' : ` ${start.getFullYear()}`} – ${dayMonth(end)} ${end.getFullYear()}`;
+	return { title, subtitle: title, fileSlug: `${startDate}_to_${endDate}`, isFullMonth };
+}
+
+const monthKeyLabel = (monthKey: string) =>
+	`${MONTH_NAMES[Number(monthKey.slice(5, 7)) - 1]} ${monthKey.slice(0, 4)}`;
+
+const isoDayBefore = (isoDate: string) => {
+	const d = new Date(`${isoDate}T00:00:00Z`);
+	d.setUTCDate(d.getUTCDate() - 1);
+	return d.toISOString().split('T')[0];
+};
 const PDF_HAIRLINE: [number, number, number] = [214, 211, 209];
 
 const xlHairlineBorder = {
@@ -413,19 +469,15 @@ class ExportService {
 		return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
 	}
 
-	// Fetch monthly vehicle summary data
-	async getMonthlySummaryForExport(
-		year: number,
-		month: number,
+	// Fetch per-vehicle claim summary data for an arbitrary date range
+	async getClaimSummaryForExport(
+		startDate: string,
+		endDate: string,
 		supabaseService: MonthlyClaimDataService
 	): Promise<ApiResponse<MonthlyClaimExportData>> {
 		try {
 			await supabaseService.init();
 			const client = supabaseService.getClient();
-
-			// Get start and end dates for the month (using UTC to avoid timezone issues)
-			const startDate = new Date(Date.UTC(year, month - 1, 1)).toISOString().split('T')[0];
-			const endDate = new Date(Date.UTC(year, month, 0)).toISOString().split('T')[0];
 
 			const [result, adjustmentsResult] = await Promise.all([
 				client
@@ -442,13 +494,20 @@ class ExportService {
 					.lte('entry_date', endDate)
 					.order('entry_date', { ascending: true })
 					.order('time', { ascending: true }),
-				supabaseService.getVehicleMonthlyClaimAdjustments(startDate, startDate)
+				supabaseService.getVehicleMonthlyClaimAdjustments(
+					`${startDate.slice(0, 7)}-01`,
+					`${endDate.slice(0, 7)}-01`
+				)
 			]);
 
 			if (result.error) return { data: null, error: result.error.message };
 			if (adjustmentsResult.error) return { data: null, error: adjustmentsResult.error };
 			const adjustments = adjustmentsResult.data || [];
-			const adjustmentByVehicle = new Map(adjustments.map((item) => [item.vehicle_id, item]));
+			// Classifier percentages are monthly facts: key by vehicle AND month so
+			// a multi-month period applies each month's own percentage.
+			const adjustmentByVehicleMonth = new Map(
+				adjustments.map((item) => [`${item.vehicle_id}|${String(item.claim_month).slice(0, 7)}`, item])
+			);
 
 			// Group data by vehicle and calculate summaries
 			const vehicleSummaries = new Map<
@@ -468,6 +527,7 @@ class ExportService {
 					totalHours: number;
 					hasOdometerData: boolean;
 					hasHoursData: boolean;
+					months: Map<string, { total: number; eligible: number }>;
 					activities: Map<
 						string,
 						{ name: string; eligible: boolean; reviewed: boolean; litres: number }
@@ -499,6 +559,7 @@ class ExportService {
 						totalHours: 0,
 						hasOdometerData: false,
 						hasHoursData: false,
+						months: new Map(),
 						activities: new Map()
 					});
 				}
@@ -517,6 +578,12 @@ class ExportService {
 				};
 				activitySummary.litres += litres;
 				summary.activities.set(activityKey, activitySummary);
+
+				const monthKey = String(entry.entry_date).slice(0, 7);
+				const monthTotals = summary.months.get(monthKey) || { total: 0, eligible: 0 };
+				monthTotals.total += litres;
+				if (activityEligible) monthTotals.eligible += litres;
+				summary.months.set(monthKey, monthTotals);
 
 				// Track odometer readings to get month start and end
 				if (entry.odometer_start && entry.odometer_start > 0) {
@@ -582,24 +649,37 @@ class ExportService {
 					}
 					// If no odometer_unit, distance, consumption, and unit remain empty
 
-					const adjustment = adjustmentByVehicle.get(summary.vehicleId);
-					const claim = calculateDieselClaim({
-						totalLitres: summary.totalFuel,
-						baseEligibleLitres: summary.baseEligibleFuel,
-						method: summary.claimMethod,
-						adjustment
-					});
-					if (claim.missingAdjustment)
-						warnings.push(
-							`${summary.code}: monthly classifier result missing; all litres excluded.`
-						);
+					// Classifier vehicles get each month's own percentage; a period
+					// spanning months is the sum of its monthly claims.
+					let claimableLitres = 0;
+					if (summary.claimMethod === 'monthly_classifier') {
+						for (const [monthKey, monthTotals] of summary.months) {
+							const claim = calculateDieselClaim({
+								totalLitres: monthTotals.total,
+								baseEligibleLitres: monthTotals.eligible,
+								method: summary.claimMethod,
+								adjustment: adjustmentByVehicleMonth.get(`${summary.vehicleId}|${monthKey}`)
+							});
+							if (claim.missingAdjustment)
+								warnings.push(
+									`${summary.code}: classifier result missing for ${monthKeyLabel(monthKey)}; that month's litres excluded.`
+								);
+							claimableLitres += claim.claimableLitres;
+						}
+					} else {
+						claimableLitres = calculateDieselClaim({
+							totalLitres: summary.totalFuel,
+							baseEligibleLitres: summary.baseEligibleFuel,
+							method: summary.claimMethod
+						}).claimableLitres;
+					}
 					for (const activity of summary.activities.values()) {
 						if (!activity.reviewed)
 							warnings.push(`${activity.name}: activity eligibility has not been reviewed.`);
 					}
 
-					const roundedTotal = roundClaimLitres(claim.totalLitres);
-					const roundedClaimable = roundClaimLitres(claim.claimableLitres);
+					const roundedTotal = roundClaimLitres(summary.totalFuel);
+					const roundedClaimable = roundClaimLitres(claimableLitres);
 					return {
 						code: summary.code,
 						name: summary.name,
@@ -634,37 +714,21 @@ class ExportService {
 		}
 	}
 
-	// Generate monthly summary Excel file
+	// Generate claim summary Excel file
 	async generateMonthlySummaryExcel(
 		report: MonthlyClaimExportData,
-		year: number,
-		month: number,
+		startDate: string,
+		endDate: string,
 		companyName: string = 'KCT Farming (Pty) Ltd'
 	): Promise<void> {
 		try {
 			const data = report.summary;
 			const workbook = XLSX.utils.book_new();
-
-			// Format month name
-			const monthNames = [
-				'January',
-				'February',
-				'March',
-				'April',
-				'May',
-				'June',
-				'July',
-				'August',
-				'September',
-				'October',
-				'November',
-				'December'
-			];
-			const monthName = monthNames[month - 1];
+			const label = claimPeriodLabel(startDate, endDate);
 
 			// Create header data
 			const headerData = [
-				[`Monthly Fuel and Diesel Claim Summary - ${companyName} - ${monthName} ${year}`],
+				[`Fuel and Diesel Claim Summary - ${companyName} - ${label.title}`],
 				report.warnings.length > 0
 					? ['Attention: claim data needs review on the Audit page before submission.']
 					: [],
@@ -767,10 +831,10 @@ class ExportService {
 			});
 
 			// Add worksheet to workbook
-			XLSX.utils.book_append_sheet(workbook, worksheet, 'Monthly Summary');
+			XLSX.utils.book_append_sheet(workbook, worksheet, 'Claim Summary');
 
 			// Generate filename
-			const filename = `Monthly_Vehicle_Summary_${year}_${month.toString().padStart(2, '0')}.xlsx`;
+			const filename = `Vehicle_Claim_Summary_${label.fileSlug}.xlsx`;
 
 			// Write and download file
 			XLSX.writeFile(workbook, filename);
@@ -807,23 +871,23 @@ class ExportService {
 		}
 	}
 
-	// Monthly summary export method
-	async exportMonthlySummary(
-		year: number,
-		month: number,
+	// Claim summary Excel export (whole month or custom period)
+	async exportClaimSummary(
+		startDate: string,
+		endDate: string,
 		supabaseService: any,
 		companyName?: string
 	): Promise<{ success: boolean; error?: string }> {
 		try {
 			// Fetch data
-			const result = await this.getMonthlySummaryForExport(year, month, supabaseService);
+			const result = await this.getClaimSummaryForExport(startDate, endDate, supabaseService);
 
 			if (result.error || !result.data) {
 				return { success: false, error: result.error || 'No data found' };
 			}
 
 			// Generate and download Excel file
-			await this.generateMonthlySummaryExcel(result.data, year, month, companyName);
+			await this.generateMonthlySummaryExcel(result.data, startDate, endDate, companyName);
 
 			return { success: true };
 		} catch (error) {
@@ -834,116 +898,81 @@ class ExportService {
 		}
 	}
 
-	// Enhanced monthly summary PDF export with reconciliation data
-	async exportMonthlySummaryPDFWithReconciliation(
-		year: number,
-		month: number,
+	// Claim summary PDF export with reconciliation (whole month or custom period)
+	async exportClaimSummaryPDF(
+		startDate: string,
+		endDate: string,
 		supabaseService: any,
 		companyName?: string
 	): Promise<{ success: boolean; error?: string }> {
 		try {
 			// Fetch vehicle data
-			const vehicleResult = await this.getMonthlySummaryForExport(year, month, supabaseService);
+			const vehicleResult = await this.getClaimSummaryForExport(startDate, endDate, supabaseService);
 
 			if (vehicleResult.error || !vehicleResult.data) {
 				return { success: false, error: vehicleResult.error || 'No vehicle data found' };
 			}
 
-			// Format month name
-			const monthNames = [
-				'January',
-				'February',
-				'March',
-				'April',
-				'May',
-				'June',
-				'July',
-				'August',
-				'September',
-				'October',
-				'November',
-				'December'
-			];
-			const monthName = monthNames[month - 1];
-
-			// Fetch reconciliation data for the month
-			const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
-			const monthEnd = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
-
-			// Calculate previous month's last day for opening level
-			const prevMonth = month === 1 ? 12 : month - 1;
-			const prevYear = month === 1 ? year - 1 : year;
-			// Use month index (0-11) for Date constructor: prevMonth is month NUMBER (1-12), so use it directly as the NEXT month's index
-			const lastDayOfPrevMonth = new Date(prevYear, prevMonth, 0).getDate();
-			const prevMonthEnd = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(lastDayOfPrevMonth).padStart(2, '0')}`;
+			// Opening balances come from the day before the period starts
+			const dayBeforeStart = isoDayBefore(startDate);
 
 			let reconciliationData = {
 				fuelDispensed: 0,
 				bowserStart: 0,
 				bowserEnd: 0,
 				tankStartCalculated: 0,
-				tankEndCalculated: 0,
+				tankStartDate: null as string | null,
 				lastDipReading: 0,
+				lastDipDate: null as string | null,
 				tankActivities: [],
 				reconciled: false
 			};
 
 			try {
 				// Performance optimization: Execute all reconciliation queries in parallel
-				const [
-					fuelReconResult,
-					tankStartReconResult,
-					tankEndReconResult,
-					dipReadingResult,
-					tankActivitiesResult
-				] = await Promise.all([
-					// Fuel reconciliation data
-					supabaseService.getDateRangeReconciliationData(monthStart, monthEnd),
+				const [fuelReconResult, tankStartReconResult, dipReadingResult, tankActivitiesResult] =
+					await Promise.all([
+						// Fuel reconciliation data
+						supabaseService.getDateRangeReconciliationData(startDate, endDate),
 
-					// Tank reconciliation data for opening level (previous month's closing)
-					supabaseService.query(() =>
-						supabaseService
-							.ensureInitialized()
-							.from('tank_reconciliations')
-							.select('*')
-							.eq('reconciliation_date', prevMonthEnd)
-							.maybeSingle()
-					),
+						// Opening tank level: latest close on or before the day
+						// before the period starts (month-end closes exist, so a
+						// mid-month start falls back to the nearest earlier close)
+						supabaseService.query(() =>
+							supabaseService
+								.ensureInitialized()
+								.from('tank_reconciliations')
+								.select('*')
+								.lte('reconciliation_date', dayBeforeStart)
+								.order('reconciliation_date', { ascending: false })
+								.limit(1)
+								.maybeSingle()
+						),
 
-					// Tank reconciliation data for month end (closing level)
-					supabaseService.query(() =>
-						supabaseService
-							.ensureInitialized()
-							.from('tank_reconciliations')
-							.select('*')
-							.eq('reconciliation_date', monthEnd)
-							.maybeSingle()
-					),
+						// Actual dip reading from tank_readings table (last reading in the period)
+						supabaseService.query(() =>
+							supabaseService
+								.ensureInitialized()
+								.from('tank_readings')
+								.select('*')
+								.gte('reading_date', startDate)
+								.lte('reading_date', endDate)
+								.order('reading_date', { ascending: false })
+								.limit(1)
+								.maybeSingle()
+						),
 
-					// Actual dip reading from tank_readings table (last reading of the month)
-					supabaseService.query(() =>
-						supabaseService
-							.ensureInitialized()
-							.from('tank_readings')
-							.select('*')
-							.gte('reading_date', monthStart)
-							.lte('reading_date', monthEnd)
-							.order('reading_date', { ascending: false })
-							.limit(1)
-							.maybeSingle()
-					),
-
-					// Tank activities (refills and adjustments) for the month
-					supabaseService.query(() =>
-						supabaseService
-							.ensureInitialized()
-							.from('tank_refills')
-							.select('delivery_date, litres_added, invoice_number')
-							.gte('delivery_date', monthStart)
-							.lte('delivery_date', monthEnd)
-							.order('delivery_date', { ascending: true })
-					)
-				]);
+						// Tank activities (refills and adjustments) for the period
+						supabaseService.query(() =>
+							supabaseService
+								.ensureInitialized()
+								.from('tank_refills')
+								.select('delivery_date, litres_added, invoice_number')
+								.gte('delivery_date', startDate)
+								.lte('delivery_date', endDate)
+								.order('delivery_date', { ascending: true })
+						)
+					]);
 
 				// Process results
 				if (fuelReconResult.data) {
@@ -954,14 +983,12 @@ class ExportService {
 
 				if (tankStartReconResult.data) {
 					reconciliationData.tankStartCalculated = tankStartReconResult.data.calculated_level || 0;
-				}
-
-				if (tankEndReconResult.data) {
-					reconciliationData.tankEndCalculated = tankEndReconResult.data.calculated_level || 0;
+					reconciliationData.tankStartDate = tankStartReconResult.data.reconciliation_date || null;
 				}
 
 				if (dipReadingResult.data) {
 					reconciliationData.lastDipReading = dipReadingResult.data.reading_value || 0;
+					reconciliationData.lastDipDate = dipReadingResult.data.reading_date || null;
 				}
 
 				if (tankActivitiesResult.data) {
@@ -975,8 +1002,8 @@ class ExportService {
 			await this.generateMonthlySummaryPDFWithReconciliation(
 				vehicleResult.data,
 				reconciliationData,
-				year,
-				month,
+				startDate,
+				endDate,
 				companyName
 			);
 
@@ -993,8 +1020,8 @@ class ExportService {
 	async generateMonthlySummaryPDFWithReconciliation(
 		report: MonthlyClaimExportData,
 		reconciliationData: any,
-		year: number,
-		month: number,
+		startDate: string,
+		endDate: string,
 		companyName: string = 'KCT Farming (Pty) Ltd'
 	): Promise<void> {
 		try {
@@ -1003,22 +1030,11 @@ class ExportService {
 			const pageWidth = pdf.internal.pageSize.width;
 			const pageHeight = pdf.internal.pageSize.height;
 
-			const monthNames = [
-				'January',
-				'February',
-				'March',
-				'April',
-				'May',
-				'June',
-				'July',
-				'August',
-				'September',
-				'October',
-				'November',
-				'December'
-			];
-			const monthName = monthNames[month - 1];
-			const daysInMonth = new Date(year, month, 0).getDate();
+			const label = claimPeriodLabel(startDate, endDate);
+			const dayMonth = (iso: string) => {
+				const d = new Date(`${iso}T00:00:00`);
+				return `${d.getDate()} ${MONTH_NAMES[d.getMonth()].slice(0, 3)}`;
+			};
 
 			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
 			const totalClaimable = data.reduce((sum, vehicle) => sum + vehicle.claimableFuel, 0);
@@ -1039,12 +1055,16 @@ class ExportService {
 			pdf.setFontSize(20);
 			pdf.setFont('helvetica', 'bold');
 			pdf.setTextColor(0, 0, 0);
-			pdf.text(`${monthName} ${year}`, marginX, 19);
+			pdf.text(label.title, marginX, 19);
 
 			pdf.setFontSize(8.5);
 			pdf.setFont('helvetica', 'normal');
 			pdf.setTextColor(...PDF_GREY);
-			pdf.text(`Monthly fuel and diesel claim report · 1–${daysInMonth} ${monthName} ${year}`, marginX, 26);
+			pdf.text(
+				`${label.isFullMonth ? 'Monthly fuel and diesel claim report' : 'Fuel and diesel claim report'} · ${label.subtitle}`,
+				marginX,
+				26
+			);
 			pdf.text(companyName, pageWidth - marginX, 26, { align: 'right' });
 			pdf.setTextColor(0, 0, 0);
 
@@ -1240,10 +1260,12 @@ class ExportService {
 				reconciliationData.tankStartCalculated -
 				reconciliationData.fuelDispensed +
 				totalTankAdditions;
-			const lastDayOfMonth = daysInMonth;
 			const hasDip = (reconciliationData.lastDipReading || 0) > 0;
 			const tankVariance = expectedLevel - reconciliationData.lastDipReading;
-			const shortMonth = monthName.slice(0, 3);
+			const tankOpenLabel = dayMonth(reconciliationData.tankStartDate || isoDayBefore(startDate));
+			const dipLabel = reconciliationData.lastDipDate
+				? `Actual dip (${dayMonth(reconciliationData.lastDipDate)})`
+				: 'Actual dip';
 			const formatLitresValue = (value: number) =>
 				`${value.toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`;
 			const formatSignedLitres = (value: number) =>
@@ -1318,11 +1340,11 @@ class ExportService {
 
 			drawPanel(marginX, panelTop, panelWidth, 'Bowser readings', [
 				{
-					label: `Opening meter (1 ${shortMonth})`,
+					label: `Opening meter (${dayMonth(startDate)})`,
 					value: formatLitresValue(reconciliationData.bowserStart)
 				},
 				{
-					label: `Closing meter (${lastDayOfMonth} ${shortMonth})`,
+					label: `Closing meter (${dayMonth(endDate)})`,
 					value: formatLitresValue(reconciliationData.bowserEnd)
 				},
 				{ label: 'Meter movement', value: formatLitresValue(bowserDifference), bold: true },
@@ -1341,7 +1363,7 @@ class ExportService {
 
 			drawPanel(tankPanelX, panelTop, panelWidth, 'Tank balance', [
 				{
-					label: `Opening balance (1 ${shortMonth})`,
+					label: `Opening balance (${tankOpenLabel})`,
 					value: formatLitresValue(reconciliationData.tankStartCalculated)
 				},
 				{
@@ -1356,7 +1378,7 @@ class ExportService {
 				},
 				{ label: 'Expected closing', value: formatLitresValue(expectedLevel), bold: true },
 				{
-					label: `Actual dip (${lastDayOfMonth} ${shortMonth})`,
+					label: dipLabel,
 					value: hasDip ? formatLitresValue(reconciliationData.lastDipReading) : 'Not recorded',
 					color: hasDip ? undefined : PDF_NONCLAIM_RED
 				},
@@ -1419,14 +1441,14 @@ class ExportService {
 				pdf.setFontSize(6.8);
 				pdf.setFont('helvetica', 'normal');
 				pdf.setTextColor(...PDF_GREY);
-				pdf.text(`${companyName} — diesel claim working paper · ${monthName} ${year}`, marginX, pageHeight - 9);
+				pdf.text(`${companyName} — diesel claim working paper · ${label.title}`, marginX, pageHeight - 9);
 				pdf.text(`Generated ${generatedAt} · Page ${i} of ${pageCount}`, pageWidth - marginX, pageHeight - 9, {
 					align: 'right'
 				});
 			}
 
 			// Save the PDF
-			const fileName = `Monthly_Fuel_Report_${monthName}_${year}.pdf`;
+			const fileName = `Fuel_Claim_Report_${label.fileSlug}.pdf`;
 			pdf.save(fileName);
 		} catch (error) {
 			console.error('PDF generation error:', error);
@@ -1434,15 +1456,6 @@ class ExportService {
 		}
 	}
 
-	// Helper method to format date range
-	formatDateRange(monthName: string, year: number): string {
-		const daysInMonth = new Date(
-			year,
-			new Date(`${monthName} 1, ${year}`).getMonth() + 1,
-			0
-		).getDate();
-		return `${monthName.slice(0, 3)} 1 - ${daysInMonth}, ${year}`;
-	}
 }
 
 export default new ExportService();
