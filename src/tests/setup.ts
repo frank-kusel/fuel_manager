@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom';
+import { afterEach, vi } from 'vitest';
 
 // Global test setup for FarmTrack SvelteKit application
 // This file runs before all tests
@@ -38,13 +38,15 @@ Object.defineProperty(window, 'indexedDB', {
 });
 
 // Mock Supabase client (will be replaced with actual mock in tests)
-global.supabaseClient = {
-	from: vi.fn().mockReturnThis(),
-	select: vi.fn().mockResolvedValue({ data: [], error: null }),
-	insert: vi.fn().mockResolvedValue({ data: [], error: null }),
-	update: vi.fn().mockResolvedValue({ data: [], error: null }),
-	delete: vi.fn().mockResolvedValue({ data: [], error: null })
-};
+Object.assign(globalThis, {
+	supabaseClient: {
+		from: vi.fn().mockReturnThis(),
+		select: vi.fn().mockResolvedValue({ data: [], error: null }),
+		insert: vi.fn().mockResolvedValue({ data: [], error: null }),
+		update: vi.fn().mockResolvedValue({ data: [], error: null }),
+		delete: vi.fn().mockResolvedValue({ data: [], error: null })
+	}
+});
 
 // Reset all mocks after each test
 afterEach(() => {

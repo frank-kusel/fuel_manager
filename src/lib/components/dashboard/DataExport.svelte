@@ -5,23 +5,31 @@
 	const now = new Date();
 	const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 	const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-	
+
+	interface Props {
+		selectedYear?: number;
+		selectedMonth?: number;
+	}
+
+	let {
+		selectedYear = $bindable(now.getFullYear()),
+		selectedMonth = $bindable(now.getMonth() + 1)
+	}: Props = $props();
+
 	// State management
-	let startDate = monthStart.toISOString().split('T')[0];
-	let endDate = monthEnd.toISOString().split('T')[0];
-	let isExporting = false;
-	let exportError = '';
-	let exportSuccess = false;
-	
+	let startDate = $state(monthStart.toISOString().split('T')[0]);
+	let endDate = $state(monthEnd.toISOString().split('T')[0]);
+	let isExporting = $state(false);
+	let exportError = $state('');
+	let exportSuccess = $state(false);
+
 	// Monthly summary state
-	let selectedYear = now.getFullYear();
-	let selectedMonth = now.getMonth() + 1;
-	let isExportingMonthly = false;
-	let isExportingPDF = false;
-	let monthlyExportError = '';
-	let monthlyExportSuccess = false;
-	let pdfExportError = '';
-	let pdfExportSuccess = false;
+	let isExportingMonthly = $state(false);
+	let isExportingPDF = $state(false);
+	let monthlyExportError = $state('');
+	let monthlyExportSuccess = $state(false);
+	let pdfExportError = $state('');
+	let pdfExportSuccess = $state(false);
 
 	// The export service pulls in SheetJS + jsPDF (~1 MB); load it only when
 	// an export button is actually clicked so the page chunk stays small.
@@ -51,8 +59,8 @@
 		try {
 			const { exportService, supabaseService } = await loadExportDeps();
 			const result = await exportService.exportToExcel(
-				startDate, 
-				endDate, 
+				startDate,
+				endDate,
 				supabaseService,
 				'KCT Farming (Pty) Ltd'
 			);
@@ -65,7 +73,6 @@
 			} else {
 				exportError = result.error || 'Export failed';
 			}
-
 		} catch (error) {
 			console.error('Export error:', error);
 			exportError = error instanceof Error ? error.message : 'Export failed';
@@ -82,8 +89,8 @@
 		try {
 			const { exportService, supabaseService } = await loadExportDeps();
 			const result = await exportService.exportMonthlySummary(
-				selectedYear, 
-				selectedMonth, 
+				selectedYear,
+				selectedMonth,
 				supabaseService,
 				'KCT Farming (Pty) Ltd'
 			);
@@ -96,7 +103,6 @@
 			} else {
 				monthlyExportError = result.error || 'Monthly summary export failed';
 			}
-
 		} catch (error) {
 			console.error('Monthly summary export error:', error);
 			monthlyExportError = error instanceof Error ? error.message : 'Monthly summary export failed';
@@ -109,7 +115,7 @@
 		exportError = '';
 		exportSuccess = false;
 	}
-	
+
 	async function handleMonthlySummaryPDFExport() {
 		isExportingPDF = true;
 		pdfExportError = '';
@@ -118,8 +124,8 @@
 		try {
 			const { exportService, supabaseService } = await loadExportDeps();
 			const result = await exportService.exportMonthlySummaryPDFWithReconciliation(
-				selectedYear, 
-				selectedMonth, 
+				selectedYear,
+				selectedMonth,
 				supabaseService,
 				'KCT Farming (Pty) Ltd'
 			);
@@ -132,7 +138,6 @@
 			} else {
 				pdfExportError = result.error || 'PDF export failed';
 			}
-
 		} catch (error) {
 			console.error('Enhanced PDF export error:', error);
 			pdfExportError = error instanceof Error ? error.message : 'PDF export failed';
@@ -153,7 +158,15 @@
 	<section class="panel">
 		<div class="panel-head">
 			<div class="panel-icon" aria-hidden="true">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+				<svg
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.8"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg
+				>
 			</div>
 			<div>
 				<h4 class="panel-title">Monthly vehicle summary</h4>
@@ -165,25 +178,25 @@
 			<div class="month-inputs">
 				<div class="month-field">
 					<label for="export-year">Year</label>
-					<select 
+					<select
 						id="export-year"
 						bind:value={selectedYear}
 						disabled={isExportingMonthly}
-						on:change={clearMonthlyMessages}
+						onchange={clearMonthlyMessages}
 					>
 						{#each Array(5) as _, i}
 							<option value={now.getFullYear() - i}>{now.getFullYear() - i}</option>
 						{/each}
 					</select>
 				</div>
-				
+
 				<div class="month-field">
 					<label for="export-month">Month</label>
-					<select 
+					<select
 						id="export-month"
 						bind:value={selectedMonth}
 						disabled={isExportingMonthly}
-						on:change={clearMonthlyMessages}
+						onchange={clearMonthlyMessages}
 					>
 						<option value={1}>January</option>
 						<option value={2}>February</option>
@@ -203,7 +216,7 @@
 
 			<div class="monthly-actions">
 				<div class="export-buttons-grid">
-					<Button 
+					<Button
 						variant="primary"
 						size="medium"
 						loading={isExportingMonthly}
@@ -216,8 +229,8 @@
 							Excel
 						{/if}
 					</Button>
-					
-					<Button 
+
+					<Button
 						variant="outline"
 						size="medium"
 						loading={isExportingPDF}
@@ -267,7 +280,17 @@
 	<section class="panel">
 		<div class="panel-head">
 			<div class="panel-icon" aria-hidden="true">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg>
+				<svg
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.8"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline
+						points="14 2 14 8 20 8"
+					/><path d="M12 18v-6M9 15l3 3 3-3" /></svg
+				>
 			</div>
 			<div>
 				<h4 class="panel-title">Daily capture export</h4>
@@ -278,29 +301,29 @@
 			<div class="date-inputs">
 				<div class="date-field">
 					<label for="start-date">Start Date</label>
-					<input 
+					<input
 						id="start-date"
-						type="date" 
+						type="date"
 						bind:value={startDate}
 						disabled={isExporting}
-						on:change={clearMessages}
+						onchange={clearMessages}
 					/>
 				</div>
-				
+
 				<div class="date-field">
 					<label for="end-date">End Date</label>
-					<input 
+					<input
 						id="end-date"
-						type="date" 
+						type="date"
 						bind:value={endDate}
 						disabled={isExporting}
-						on:change={clearMessages}
+						onchange={clearMessages}
 					/>
 				</div>
 			</div>
 
 			<div class="export-actions">
-				<Button 
+				<Button
 					variant="primary"
 					size="medium"
 					loading={isExporting}
@@ -331,7 +354,6 @@
 			</div>
 		{/if}
 	</section>
-
 </div>
 
 <style>
@@ -420,7 +442,9 @@
 		font-size: var(--text-base);
 		background: white;
 		color: var(--gray-900);
-		transition: border-color 0.15s ease, box-shadow 0.15s ease;
+		transition:
+			border-color 0.15s ease,
+			box-shadow 0.15s ease;
 		box-sizing: border-box;
 	}
 
@@ -475,7 +499,6 @@
 		margin-top: 1rem;
 	}
 
-
 	.monthly-controls {
 		display: flex;
 		flex-direction: column;
@@ -511,7 +534,9 @@
 		font-size: var(--text-base);
 		background: white;
 		color: var(--gray-900);
-		transition: border-color 0.15s ease, box-shadow 0.15s ease;
+		transition:
+			border-color 0.15s ease,
+			box-shadow 0.15s ease;
 	}
 
 	.month-field select:focus {
@@ -539,7 +564,6 @@
 		width: 100%;
 		max-width: 300px;
 	}
-
 
 	/* Mobile responsiveness */
 	@media (max-width: 768px) {

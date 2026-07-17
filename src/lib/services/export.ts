@@ -1,7 +1,18 @@
 import * as XLSX from 'xlsx-js-style';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { ApiResponse, FuelEntry } from '$lib/types';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type {
+	ApiResponse,
+	DieselClaimMethod,
+	FuelEntry,
+	VehicleMonthlyClaimAdjustment
+} from '$lib/types';
+import {
+	calculateClassifierVariance,
+	calculateDieselClaim,
+	roundClaimLitres
+} from '$lib/utils/diesel-claim';
 
 // ---------------------------------------------------------------------------
 // Ledger-style export palette
@@ -124,31 +135,67 @@ export interface ExportData {
 }
 
 export interface MonthlySummaryData {
+	vehicleId: string;
 	code: string;
 	name: string;
 	registration: string;
 	category: string;
 	distance: number | string;
 	fuel: number;
+	baseEligibleFuel: number;
+	claimableFuel: number;
+	nonClaimableFuel: number;
+	claimablePercentage: number | null;
+	claimBasis: string;
+	missingAdjustment: boolean;
 	consumption: number | string;
 	unit: string;
+}
+
+export interface MonthlyClaimDetailData {
+	vehicleCode: string;
+	vehicleName: string;
+	activityName: string;
+	activityEligible: boolean;
+	totalFuel: number;
+	claimablePercentage: number | null;
+	claimableFuel: number;
+	nonClaimableFuel: number;
+	claimBasis: string;
+}
+
+export interface MonthlyClaimExportData {
+	summary: MonthlySummaryData[];
+	details: MonthlyClaimDetailData[];
+	adjustments: VehicleMonthlyClaimAdjustment[];
+	warnings: string[];
+}
+
+interface MonthlyClaimDataService {
+	init(): Promise<void>;
+	getClient(): SupabaseClient;
+	getVehicleMonthlyClaimAdjustments(
+		startMonth?: string,
+		endMonth?: string
+	): Promise<ApiResponse<VehicleMonthlyClaimAdjustment[]>>;
 }
 
 class ExportService {
 	// Fetch fuel entries data for export with date range
 	async getFuelEntriesForExport(
-		startDate: string, 
+		startDate: string,
 		endDate: string,
 		supabaseService: any
 	): Promise<ApiResponse<ExportData[]>> {
 		try {
 			await supabaseService.init();
 			const client = supabaseService.getClient();
-			
+
 			// Fetch fuel entries with all related data
 			const result = await client
 				.from('fuel_entries')
-				.select(`
+				.select(
+					`
 					*,
 					vehicles:vehicle_id(code, name),
 					drivers:driver_id(employee_code, name),
@@ -159,7 +206,8 @@ class ExportService {
 					fuel_entry_fields(
 						fields(code, name)
 					)
-				`)
+				`
+				)
 				.is('deleted_at', null)
 				.gte('entry_date', startDate)
 				.lte('entry_date', endDate)
@@ -176,7 +224,11 @@ class ExportService {
 				.map((entry: any) => {
 					// Calculate distance from odometer readings
 					let hrsKm = 0;
-					if (entry.odometer_end && entry.odometer_start && entry.odometer_end > entry.odometer_start) {
+					if (
+						entry.odometer_end &&
+						entry.odometer_start &&
+						entry.odometer_end > entry.odometer_start
+					) {
 						hrsKm = entry.odometer_end - entry.odometer_start;
 					} else if (entry.hours_worked) {
 						// Fallback to hours worked if no valid odometer readings
@@ -218,41 +270,64 @@ class ExportService {
 				});
 
 			return { data: exportData, error: null };
-			
 		} catch (error) {
-			return { 
-				data: null, 
-				error: error instanceof Error ? error.message : 'Failed to fetch export data' 
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to fetch export data'
 			};
 		}
 	}
 
 	// Generate Excel file and trigger download
 	async generateExcelFile(
-		data: ExportData[], 
-		startDate: string, 
+		data: ExportData[],
+		startDate: string,
 		endDate: string,
 		companyName: string = 'KCT Farming (Pty) Ltd'
 	): Promise<void> {
 		try {
 			// Create new workbook
 			const workbook = XLSX.utils.book_new();
-			
+
 			// Format date range for header
 			const formattedStartDate = this.formatDate(startDate);
 			const formattedEndDate = this.formatDate(endDate);
 			const dateRange = `(${formattedStartDate}-${formattedEndDate})`;
-			
+
 			// Create header data
 			const headerData = [
 				[`Vehicle Daily Capture Sheet (Estate - ${companyName}) - ${dateRange}`],
 				[],
-				['Date', 'Vehicle', 'Activity Details', '', 'Fuel Consp', '', '', 'Fuel Store', '', 'Other', ''],
-				['Date', 'Vehicle', 'Field', 'Activity', 'Fuel', 'HrsKm', 'Odo. End', 'Store', 'Issue No.', 'Tons', 'Driver']
+				[
+					'Date',
+					'Vehicle',
+					'Activity Details',
+					'',
+					'Fuel Consp',
+					'',
+					'',
+					'Fuel Store',
+					'',
+					'Other',
+					''
+				],
+				[
+					'Date',
+					'Vehicle',
+					'Field',
+					'Activity',
+					'Fuel',
+					'HrsKm',
+					'Odo. End',
+					'Store',
+					'Issue No.',
+					'Tons',
+					'Driver'
+				]
 			];
-			
+
 			// Add data rows
-			const dataRows = data.map(row => [
+			const dataRows = data.map((row) => [
 				row.date,
 				row.vehicle,
 				row.field,
@@ -268,23 +343,23 @@ class ExportService {
 
 			// Combine header and data
 			const worksheetData = [...headerData, ...dataRows];
-			
+
 			// Create worksheet
 			const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-			
+
 			// Set column widths
 			worksheet['!cols'] = [
 				{ wch: 12 }, // Date
 				{ wch: 10 }, // Vehicle
 				{ wch: 10 }, // Field
 				{ wch: 10 }, // Activity
-				{ wch: 8 },  // Fuel
-				{ wch: 8 },  // HrsKm
+				{ wch: 8 }, // Fuel
+				{ wch: 8 }, // HrsKm
 				{ wch: 10 }, // Odo. End
 				{ wch: 10 }, // Store
 				{ wch: 10 }, // Issue No.
-				{ wch: 8 },  // Tons
-				{ wch: 8 }   // Driver
+				{ wch: 8 }, // Tons
+				{ wch: 8 } // Driver
 			];
 
 			// Merge cells for main header
@@ -293,7 +368,7 @@ class ExportService {
 				{ s: { r: 2, c: 2 }, e: { r: 2, c: 3 } }, // Activity Details
 				{ s: { r: 2, c: 4 }, e: { r: 2, c: 6 } }, // Fuel Consp
 				{ s: { r: 2, c: 7 }, e: { r: 2, c: 8 } }, // Fuel Store
-				{ s: { r: 2, c: 9 }, e: { r: 2, c: 10 } }  // Other
+				{ s: { r: 2, c: 9 }, e: { r: 2, c: 10 } } // Other
 			];
 
 			// Clean-ledger styling: monochrome, hairline borders,
@@ -307,21 +382,26 @@ class ExportService {
 				columnStyles: {
 					4: { numFmt: '#,##0.0', halign: 'right', fontColor: XL_RED }, // Fuel (litres dispensed = fuel out)
 					5: { numFmt: '#,##0.0', halign: 'right' }, // HrsKm
-					6: { numFmt: '#,##0', halign: 'right' },   // Odo. End
-					8: { numFmt: '0', halign: 'right' },       // Issue No.
-					9: { numFmt: '#,##0.0', halign: 'right' }  // Tons
+					6: { numFmt: '#,##0', halign: 'right' }, // Odo. End
+					8: { numFmt: '0', halign: 'right' }, // Issue No.
+					9: { numFmt: '#,##0.0', halign: 'right' } // Tons
 				}
 			});
+			for (let column = 0; column < 10; column++) {
+				const cell: any = (worksheet as any)[
+					XLSX.utils.encode_cell({ r: worksheetData.length - 1, c: column })
+				];
+				if (cell) cell.s = { ...cell.s, font: { ...(cell.s?.font || {}), bold: true } };
+			}
 
 			// Add worksheet to workbook
 			XLSX.utils.book_append_sheet(workbook, worksheet, 'Vehicle Daily Capture');
-			
+
 			// Generate filename
 			const filename = `Vehicle_Daily_Capture_${startDate}_to_${endDate}.xlsx`;
-			
+
 			// Write and download file
 			XLSX.writeFile(workbook, filename);
-			
 		} catch (error) {
 			console.error('Failed to generate Excel file:', error);
 			throw new Error('Failed to generate Excel file');
@@ -338,77 +418,107 @@ class ExportService {
 	async getMonthlySummaryForExport(
 		year: number,
 		month: number,
-		supabaseService: any
-	): Promise<ApiResponse<MonthlySummaryData[]>> {
+		supabaseService: MonthlyClaimDataService
+	): Promise<ApiResponse<MonthlyClaimExportData>> {
 		try {
 			await supabaseService.init();
 			const client = supabaseService.getClient();
-			
+
 			// Get start and end dates for the month (using UTC to avoid timezone issues)
 			const startDate = new Date(Date.UTC(year, month - 1, 1)).toISOString().split('T')[0];
 			const endDate = new Date(Date.UTC(year, month, 0)).toISOString().split('T')[0];
-			
-			// Fetch fuel entries with vehicle data for the month
-			const result = await client
-				.from('fuel_entries')
-				.select(`
-					*,
-					vehicles:vehicle_id(id, code, name, type, odometer_unit, registration)
-				`)
-				.is('deleted_at', null)
-				.gte('entry_date', startDate)
-				.lte('entry_date', endDate)
-				.order('entry_date', { ascending: true })
-				.order('time', { ascending: true });
 
-			if (result.error) {
-				return { data: null, error: result.error.message };
-			}
+			const [result, adjustmentsResult] = await Promise.all([
+				client
+					.from('fuel_entries')
+					.select(
+						`
+						*,
+						vehicles:vehicle_id(id, code, name, type, odometer_unit, registration, diesel_claim_method),
+						activities:activity_id(id, name, diesel_claim_eligible, diesel_claim_reviewed_at)
+					`
+					)
+					.is('deleted_at', null)
+					.gte('entry_date', startDate)
+					.lte('entry_date', endDate)
+					.order('entry_date', { ascending: true })
+					.order('time', { ascending: true }),
+				supabaseService.getVehicleMonthlyClaimAdjustments(startDate, startDate)
+			]);
+
+			if (result.error) return { data: null, error: result.error.message };
+			if (adjustmentsResult.error) return { data: null, error: adjustmentsResult.error };
+			const adjustments = adjustmentsResult.data || [];
+			const adjustmentByVehicle = new Map(adjustments.map((item) => [item.vehicle_id, item]));
 
 			// Group data by vehicle and calculate summaries
-			const vehicleSummaries = new Map<string, {
-				code: string;
-				name: string;
-				type: string;
-				registration: string;
-				odometerUnit: string;
-				totalFuel: number;
-				firstOdometer: number | null;
-				lastOdometer: number | null;
-				totalHours: number;
-				hasOdometerData: boolean;
-				hasHoursData: boolean;
-				entries: any[];
-			}>();
+			const vehicleSummaries = new Map<
+				string,
+				{
+					vehicleId: string;
+					code: string;
+					name: string;
+					type: string;
+					registration: string;
+					odometerUnit: string | null;
+					claimMethod: DieselClaimMethod;
+					totalFuel: number;
+					baseEligibleFuel: number;
+					firstOdometer: number | null;
+					lastOdometer: number | null;
+					totalHours: number;
+					hasOdometerData: boolean;
+					hasHoursData: boolean;
+					activities: Map<
+						string,
+						{ name: string; eligible: boolean; reviewed: boolean; litres: number }
+					>;
+				}
+			>();
 
-			result.data.forEach((entry: any) => {
+			(result.data || []).forEach((entry: any) => {
 				const vehicleId = entry.vehicle_id;
-				const vehicle = entry.vehicles;
-				
+				const vehicle = Array.isArray(entry.vehicles) ? entry.vehicles[0] : entry.vehicles;
+				const activity = Array.isArray(entry.activities) ? entry.activities[0] : entry.activities;
+
 				if (!vehicle) return;
-				
+
 				const key = vehicleId;
 				if (!vehicleSummaries.has(key)) {
 					vehicleSummaries.set(key, {
+						vehicleId,
 						code: vehicle.code || 'N/A',
 						name: vehicle.name || 'Unknown',
 						type: vehicle.type || 'Other',
 						registration: vehicle.registration || '',
-						odometerUnit: vehicle.odometer_unit || null, // Keep null instead of defaulting to 'km'
+						odometerUnit: vehicle.odometer_unit || null,
+						claimMethod: vehicle.diesel_claim_method || 'activity_only',
 						totalFuel: 0,
+						baseEligibleFuel: 0,
 						firstOdometer: null,
 						lastOdometer: null,
 						totalHours: 0,
 						hasOdometerData: false,
 						hasHoursData: false,
-						entries: []
+						activities: new Map()
 					});
 				}
 
 				const summary = vehicleSummaries.get(key)!;
-				summary.entries.push(entry);
-				summary.totalFuel += entry.litres_dispensed || 0;
-				
+				const litres = Number(entry.litres_dispensed || 0);
+				const activityEligible = activity?.diesel_claim_eligible === true;
+				summary.totalFuel += litres;
+				if (activityEligible) summary.baseEligibleFuel += litres;
+				const activityKey = activity?.id || 'unknown';
+				const activitySummary = summary.activities.get(activityKey) || {
+					name: activity?.name || 'Unknown / unassigned',
+					eligible: activityEligible,
+					reviewed: !!activity?.diesel_claim_reviewed_at,
+					litres: 0
+				};
+				activitySummary.litres += litres;
+				summary.activities.set(activityKey, activitySummary);
+
 				// Track odometer readings to get month start and end
 				if (entry.odometer_start && entry.odometer_start > 0) {
 					if (summary.firstOdometer === null || entry.odometer_start < summary.firstOdometer) {
@@ -416,48 +526,54 @@ class ExportService {
 					}
 					summary.hasOdometerData = true;
 				}
-				
+
 				if (entry.odometer_end && entry.odometer_end > 0) {
 					if (summary.lastOdometer === null || entry.odometer_end > summary.lastOdometer) {
 						summary.lastOdometer = entry.odometer_end;
 					}
 					summary.hasOdometerData = true;
 				}
-				
+
 				if (entry.hours_worked && entry.hours_worked > 0) {
 					summary.totalHours += entry.hours_worked;
 					summary.hasHoursData = true;
 				}
 			});
 
-			// Transform to export format
+			const details: MonthlyClaimDetailData[] = [];
+			const warnings: string[] = [];
 			const summaryData: MonthlySummaryData[] = Array.from(vehicleSummaries.values())
-				.filter(summary => summary.totalFuel > 0) // Only include vehicles with fuel consumption
-				.map(summary => {
+				.filter((summary) => summary.totalFuel > 0) // Only include vehicles with fuel consumption
+				.map((summary) => {
 					let distance: number | string = '';
 					let consumption: number | string = '';
 					let unit = '';
-					
+
 					// Only calculate if there is an odometer_unit (not null, not undefined, not empty)
-					if (summary.odometerUnit !== null && summary.odometerUnit !== undefined && summary.odometerUnit.trim() !== '') {
+					if (summary.odometerUnit?.trim()) {
 						unit = summary.odometerUnit;
-						
+
 						// Calculate distance based on odometer difference
-						if (summary.hasOdometerData && summary.firstOdometer !== null && summary.lastOdometer !== null) {
+						if (
+							summary.hasOdometerData &&
+							summary.firstOdometer !== null &&
+							summary.lastOdometer !== null
+						) {
 							const odometerDifference = summary.lastOdometer - summary.firstOdometer;
 							if (odometerDifference > 0) {
 								distance = Math.round(odometerDifference * 100) / 100; // 2 decimal places
-								
+
 								// Calculate consumption: fuel / distance
 								// If unit is km, multiply by 100 to get L/100km
 								if (unit.toLowerCase() === 'km') {
-									consumption = Math.round((summary.totalFuel / (odometerDifference / 100)) * 100) / 100; // L/100km, 2 decimal places
+									consumption =
+										Math.round((summary.totalFuel / (odometerDifference / 100)) * 100) / 100; // L/100km, 2 decimal places
 								} else {
 									consumption = Math.round((summary.totalFuel / odometerDifference) * 100) / 100; // L per unit, 2 decimal places
 								}
 							} else {
 								// No movement - show 0.00 distance and no consumption
-								distance = 0.00;
+								distance = 0.0;
 								consumption = '';
 							}
 						} else {
@@ -468,7 +584,47 @@ class ExportService {
 					}
 					// If no odometer_unit, distance, consumption, and unit remain empty
 
+					const adjustment = adjustmentByVehicle.get(summary.vehicleId);
+					const claim = calculateDieselClaim({
+						totalLitres: summary.totalFuel,
+						baseEligibleLitres: summary.baseEligibleFuel,
+						method: summary.claimMethod,
+						adjustment
+					});
+					if (claim.missingAdjustment)
+						warnings.push(
+							`${summary.code}: monthly classifier result missing; all litres excluded.`
+						);
+					for (const activity of summary.activities.values()) {
+						const activityClaim = calculateDieselClaim({
+							totalLitres: activity.litres,
+							baseEligibleLitres: activity.eligible ? activity.litres : 0,
+							method: summary.claimMethod,
+							adjustment
+						});
+						if (!activity.reviewed)
+							warnings.push(`${activity.name}: activity eligibility has not been reviewed.`);
+						const detailTotal = roundClaimLitres(activityClaim.totalLitres);
+						const detailClaimable = roundClaimLitres(activityClaim.claimableLitres);
+						details.push({
+							vehicleCode: summary.code,
+							vehicleName: summary.name,
+							activityName: activity.name,
+							activityEligible: activity.eligible,
+							totalFuel: detailTotal,
+							claimablePercentage: activityClaim.claimablePercentage,
+							claimableFuel: detailClaimable,
+							nonClaimableFuel: roundClaimLitres(detailTotal - detailClaimable),
+							claimBasis: activity.eligible
+								? activityClaim.claimBasis
+								: 'Activity marked non-claimable'
+						});
+					}
+
+					const roundedTotal = roundClaimLitres(claim.totalLitres);
+					const roundedClaimable = roundClaimLitres(claim.claimableLitres);
 					return {
+						vehicleId: summary.vehicleId,
 						code: summary.code,
 						name: summary.name,
 						registration: summary.registration,
@@ -478,79 +634,141 @@ class ExportService {
 						// printable ASCII for documents.
 						category: cleanDocText(summary.type),
 						distance: distance,
-						fuel: Math.round(summary.totalFuel * 100) / 100, // 2 decimal places
+						fuel: roundedTotal,
+						baseEligibleFuel: roundClaimLitres(claim.baseEligibleLitres),
+						claimableFuel: roundedClaimable,
+						nonClaimableFuel: roundClaimLitres(roundedTotal - roundedClaimable),
+						claimablePercentage: claim.claimablePercentage,
+						claimBasis: claim.claimBasis,
+						missingAdjustment: claim.missingAdjustment,
 						consumption: consumption,
 						unit: unit
 					};
 				})
 				.sort((a, b) => a.code.localeCompare(b.code)); // Sort by vehicle code
 
-			return { data: summaryData, error: null };
-			
+			return {
+				data: {
+					summary: summaryData,
+					details: details.sort(
+						(a, b) =>
+							a.vehicleCode.localeCompare(b.vehicleCode) ||
+							a.activityName.localeCompare(b.activityName)
+					),
+					adjustments,
+					warnings: [...new Set(warnings)]
+				},
+				error: null
+			};
 		} catch (error) {
-			return { 
-				data: null, 
-				error: error instanceof Error ? error.message : 'Failed to fetch monthly summary data' 
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to fetch monthly summary data'
 			};
 		}
 	}
 
-
 	// Generate monthly summary Excel file
 	async generateMonthlySummaryExcel(
-		data: MonthlySummaryData[],
+		report: MonthlyClaimExportData,
 		year: number,
 		month: number,
 		companyName: string = 'KCT Farming (Pty) Ltd'
 	): Promise<void> {
 		try {
-			// Create new workbook
+			const data = report.summary;
 			const workbook = XLSX.utils.book_new();
-			
+
 			// Format month name
-			const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-				'July', 'August', 'September', 'October', 'November', 'December'];
+			const monthNames = [
+				'January',
+				'February',
+				'March',
+				'April',
+				'May',
+				'June',
+				'July',
+				'August',
+				'September',
+				'October',
+				'November',
+				'December'
+			];
 			const monthName = monthNames[month - 1];
-			
+
 			// Create header data
 			const headerData = [
-				[`Monthly Vehicle Summary - ${companyName} - ${monthName} ${year}`],
+				[`Monthly Fuel and Diesel Claim Summary - ${companyName} - ${monthName} ${year}`],
 				[],
-				['Code', 'Name', 'Category', 'Distance', 'Fuel', 'Consumption', 'Unit']
+				[
+					'Code',
+					'Name',
+					'Category',
+					'Distance',
+					'Total Fuel',
+					'Claimable',
+					'Non-claimable',
+					'Consumption',
+					'Unit',
+					'Claim Basis'
+				]
 			];
-			
+
 			// Add data rows
-			const dataRows = data.map(row => [
+			const dataRows = data.map((row) => [
 				row.code,
 				row.name,
 				row.category,
 				row.distance,
 				row.fuel,
+				row.claimableFuel,
+				row.nonClaimableFuel,
 				row.consumption,
-				row.unit
+				row.unit,
+				row.claimBasis
+			]);
+			const totals = data.reduce(
+				(acc, row) => ({
+					total: acc.total + row.fuel,
+					claimable: acc.claimable + row.claimableFuel
+				}),
+				{ total: 0, claimable: 0 }
+			);
+			dataRows.push([
+				'',
+				'TOTAL',
+				'',
+				'',
+				roundClaimLitres(totals.total),
+				roundClaimLitres(totals.claimable),
+				roundClaimLitres(totals.total - totals.claimable),
+				'',
+				'',
+				''
 			]);
 
 			// Combine header and data
 			const worksheetData = [...headerData, ...dataRows];
-			
+
 			// Create worksheet
 			const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-			
+
 			// Set column widths
 			worksheet['!cols'] = [
-				{ wch: 8 },  // Code
-				{ wch: 25 }, // Name
-				{ wch: 15 }, // Category
-				{ wch: 10 }, // Distance
-				{ wch: 10 }, // Fuel
-				{ wch: 12 }, // Consumption
-				{ wch: 8 }   // Unit
+				{ wch: 8 },
+				{ wch: 24 },
+				{ wch: 15 },
+				{ wch: 10 },
+				{ wch: 12 },
+				{ wch: 12 },
+				{ wch: 14 },
+				{ wch: 12 },
+				{ wch: 8 },
+				{ wch: 38 }
 			];
 
 			// Merge cells for main header
-			worksheet['!merges'] = [
-				{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } } // Main header
-			];
+			worksheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }];
 
 			// Clean-ledger styling: monochrome, hairline borders,
 			// red for fuel consumed (fuel out of the tank)
@@ -559,24 +777,114 @@ class ExportService {
 				headerRows: [2],
 				dataStartRow: 3,
 				rowCount: worksheetData.length,
-				colCount: 7,
+				colCount: 10,
 				columnStyles: {
-					3: { numFmt: '#,##0.00', halign: 'right' }, // Distance
-					4: { numFmt: '#,##0.00', halign: 'right', fontColor: XL_RED }, // Fuel (dispensed = fuel out)
-					5: { numFmt: '#,##0.00', halign: 'right' }, // Consumption
-					6: { halign: 'center' } // Unit
+					3: { numFmt: '#,##0.00', halign: 'right' },
+					4: { numFmt: '#,##0.00', halign: 'right', fontColor: XL_RED },
+					5: { numFmt: '#,##0.00', halign: 'right' },
+					6: { numFmt: '#,##0.00', halign: 'right' },
+					7: { numFmt: '#,##0.00', halign: 'right' },
+					8: { halign: 'center' }
 				}
 			});
 
 			// Add worksheet to workbook
 			XLSX.utils.book_append_sheet(workbook, worksheet, 'Monthly Summary');
-			
+
+			const detailRows: Array<Array<string | number>> = [
+				['Diesel Claim Detail'],
+				['Period', `${monthName} ${year}`],
+				...report.warnings.map((warning) => ['Warning', warning]),
+				[]
+			];
+			for (const adjustment of report.adjustments) {
+				const vehicle = data.find((row) => row.vehicleId === adjustment.vehicle_id);
+				const variance = calculateClassifierVariance(
+					vehicle?.fuel || 0,
+					adjustment.classifier_measured_litres
+				);
+				detailRows.push(
+					[
+						'Classifier vehicle',
+						vehicle ? `${vehicle.code} - ${vehicle.name}` : adjustment.vehicle_id
+					],
+					['Classifier measured litres', adjustment.classifier_measured_litres],
+					['Classifier claimable litres', adjustment.classifier_claimable_litres],
+					['Classifier percentage', adjustment.claimable_percentage / 100],
+					['Fuel Manager variance litres', roundClaimLitres(variance.litres)],
+					['Fuel Manager variance percentage', variance.percentage / 100],
+					['Source reference', adjustment.source_reference || ''],
+					['Notes', adjustment.notes || ''],
+					[]
+				);
+			}
+			const detailHeaderRow = detailRows.length;
+			detailRows.push(
+				[
+					'Vehicle',
+					'Vehicle Name',
+					'Activity',
+					'Activity Eligible',
+					'Total Fuel',
+					'Classifier %',
+					'Claimable',
+					'Non-claimable',
+					'Claim Basis'
+				],
+				...report.details.map((row) => [
+					row.vehicleCode,
+					row.vehicleName,
+					row.activityName,
+					row.activityEligible ? 'Yes' : 'No',
+					row.totalFuel,
+					row.claimablePercentage === null ? '' : row.claimablePercentage / 100,
+					row.claimableFuel,
+					row.nonClaimableFuel,
+					row.claimBasis
+				])
+			);
+			const detailSheet = XLSX.utils.aoa_to_sheet(detailRows);
+			detailSheet['!cols'] = [
+				{ wch: 10 },
+				{ wch: 24 },
+				{ wch: 28 },
+				{ wch: 17 },
+				{ wch: 12 },
+				{ wch: 13 },
+				{ wch: 12 },
+				{ wch: 14 },
+				{ wch: 38 }
+			];
+			applyLedgerStyles(detailSheet, {
+				titleRows: [0],
+				headerRows: [detailHeaderRow],
+				dataStartRow: detailHeaderRow + 1,
+				rowCount: detailRows.length,
+				colCount: 9,
+				columnStyles: {
+					4: { numFmt: '#,##0.00', halign: 'right' },
+					5: { numFmt: '0.00%', halign: 'right' },
+					6: { numFmt: '#,##0.00', halign: 'right' },
+					7: { numFmt: '#,##0.00', halign: 'right' }
+				}
+			});
+			for (let row = 0; row < detailHeaderRow; row++) {
+				const label = (detailSheet as any)[XLSX.utils.encode_cell({ r: row, c: 0 })];
+				const value = (detailSheet as any)[XLSX.utils.encode_cell({ r: row, c: 1 })];
+				if (
+					label?.v === 'Classifier percentage' ||
+					label?.v === 'Fuel Manager variance percentage'
+				) {
+					if (value) value.z = '0.00%';
+				}
+			}
+			XLSX.utils.book_append_sheet(workbook, detailSheet, 'Claim Detail');
+
 			// Generate filename
 			const filename = `Monthly_Vehicle_Summary_${year}_${month.toString().padStart(2, '0')}.xlsx`;
-			
+
 			// Write and download file
 			XLSX.writeFile(workbook, filename);
-			
 		} catch (error) {
 			console.error('Failed to generate monthly summary Excel file:', error);
 			throw new Error('Failed to generate monthly summary Excel file');
@@ -593,52 +901,64 @@ class ExportService {
 		try {
 			// Fetch data
 			const result = await this.getFuelEntriesForExport(startDate, endDate, supabaseService);
-			
+
 			if (result.error || !result.data) {
 				return { success: false, error: result.error || 'No data found' };
 			}
 
 			// Generate and download Excel file
 			await this.generateExcelFile(result.data, startDate, endDate, companyName);
-			
+
 			return { success: true };
-			
 		} catch (error) {
-			return { 
-				success: false, 
-				error: error instanceof Error ? error.message : 'Export failed' 
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Export failed'
 			};
 		}
 	}
 
 	// Generate monthly summary PDF file
 	async generateMonthlySummaryPDF(
-		data: MonthlySummaryData[],
+		report: MonthlyClaimExportData,
 		year: number,
 		month: number,
 		companyName: string = 'KCT Farming (Pty) Ltd'
 	): Promise<void> {
 		try {
+			const data = report.summary;
 			// Create new PDF document
 			const pdf = new jsPDF('p', 'mm', 'a4');
 			const pageWidth = pdf.internal.pageSize.width;
 			const pageHeight = pdf.internal.pageSize.height;
-			
+
 			// Format month name
-			const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-				'July', 'August', 'September', 'October', 'November', 'December'];
+			const monthNames = [
+				'January',
+				'February',
+				'March',
+				'April',
+				'May',
+				'June',
+				'July',
+				'August',
+				'September',
+				'October',
+				'November',
+				'December'
+			];
 			const monthName = monthNames[month - 1];
-			
+
 			// Calculate total fuel consumption
 			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
-			const averageFuel = data.length > 0 ? totalFuel / data.length : 0;
-			
+			const totalClaimable = data.reduce((sum, vehicle) => sum + vehicle.claimableFuel, 0);
+
 			// Minimal journal-style header: bold black title, small grey subtitle, hairline rule
 			const marginX = 20;
 			pdf.setFontSize(16);
 			pdf.setFont('helvetica', 'bold');
 			pdf.setTextColor(0, 0, 0);
-			pdf.text('Monthly Fuel Consumption Report', marginX, 24);
+			pdf.text('Monthly Fuel and Diesel Claim Report', marginX, 24);
 
 			pdf.setFontSize(10);
 			pdf.setFont('helvetica', 'normal');
@@ -659,36 +979,38 @@ class ExportService {
 			pdf.setFont('helvetica', 'normal');
 			pdf.text(`Total Active Vehicles: ${data.length}`, marginX, 55);
 			pdf.text(`Total Fuel Consumption: ${totalFuel.toFixed(2)} Litres`, marginX, 60);
+			pdf.text(
+				`Claimable: ${totalClaimable.toFixed(2)} L | Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`,
+				marginX,
+				65
+			);
 
 			// Table with separate name and registration columns
-			const tableStartY = 68;
-			const tableData = data.map(vehicle => [
+			const tableStartY = 73;
+			const tableData = data.map((vehicle) => [
 				vehicle.code,
 				vehicle.name,
-				vehicle.registration || '—',
-				vehicle.category,
-				vehicle.distance === '' ? '—' : vehicle.distance.toString(),
 				vehicle.fuel.toFixed(2),
-				vehicle.consumption === '' ? '—' : vehicle.consumption.toString(),
-				vehicle.unit || '—'
+				vehicle.claimableFuel.toFixed(2),
+				vehicle.nonClaimableFuel.toFixed(2),
+				vehicle.claimBasis
 			]);
-			
-			// Add subtotal row (8 cells — fuel total sits under the Fuel column)
+
 			tableData.push([
 				'',
-				'',
-				'',
-				'',
-				'',
+				'TOTAL',
 				`${totalFuel.toFixed(2)}`,
-				'',
+				`${totalClaimable.toFixed(2)}`,
+				`${(totalFuel - totalClaimable).toFixed(2)}`,
 				''
 			]);
 
 			// Minimal ledger table: white header, grey hairline grid, tabular right-aligned numerals
 			autoTable(pdf, {
 				startY: tableStartY,
-				head: [['Vehicle ID', 'Vehicle Name', 'Registration', 'Classification', 'Distance', 'Fuel (L)', 'Efficiency*', 'Unit']],
+				head: [
+					['Vehicle', 'Name', 'Total (L)', 'Claimable (L)', 'Non-claimable (L)', 'Claim Basis']
+				],
 				body: tableData,
 				theme: 'grid',
 				styles: {
@@ -711,14 +1033,12 @@ class ExportService {
 					lineWidth: 0.1
 				},
 				columnStyles: {
-					0: { halign: 'center' }, // Vehicle ID
-					1: { halign: 'left' }, // Vehicle Name
-					2: { halign: 'center' }, // Registration
-					3: { halign: 'center' }, // Classification
-					4: { halign: 'right' }, // Distance
-					5: { halign: 'right' }, // Fuel
-					6: { halign: 'right' }, // Efficiency
-					7: { halign: 'center' } // Unit
+					0: { halign: 'center' },
+					1: { halign: 'left' },
+					2: { halign: 'right' },
+					3: { halign: 'right' },
+					4: { halign: 'right' },
+					5: { halign: 'left', cellWidth: 42 }
 				},
 				didParseCell: function (data: any) {
 					if (data.section !== 'body') return;
@@ -754,13 +1074,16 @@ class ExportService {
 			pdf.setFontSize(8);
 			pdf.setFont('helvetica', 'italic');
 			pdf.setTextColor(...PDF_GREY);
-			pdf.text('* Efficiency calculated as L/100km or L/hr depending on the unit', marginX, finalY);
+			pdf.text(
+				'* Claimable plus non-claimable litres reconcile to total fuel recorded.',
+				marginX,
+				finalY
+			);
 			pdf.setTextColor(0, 0, 0);
-			
+
 			// Generate filename and download
 			const filename = `Fuel_Analysis_Report_${year}_${month.toString().padStart(2, '0')}.pdf`;
 			pdf.save(filename);
-			
 		} catch (error) {
 			console.error('Failed to generate monthly summary PDF file:', error);
 			throw new Error('Failed to generate monthly summary PDF file');
@@ -777,20 +1100,19 @@ class ExportService {
 		try {
 			// Fetch data
 			const result = await this.getMonthlySummaryForExport(year, month, supabaseService);
-			
+
 			if (result.error || !result.data) {
 				return { success: false, error: result.error || 'No data found' };
 			}
 
 			// Generate and download Excel file
 			await this.generateMonthlySummaryExcel(result.data, year, month, companyName);
-			
+
 			return { success: true };
-			
 		} catch (error) {
-			return { 
-				success: false, 
-				error: error instanceof Error ? error.message : 'Monthly summary export failed' 
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Monthly summary export failed'
 			};
 		}
 	}
@@ -805,20 +1127,19 @@ class ExportService {
 		try {
 			// Fetch data
 			const result = await this.getMonthlySummaryForExport(year, month, supabaseService);
-			
+
 			if (result.error || !result.data) {
 				return { success: false, error: result.error || 'No data found' };
 			}
 
 			// Generate and download PDF file
 			await this.generateMonthlySummaryPDF(result.data, year, month, companyName);
-			
+
 			return { success: true };
-			
 		} catch (error) {
-			return { 
-				success: false, 
-				error: error instanceof Error ? error.message : 'Monthly summary PDF export failed' 
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Monthly summary PDF export failed'
 			};
 		}
 	}
@@ -833,14 +1154,26 @@ class ExportService {
 		try {
 			// Fetch vehicle data
 			const vehicleResult = await this.getMonthlySummaryForExport(year, month, supabaseService);
-			
+
 			if (vehicleResult.error || !vehicleResult.data) {
 				return { success: false, error: vehicleResult.error || 'No vehicle data found' };
 			}
 
 			// Format month name
-			const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-				'July', 'August', 'September', 'October', 'November', 'December'];
+			const monthNames = [
+				'January',
+				'February',
+				'March',
+				'April',
+				'May',
+				'June',
+				'July',
+				'August',
+				'September',
+				'October',
+				'November',
+				'December'
+			];
 			const monthName = monthNames[month - 1];
 
 			// Fetch reconciliation data for the month
@@ -867,31 +1200,40 @@ class ExportService {
 
 			try {
 				// Performance optimization: Execute all reconciliation queries in parallel
-				const [fuelReconResult, tankStartReconResult, tankEndReconResult, dipReadingResult, tankActivitiesResult] = await Promise.all([
+				const [
+					fuelReconResult,
+					tankStartReconResult,
+					tankEndReconResult,
+					dipReadingResult,
+					tankActivitiesResult
+				] = await Promise.all([
 					// Fuel reconciliation data
 					supabaseService.getDateRangeReconciliationData(monthStart, monthEnd),
 
 					// Tank reconciliation data for opening level (previous month's closing)
 					supabaseService.query(() =>
-						supabaseService.ensureInitialized()
+						supabaseService
+							.ensureInitialized()
 							.from('tank_reconciliations')
 							.select('*')
 							.eq('reconciliation_date', prevMonthEnd)
 							.maybeSingle()
 					),
-					
+
 					// Tank reconciliation data for month end (closing level)
 					supabaseService.query(() =>
-						supabaseService.ensureInitialized()
+						supabaseService
+							.ensureInitialized()
 							.from('tank_reconciliations')
 							.select('*')
 							.eq('reconciliation_date', monthEnd)
 							.maybeSingle()
 					),
-					
+
 					// Actual dip reading from tank_readings table (last reading of the month)
 					supabaseService.query(() =>
-						supabaseService.ensureInitialized()
+						supabaseService
+							.ensureInitialized()
 							.from('tank_readings')
 							.select('*')
 							.gte('reading_date', monthStart)
@@ -900,10 +1242,11 @@ class ExportService {
 							.limit(1)
 							.maybeSingle()
 					),
-					
+
 					// Tank activities (refills and adjustments) for the month
 					supabaseService.query(() =>
-						supabaseService.ensureInitialized()
+						supabaseService
+							.ensureInitialized()
 							.from('tank_refills')
 							.select('delivery_date, litres_added, invoice_number')
 							.gte('delivery_date', monthStart)
@@ -934,47 +1277,58 @@ class ExportService {
 				if (tankActivitiesResult.data) {
 					reconciliationData.tankActivities = tankActivitiesResult.data || [];
 				}
-
 			} catch (reconError) {
 				console.warn('Could not fetch reconciliation data:', reconError);
 			}
 
 			// Generate enhanced PDF with reconciliation data
 			await this.generateMonthlySummaryPDFWithReconciliation(
-				vehicleResult.data, 
-				reconciliationData, 
-				year, 
-				month, 
+				vehicleResult.data,
+				reconciliationData,
+				year,
+				month,
 				companyName
 			);
-			
+
 			return { success: true };
-			
 		} catch (error) {
-			return { 
-				success: false, 
-				error: error instanceof Error ? error.message : 'Enhanced PDF export failed' 
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : 'Enhanced PDF export failed'
 			};
 		}
 	}
 
 	// Generate enhanced monthly summary PDF with reconciliation data (journal style)
 	async generateMonthlySummaryPDFWithReconciliation(
-		data: MonthlySummaryData[],
+		report: MonthlyClaimExportData,
 		reconciliationData: any,
 		year: number,
 		month: number,
 		companyName: string = 'KCT Farming (Pty) Ltd'
 	): Promise<void> {
 		try {
+			const data = report.summary;
 			// Create new PDF document
 			const pdf = new jsPDF('p', 'mm', 'a4');
 			const pageWidth = pdf.internal.pageSize.width;
 			const pageHeight = pdf.internal.pageSize.height;
 
 			// Format month name
-			const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-				'July', 'August', 'September', 'October', 'November', 'December'];
+			const monthNames = [
+				'January',
+				'February',
+				'March',
+				'April',
+				'May',
+				'June',
+				'July',
+				'August',
+				'September',
+				'October',
+				'November',
+				'December'
+			];
 			const monthName = monthNames[month - 1];
 
 			// Calculate previous month's last day for opening level
@@ -984,14 +1338,14 @@ class ExportService {
 
 			// Calculate total fuel consumption
 			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
-			const averageFuel = data.length > 0 ? totalFuel / data.length : 0;
-			
+			const totalClaimable = data.reduce((sum, vehicle) => sum + vehicle.claimableFuel, 0);
+
 			// Minimal journal-style header: bold black title, small grey subtitle, hairline rule
 			const marginX = 20;
 			pdf.setFontSize(16);
 			pdf.setFont('helvetica', 'bold');
 			pdf.setTextColor(0, 0, 0);
-			pdf.text('Monthly Fuel Consumption Report', marginX, 18);
+			pdf.text('Monthly Fuel and Diesel Claim Report', marginX, 18);
 
 			pdf.setFontSize(10);
 			pdf.setFont('helvetica', 'normal');
@@ -1011,42 +1365,37 @@ class ExportService {
 			const valueX = 80;
 			const detailsX = 135;
 
-			// Start table directly after header
-			let yPos = 42;
+			pdf.setFontSize(9);
+			pdf.setFont('helvetica', 'normal');
+			pdf.text(`Total fuel: ${totalFuel.toFixed(2)} L`, marginX, 42);
+			pdf.text(`Claimable: ${totalClaimable.toFixed(2)} L`, 82, 42);
+			pdf.text(`Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`, 138, 42);
 
-			// Professional table with separate name and registration columns
-			const tableStartY = yPos;
-			const tableData = data.map(vehicle => [
+			const claimTableData = data.map((vehicle) => [
 				vehicle.code,
 				vehicle.name,
-				vehicle.registration || '—',
-				vehicle.category,
-				vehicle.distance === '' ? '—' : vehicle.distance.toString(),
 				vehicle.fuel.toFixed(2),
-				vehicle.consumption === '' ? '—' : vehicle.consumption.toString(),
-				vehicle.unit || '—'
+				vehicle.claimableFuel.toFixed(2),
+				vehicle.nonClaimableFuel.toFixed(2),
+				vehicle.claimBasis
 			]);
-			
-			// Add subtotal row
-			tableData.push([
+			claimTableData.push([
 				'',
-				'',
-				'',
-				'',
-				'',
-				`${totalFuel.toFixed(2)}`,
-				'',
+				'TOTAL',
+				totalFuel.toFixed(2),
+				totalClaimable.toFixed(2),
+				(totalFuel - totalClaimable).toFixed(2),
 				''
 			]);
-
-			// Minimal ledger table: white header, grey hairline grid, tabular right-aligned numerals
 			autoTable(pdf, {
-				startY: tableStartY,
-				head: [['Vehicle ID', 'Vehicle Name', 'Registration', 'Classification', 'Distance', 'Fuel (L)', 'Efficiency*', 'Unit']],
-				body: tableData,
+				startY: 48,
+				head: [
+					['Vehicle', 'Name', 'Total (L)', 'Claimable (L)', 'Non-claimable (L)', 'Claim Basis']
+				],
+				body: claimTableData,
 				theme: 'grid',
 				styles: {
-					fontSize: 9,
+					fontSize: 8,
 					cellPadding: 1.5,
 					lineColor: PDF_HAIRLINE,
 					lineWidth: 0.1,
@@ -1065,29 +1414,124 @@ class ExportService {
 					lineWidth: 0.1
 				},
 				columnStyles: {
-					0: { halign: 'center' }, // Vehicle ID
-					1: { halign: 'left' }, // Vehicle Name
-					2: { halign: 'center' }, // Registration
-					3: { halign: 'center' }, // Classification
-					4: { halign: 'right' }, // Distance
-					5: { halign: 'right' }, // Fuel
-					6: { halign: 'right' }, // Efficiency
-					7: { halign: 'center' } // Unit
+					0: { halign: 'center', cellWidth: 15 },
+					1: { halign: 'left', cellWidth: 36 },
+					2: { halign: 'right', cellWidth: 20 },
+					3: { halign: 'right', cellWidth: 23 },
+					4: { halign: 'right', cellWidth: 27 },
+					5: { halign: 'left' }
 				},
 				didParseCell: function (data: any) {
-					if (data.section !== 'body') return;
-					// Style the subtotal row (last row): bold, no fill.
-					// The Fuel column stays black — red is reserved for tank
-					// MOVEMENTS in the reconciliation, so it keeps its meaning.
-					if (data.row.index === tableData.length - 1) {
+					if (data.section === 'body' && data.row.index === claimTableData.length - 1) {
 						data.cell.styles.fontStyle = 'bold';
 					}
 				},
 				margin: { left: marginX, right: marginX }
 			});
 
-			// Get table end position
-			const tableEndY = (pdf as any).lastAutoTable.finalY || tableStartY + 100;
+			let claimNoteY = ((pdf as any).lastAutoTable.finalY || 90) + 7;
+			for (const adjustment of report.adjustments) {
+				const vehicle = data.find((row) => row.vehicleId === adjustment.vehicle_id);
+				const variance = calculateClassifierVariance(
+					vehicle?.fuel || 0,
+					adjustment.classifier_measured_litres
+				);
+				if (claimNoteY > pageHeight - 35) {
+					pdf.addPage();
+					claimNoteY = 20;
+				}
+				pdf.setFontSize(9);
+				pdf.setFont('helvetica', 'bold');
+				pdf.text(`${vehicle?.code || 'Classifier vehicle'} calculation`, marginX, claimNoteY);
+				claimNoteY += 5;
+				pdf.setFont('helvetica', 'normal');
+				pdf.text(
+					`${adjustment.classifier_claimable_litres.toFixed(2)} L / ${adjustment.classifier_measured_litres.toFixed(2)} L = ${adjustment.claimable_percentage.toFixed(2)}%`,
+					marginX,
+					claimNoteY
+				);
+				claimNoteY += 4;
+				pdf.setTextColor(
+					...(variance.exceedsThreshold ? ([160, 94, 16] as [number, number, number]) : PDF_GREY)
+				);
+				pdf.text(
+					`Fuel Manager vs telematics: ${variance.litres >= 0 ? '+' : ''}${variance.litres.toFixed(2)} L (${variance.percentage >= 0 ? '+' : ''}${variance.percentage.toFixed(1)}%)`,
+					marginX,
+					claimNoteY
+				);
+				pdf.setTextColor(0, 0, 0);
+				claimNoteY += 4;
+				if (adjustment.source_reference) {
+					pdf.setTextColor(...PDF_GREY);
+					pdf.text(`Source: ${cleanDocText(adjustment.source_reference)}`, marginX, claimNoteY);
+					pdf.setTextColor(0, 0, 0);
+					claimNoteY += 4;
+				}
+			}
+			for (const warning of report.warnings) {
+				if (claimNoteY > pageHeight - 25) {
+					pdf.addPage();
+					claimNoteY = 20;
+				}
+				pdf.setFontSize(8);
+				pdf.setTextColor(160, 94, 16);
+				const lines = pdf.splitTextToSize(
+					`Warning: ${cleanDocText(warning)}`,
+					pageWidth - marginX * 2
+				);
+				pdf.text(lines, marginX, claimNoteY);
+				claimNoteY += lines.length * 3.5 + 1;
+			}
+			pdf.setTextColor(0, 0, 0);
+
+			pdf.addPage();
+			pdf.setFontSize(12);
+			pdf.setFont('helvetica', 'bold');
+			pdf.text('Vehicle Consumption Detail', marginX, 20);
+			const consumptionTable = data.map((vehicle) => [
+				vehicle.code,
+				vehicle.name,
+				vehicle.registration || '—',
+				vehicle.category,
+				vehicle.distance === '' ? '—' : vehicle.distance.toString(),
+				vehicle.fuel.toFixed(2),
+				vehicle.consumption === '' ? '—' : vehicle.consumption.toString(),
+				vehicle.unit || '—'
+			]);
+			autoTable(pdf, {
+				startY: 26,
+				head: [
+					[
+						'Vehicle',
+						'Name',
+						'Registration',
+						'Classification',
+						'Distance',
+						'Fuel (L)',
+						'Efficiency*',
+						'Unit'
+					]
+				],
+				body: consumptionTable,
+				theme: 'grid',
+				styles: {
+					fontSize: 8,
+					cellPadding: 1.4,
+					lineColor: PDF_HAIRLINE,
+					lineWidth: 0.1,
+					textColor: [0, 0, 0]
+				},
+				headStyles: {
+					fillColor: [255, 255, 255],
+					textColor: [0, 0, 0],
+					fontStyle: 'bold',
+					lineColor: PDF_HAIRLINE,
+					lineWidth: 0.1
+				},
+				columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } },
+				margin: { left: marginX, right: marginX }
+			});
+			const tableEndY = (pdf as any).lastAutoTable.finalY || 80;
 			let reconciliationY = tableEndY + 15;
 
 			// Page-break guard: the reconciliation block previously ran into the
@@ -1102,7 +1546,7 @@ class ExportService {
 				}
 			};
 
-			// Add footnote about efficiency - reduced spacing
+			// Add footnote about efficiency.
 			pdf.setFontSize(8);
 			pdf.setFont('helvetica', 'italic');
 			pdf.setTextColor(...PDF_GREY);
@@ -1121,7 +1565,11 @@ class ExportService {
 
 			pdf.text('Fuel Dispensed:', labelX, reconciliationY);
 			pdf.setTextColor(...PDF_RED); // fuel out
-			pdf.text(`${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(
+				`${reconciliationData.fuelDispensed.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
+				valueX,
+				reconciliationY
+			);
 			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
 
@@ -1129,21 +1577,33 @@ class ExportService {
 			const bowserClosingDate = `${new Date(year, month, 0).getDate()} ${monthName} ${year}`;
 
 			pdf.text('Bowser Opening:', labelX, reconciliationY);
-			pdf.text(`${reconciliationData.bowserStart.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(
+				`${reconciliationData.bowserStart.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
+				valueX,
+				reconciliationY
+			);
 			pdf.setTextColor(...PDF_GREY);
 			pdf.text(`(${bowserOpeningDate})`, detailsX, reconciliationY);
 			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
 
 			pdf.text('Bowser Closing:', labelX, reconciliationY);
-			pdf.text(`${reconciliationData.bowserEnd.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(
+				`${reconciliationData.bowserEnd.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
+				valueX,
+				reconciliationY
+			);
 			pdf.setTextColor(...PDF_GREY);
 			pdf.text(`(${bowserClosingDate})`, detailsX, reconciliationY);
 			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
 
 			pdf.text('Bowser Difference:', labelX, reconciliationY);
-			pdf.text(`${bowserDifference.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(
+				`${bowserDifference.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
+				valueX,
+				reconciliationY
+			);
 			reconciliationY += 4;
 
 			pdf.text('Fuel Variance:', labelX, reconciliationY);
@@ -1166,7 +1626,11 @@ class ExportService {
 
 			pdf.setFont('helvetica', 'bold');
 			pdf.text('Opening Balance:', labelX, reconciliationY);
-			pdf.text(`${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(
+				`${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
+				valueX,
+				reconciliationY
+			);
 			pdf.setFont('helvetica', 'normal');
 			pdf.setTextColor(...PDF_GREY);
 			pdf.text(`(${openingDate})`, detailsX, reconciliationY);
@@ -1176,35 +1640,45 @@ class ExportService {
 			// Tank Activities with improved formatting
 			if (reconciliationData.tankActivities.length > 0) {
 				let totalAdditions = 0;
-				reconciliationData.tankActivities.forEach(activity => {
-					ensureRoom();
-					const activityDate = new Date(activity.delivery_date).toLocaleDateString('en-ZA', {
-						day: 'numeric',
-						month: 'short'
-					});
-					const amount = activity.litres_added || 0;
-					totalAdditions += amount;
-					const sign = amount >= 0 ? '+' : '';
-					const invoiceText = activity.invoice_number || 'Adjustment';
+				reconciliationData.tankActivities.forEach(
+					(activity: { delivery_date: string; litres_added?: number; invoice_number?: string }) => {
+						ensureRoom();
+						const activityDate = new Date(activity.delivery_date).toLocaleDateString('en-ZA', {
+							day: 'numeric',
+							month: 'short'
+						});
+						const amount = activity.litres_added || 0;
+						totalAdditions += amount;
+						const sign = amount >= 0 ? '+' : '';
+						const invoiceText = activity.invoice_number || 'Adjustment';
 
-					pdf.text(`• ${activityDate}:`, labelX + 5, reconciliationY);
-					// Deliveries/refills (fuel in) -> green; negative adjustments (fuel out) -> red
-					if (amount >= 0) {
-						pdf.setTextColor(...PDF_GREEN);
-					} else {
-						pdf.setTextColor(...PDF_RED);
+						pdf.text(`• ${activityDate}:`, labelX + 5, reconciliationY);
+						// Deliveries/refills (fuel in) -> green; negative adjustments (fuel out) -> red
+						if (amount >= 0) {
+							pdf.setTextColor(...PDF_GREEN);
+						} else {
+							pdf.setTextColor(...PDF_RED);
+						}
+						pdf.text(
+							`${sign}${amount.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
+							valueX,
+							reconciliationY
+						);
+						pdf.setTextColor(...PDF_GREY);
+						pdf.text(`(${invoiceText})`, detailsX, reconciliationY);
+						pdf.setTextColor(0, 0, 0);
+						reconciliationY += 4;
 					}
-					pdf.text(`${sign}${amount.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
-					pdf.setTextColor(...PDF_GREY);
-					pdf.text(`(${invoiceText})`, detailsX, reconciliationY);
-					pdf.setTextColor(0, 0, 0);
-					reconciliationY += 4;
-				});
+				);
 
 				pdf.setFont('helvetica', 'bold');
 				pdf.text('Total Additions:', labelX, reconciliationY);
 				pdf.setTextColor(...PDF_GREEN); // fuel in
-				pdf.text(`+${totalAdditions.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+				pdf.text(
+					`+${totalAdditions.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
+					valueX,
+					reconciliationY
+				);
 				pdf.setTextColor(0, 0, 0);
 				pdf.setFont('helvetica', 'normal');
 				reconciliationY += 4;
@@ -1215,19 +1689,33 @@ class ExportService {
 			pdf.setFont('helvetica', 'bold');
 			pdf.text('Total Drawings:', labelX, reconciliationY);
 			pdf.setTextColor(...PDF_RED); // fuel out
-			pdf.text(`-${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(
+				`-${reconciliationData.fuelDispensed.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
+				valueX,
+				reconciliationY
+			);
 			pdf.setTextColor(0, 0, 0);
 			pdf.setFont('helvetica', 'normal');
 			reconciliationY += 4;
 
 			// Expected vs Actual calculation
-			const totalTankAdditions = reconciliationData.tankActivities.reduce((sum, activity) => sum + (activity.litres_added || 0), 0);
-			const expectedLevel = reconciliationData.tankStartCalculated - reconciliationData.fuelDispensed + totalTankAdditions;
+			const totalTankAdditions = reconciliationData.tankActivities.reduce(
+				(sum: number, activity: { litres_added?: number }) => sum + (activity.litres_added || 0),
+				0
+			);
+			const expectedLevel =
+				reconciliationData.tankStartCalculated -
+				reconciliationData.fuelDispensed +
+				totalTankAdditions;
 
-			const calculationFormula = `(${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', {minimumFractionDigits: 1})} - ${reconciliationData.fuelDispensed.toLocaleString('en-ZA', {minimumFractionDigits: 1})} + ${totalTankAdditions.toLocaleString('en-ZA', {minimumFractionDigits: 1})})`;
+			const calculationFormula = `(${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', { minimumFractionDigits: 1 })} - ${reconciliationData.fuelDispensed.toLocaleString('en-ZA', { minimumFractionDigits: 1 })} + ${totalTankAdditions.toLocaleString('en-ZA', { minimumFractionDigits: 1 })})`;
 			pdf.setFont('helvetica', 'bold');
 			pdf.text('Closing Balance:', labelX, reconciliationY);
-			pdf.text(`${expectedLevel.toLocaleString('en-ZA', {minimumFractionDigits: 1})}L`, valueX, reconciliationY);
+			pdf.text(
+				`${expectedLevel.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
+				valueX,
+				reconciliationY
+			);
 			pdf.setFont('helvetica', 'normal');
 			pdf.setTextColor(...PDF_GREY);
 			pdf.text(calculationFormula, detailsX, reconciliationY);
@@ -1249,7 +1737,11 @@ class ExportService {
 				reconciliationY
 			);
 			pdf.setTextColor(...PDF_GREY);
-			pdf.text(hasDip ? `(${actualReadingDate})` : '(no dip recorded for month end)', detailsX, reconciliationY);
+			pdf.text(
+				hasDip ? `(${actualReadingDate})` : '(no dip recorded for month end)',
+				detailsX,
+				reconciliationY
+			);
 			pdf.setTextColor(0, 0, 0);
 			reconciliationY += 4;
 
@@ -1269,7 +1761,6 @@ class ExportService {
 			// Save the PDF
 			const fileName = `Monthly_Fuel_Report_${monthName}_${year}.pdf`;
 			pdf.save(fileName);
-
 		} catch (error) {
 			console.error('PDF generation error:', error);
 			throw new Error('Failed to generate PDF report');
@@ -1278,7 +1769,11 @@ class ExportService {
 
 	// Helper method to format date range
 	formatDateRange(monthName: string, year: number): string {
-		const daysInMonth = new Date(year, new Date(`${monthName} 1, ${year}`).getMonth() + 1, 0).getDate();
+		const daysInMonth = new Date(
+			year,
+			new Date(`${monthName} 1, ${year}`).getMonth() + 1,
+			0
+		).getDate();
 		return `${monthName.slice(0, 3)} 1 - ${daysInMonth}, ${year}`;
 	}
 }

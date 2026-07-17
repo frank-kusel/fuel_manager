@@ -2,22 +2,24 @@
 // Provides a centralized interface for all Supabase interactions
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { 
-	Vehicle, 
-	Driver, 
-	FuelEntry, 
+import type {
+	Vehicle,
+	Driver,
+	FuelEntry,
 	FuelEntryField,
 	FuelEntryWithLocation,
 	FieldSelectionState,
-	Bowser, 
-	Activity, 
+	Bowser,
+	Activity,
 	Field,
-	Zone, 
+	Zone,
 	RefillRecord,
 	MoveFuelEntryDirection,
 	MoveFuelEntryResult,
 	SoftDeleteFuelEntryResult,
-	ApiResponse 
+	VehicleMonthlyClaimAdjustment,
+	VehicleMonthlyClaimAdjustmentInput,
+	ApiResponse
 } from '$lib/types';
 
 class SupabaseService {
@@ -31,10 +33,10 @@ class SupabaseService {
 		try {
 			// Load Supabase configuration
 			const config = await this.loadConfig();
-			
+
 			this.client = createClient(config.url, config.key);
 			this.isInitialized = true;
-			
+
 			console.log('Supabase client initialized successfully');
 		} catch (error) {
 			console.error('Failed to initialize Supabase client:', error);
@@ -47,11 +49,13 @@ class SupabaseService {
 		// Get env variables (works in both client and server environments)
 		const url = import.meta.env.VITE_SUPABASE_URL;
 		const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-		
+
 		if (!url || !key) {
-			throw new Error('Missing Supabase configuration. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
+			throw new Error(
+				'Missing Supabase configuration. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.'
+			);
 		}
-		
+
 		return { url, key };
 	}
 
@@ -72,18 +76,18 @@ class SupabaseService {
 	private async query<T>(operation: () => Promise<any>): Promise<ApiResponse<T>> {
 		try {
 			const result = await operation();
-			
+
 			if (result.error) {
 				console.error('Database query error:', result.error);
 				return { data: null, error: result.error.message || 'Database operation failed' };
 			}
-			
+
 			return { data: result.data, error: null, count: result.count };
 		} catch (error) {
 			console.error('Database operation failed:', error);
-			return { 
-				data: null, 
-				error: error instanceof Error ? error.message : 'Unknown database error' 
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Unknown database error'
 			};
 		}
 	}
@@ -140,12 +144,7 @@ class SupabaseService {
 		// Fetch the table and the derived-odometer view in parallel — the
 		// enrichment costs no extra wall-clock time this way.
 		const [result, odoMap] = await Promise.all([
-			this.query<Vehicle[]>(() =>
-				client
-					.from('vehicles')
-					.select('*')
-					.order('code')
-			),
+			this.query<Vehicle[]>(() => client.from('vehicles').select('*').order('code')),
 			this.getLatestOdometerByVehicle()
 		]);
 		if (result.data) {
@@ -157,20 +156,16 @@ class SupabaseService {
 		return result;
 	}
 
-	async createVehicle(vehicle: Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Vehicle>> {
+	async createVehicle(
+		vehicle: Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>
+	): Promise<ApiResponse<Vehicle>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('vehicles')
-				.insert(vehicle)
-				.select()
-				.single()
-		);
+		return this.query(() => client.from('vehicles').insert(vehicle).select().single());
 	}
 
 	async updateVehicle(id: string, updates: Partial<Vehicle>): Promise<ApiResponse<Vehicle>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('vehicles')
 				.update({ ...updates, updated_at: new Date().toISOString() })
@@ -233,10 +228,11 @@ class SupabaseService {
 	// Driver operations
 	async getDrivers(): Promise<ApiResponse<Driver[]>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('drivers')
-				.select(`
+				.select(
+					`
 					*,
 					default_vehicle:vehicles!drivers_default_vehicle_id_fkey (
 						id,
@@ -245,25 +241,22 @@ class SupabaseService {
 						type,
 						registration
 					)
-				`)
+				`
+				)
 				.order('name')
 		);
 	}
 
-	async createDriver(driver: Omit<Driver, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Driver>> {
+	async createDriver(
+		driver: Omit<Driver, 'id' | 'created_at' | 'updated_at'>
+	): Promise<ApiResponse<Driver>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('drivers')
-				.insert(driver)
-				.select()
-				.single()
-		);
+		return this.query(() => client.from('drivers').insert(driver).select().single());
 	}
 
 	async updateDriver(id: string, updates: Partial<Driver>): Promise<ApiResponse<Driver>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('drivers')
 				.update({ ...updates, updated_at: new Date().toISOString() })
@@ -276,10 +269,11 @@ class SupabaseService {
 	// Fuel entry operations
 	async getFuelEntries(startDate?: string, endDate?: string): Promise<ApiResponse<FuelEntry[]>> {
 		const client = this.ensureInitialized();
-		
+
 		let query = client
 			.from('fuel_entries')
-			.select(`
+			.select(
+				`
 				*,
 				vehicles!left (code, name, registration, odometer_unit),
 				drivers!left (employee_code, name),
@@ -287,7 +281,8 @@ class SupabaseService {
 				fields!left (code, name),
 				zones!left (code, name),
 				bowsers!left (name)
-			`)
+			`
+			)
 			.is('deleted_at', null)
 			.order('entry_date', { ascending: false })
 			.order('time', { ascending: false });
@@ -302,15 +297,11 @@ class SupabaseService {
 		return this.query(() => query);
 	}
 
-	async createFuelEntry(entry: Omit<FuelEntry, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<FuelEntry>> {
+	async createFuelEntry(
+		entry: Omit<FuelEntry, 'id' | 'created_at' | 'updated_at'>
+	): Promise<ApiResponse<FuelEntry>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('fuel_entries')
-				.insert(entry)
-				.select()
-				.single()
-		);
+		return this.query(() => client.from('fuel_entries').insert(entry).select().single());
 	}
 
 	async updateFuelEntry(id: string, updates: Partial<FuelEntry>): Promise<ApiResponse<FuelEntry>> {
@@ -348,13 +339,15 @@ class SupabaseService {
 	async reorderFuelEntry(
 		id: string,
 		position: number
-	): Promise<ApiResponse<{
-		moved: boolean;
-		reason?: string;
-		new_time?: string;
-		times_adjusted?: number;
-		bowsers_recalculated?: number;
-	}>> {
+	): Promise<
+		ApiResponse<{
+			moved: boolean;
+			reason?: string;
+			new_time?: string;
+			times_adjusted?: number;
+			bowsers_recalculated?: number;
+		}>
+	> {
 		const client = this.ensureInitialized();
 		return this.query(async () => {
 			const result = await client.rpc('reorder_fuel_entry', {
@@ -371,11 +364,11 @@ class SupabaseService {
 
 	// Multi-field fuel entry operations
 	async createFuelEntryWithFields(
-		entry: Omit<FuelEntry, 'id' | 'created_at' | 'updated_at'>, 
+		entry: Omit<FuelEntry, 'id' | 'created_at' | 'updated_at'>,
 		fieldIds: string[] = []
 	): Promise<ApiResponse<FuelEntry>> {
 		const client = this.ensureInitialized();
-		
+
 		try {
 			// Start transaction
 			const { data: fuelEntry, error: entryError } = await client
@@ -393,7 +386,7 @@ class SupabaseService {
 
 			// If multiple fields, create junction table entries
 			if (fieldIds.length > 0 && entry.field_selection_mode === 'multiple') {
-				const junctionEntries = fieldIds.map(fieldId => ({
+				const junctionEntries = fieldIds.map((fieldId) => ({
 					fuel_entry_id: fuelEntry.id,
 					field_id: fieldId
 				}));
@@ -411,26 +404,23 @@ class SupabaseService {
 
 			return { data: fuelEntry, error: null };
 		} catch (error) {
-			return { 
-				data: null, 
-				error: error instanceof Error ? error.message : 'Failed to create fuel entry with fields' 
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to create fuel entry with fields'
 			};
 		}
 	}
 
 	async updateFuelEntryFields(entryId: string, fieldIds: string[]): Promise<ApiResponse<boolean>> {
 		const client = this.ensureInitialized();
-		
+
 		try {
 			// Delete existing field associations
-			await client
-				.from('fuel_entry_fields')
-				.delete()
-				.eq('fuel_entry_id', entryId);
+			await client.from('fuel_entry_fields').delete().eq('fuel_entry_id', entryId);
 
 			// Insert new field associations if provided
 			if (fieldIds.length > 0) {
-				const junctionEntries = fieldIds.map(fieldId => ({
+				const junctionEntries = fieldIds.map((fieldId) => ({
 					fuel_entry_id: entryId,
 					field_id: fieldId
 				}));
@@ -446,7 +436,7 @@ class SupabaseService {
 				// Update the field selection mode on the fuel entry
 				await client
 					.from('fuel_entries')
-					.update({ 
+					.update({
 						field_selection_mode: fieldIds.length > 1 ? 'multiple' : 'single',
 						updated_at: new Date().toISOString()
 					})
@@ -455,9 +445,9 @@ class SupabaseService {
 
 			return { data: true, error: null };
 		} catch (error) {
-			return { 
-				data: null, 
-				error: error instanceof Error ? error.message : 'Failed to update fuel entry fields' 
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to update fuel entry fields'
 			};
 		}
 	}
@@ -467,11 +457,7 @@ class SupabaseService {
 		const client = this.ensureInitialized();
 		const [result, readingMap] = await Promise.all([
 			this.query<Bowser[]>(() =>
-				client
-					.from('bowsers')
-					.select('*')
-					.eq('active', true)
-					.order('name')
+				client.from('bowsers').select('*').eq('active', true).order('name')
 			),
 			this.getLatestReadingByBowser()
 		]);
@@ -490,7 +476,7 @@ class SupabaseService {
 		notes?: string;
 	}): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();
-		
+
 		try {
 			// Add the reading
 			const result = await client
@@ -502,7 +488,7 @@ class SupabaseService {
 				})
 				.select()
 				.single();
-			
+
 			// Update tank config with latest dipstick reading
 			if (result.data) {
 				await client
@@ -514,13 +500,16 @@ class SupabaseService {
 					})
 					.eq('tank_id', 'tank_a');
 			}
-			
+
 			return { data: result.data, error: result.error?.message };
 		} catch (error) {
-			return { data: null, error: error instanceof Error ? error.message : 'Failed to add tank reading' };
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to add tank reading'
+			};
 		}
 	}
-	
+
 	async addTankRefill(refill: {
 		litres_added: number;
 		supplier?: string;
@@ -530,8 +519,8 @@ class SupabaseService {
 		notes?: string;
 	}): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();
-		
-		return this.query(() => 
+
+		return this.query(() =>
 			client
 				.from('tank_refills')
 				.insert({
@@ -542,81 +531,145 @@ class SupabaseService {
 				.single()
 		);
 	}
-	
+
 	// Activity operations
 	async getActivities(): Promise<ApiResponse<Activity[]>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('activities')
-				.select('*')
-				.eq('active', true)
-				.order('category, code')
+		return this.query(() =>
+			client.from('activities').select('*').eq('active', true).order('category, code')
 		);
+	}
+
+	async saveActivityClaimEligibility(
+		updates: Array<{ id: string; diesel_claim_eligible: boolean }>
+	): Promise<ApiResponse<Activity[]>> {
+		const client = this.ensureInitialized();
+		try {
+			const reviewedAt = new Date().toISOString();
+			const results = await Promise.all(
+				updates.map((activity) =>
+					client
+						.from('activities')
+						.update({
+							diesel_claim_eligible: activity.diesel_claim_eligible,
+							diesel_claim_reviewed_at: reviewedAt
+						})
+						.eq('id', activity.id)
+						.select()
+						.single()
+				)
+			);
+			const failed = results.find((result) => result.error);
+			if (failed?.error) return { data: null, error: failed.error.message };
+			return { data: results.map((result) => result.data as Activity), error: null };
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to save activity eligibility'
+			};
+		}
+	}
+
+	async getVehicleMonthlyClaimAdjustments(
+		startMonth?: string,
+		endMonth?: string
+	): Promise<ApiResponse<VehicleMonthlyClaimAdjustment[]>> {
+		const client = this.ensureInitialized();
+		try {
+			let query = client
+				.from('vehicle_monthly_claim_adjustments')
+				.select('*')
+				.order('claim_month', { ascending: true });
+			if (startMonth) query = query.gte('claim_month', startMonth);
+			if (endMonth) query = query.lte('claim_month', endMonth);
+			const { data, error } = await query;
+			return {
+				data: (data || []) as VehicleMonthlyClaimAdjustment[],
+				error: error?.message ?? null
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to load claim adjustments'
+			};
+		}
+	}
+
+	async getVehicleMonthlyClaimAdjustment(
+		vehicleId: string,
+		claimMonth: string
+	): Promise<ApiResponse<VehicleMonthlyClaimAdjustment | null>> {
+		const client = this.ensureInitialized();
+		try {
+			const { data, error } = await client
+				.from('vehicle_monthly_claim_adjustments')
+				.select('*')
+				.eq('vehicle_id', vehicleId)
+				.eq('claim_month', claimMonth)
+				.maybeSingle();
+			return { data: data as VehicleMonthlyClaimAdjustment | null, error: error?.message ?? null };
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to load claim adjustment'
+			};
+		}
+	}
+
+	async upsertVehicleMonthlyClaimAdjustment(
+		adjustment: VehicleMonthlyClaimAdjustmentInput
+	): Promise<ApiResponse<VehicleMonthlyClaimAdjustment>> {
+		const client = this.ensureInitialized();
+		try {
+			const { data, error } = await client
+				.from('vehicle_monthly_claim_adjustments')
+				.upsert(adjustment, { onConflict: 'vehicle_id,claim_month' })
+				.select()
+				.single();
+			return { data: data as VehicleMonthlyClaimAdjustment | null, error: error?.message ?? null };
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to save claim adjustment'
+			};
+		}
 	}
 
 	// Field operations
 	async getFields(): Promise<ApiResponse<Field[]>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('fields')
-				.select('*')
-				.eq('active', true)
-				.order('code')
-		);
+		return this.query(() => client.from('fields').select('*').eq('active', true).order('code'));
 	}
 
 	// Zone operations
 	async getZones(): Promise<ApiResponse<Zone[]>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('zones')
-				.select('*')
-				.eq('active', true)
-				.order('display_order')
+		return this.query(() =>
+			client.from('zones').select('*').eq('active', true).order('display_order')
 		);
 	}
 
 	async createZone(zone: Partial<Zone>): Promise<ApiResponse<Zone>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('zones')
-				.insert(zone)
-				.select()
-				.single()
-		);
+		return this.query(() => client.from('zones').insert(zone).select().single());
 	}
 
 	async updateZone(id: string, updates: Partial<Zone>): Promise<ApiResponse<Zone>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('zones')
-				.update(updates)
-				.eq('id', id)
-				.select()
-				.single()
-		);
+		return this.query(() => client.from('zones').update(updates).eq('id', id).select().single());
 	}
 
 	// Bowser CRUD operations
-	async createBowser(bowser: Omit<Bowser, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Bowser>> {
+	async createBowser(
+		bowser: Omit<Bowser, 'id' | 'created_at' | 'updated_at'>
+	): Promise<ApiResponse<Bowser>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('bowsers')
-				.insert(bowser)
-				.select()
-				.single()
-		);
+		return this.query(() => client.from('bowsers').insert(bowser).select().single());
 	}
 
 	async updateBowser(id: string, updates: Partial<Bowser>): Promise<ApiResponse<Bowser>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('bowsers')
 				.update({ ...updates, updated_at: new Date().toISOString() })
@@ -627,20 +680,16 @@ class SupabaseService {
 	}
 
 	// Activity CRUD operations
-	async createActivity(activity: Omit<Activity, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Activity>> {
+	async createActivity(
+		activity: Omit<Activity, 'id' | 'created_at' | 'updated_at'>
+	): Promise<ApiResponse<Activity>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('activities')
-				.insert(activity)
-				.select()
-				.single()
-		);
+		return this.query(() => client.from('activities').insert(activity).select().single());
 	}
 
 	async updateActivity(id: string, updates: Partial<Activity>): Promise<ApiResponse<Activity>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('activities')
 				.update({ ...updates, updated_at: new Date().toISOString() })
@@ -651,20 +700,16 @@ class SupabaseService {
 	}
 
 	// Field CRUD operations
-	async createField(field: Omit<Field, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Field>> {
+	async createField(
+		field: Omit<Field, 'id' | 'created_at' | 'updated_at'>
+	): Promise<ApiResponse<Field>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
-			client
-				.from('fields')
-				.insert(field)
-				.select()
-				.single()
-		);
+		return this.query(() => client.from('fields').insert(field).select().single());
 	}
 
 	async updateField(id: string, updates: Partial<Field>): Promise<ApiResponse<Field>> {
 		const client = this.ensureInitialized();
-		return this.query(() => 
+		return this.query(() =>
 			client
 				.from('fields')
 				.update({ ...updates, updated_at: new Date().toISOString() })
@@ -680,7 +725,8 @@ class SupabaseService {
 		return this.query(() =>
 			client
 				.from('fuel_entries')
-				.select(`
+				.select(
+					`
 					id,
 					entry_date,
 					time,
@@ -693,7 +739,8 @@ class SupabaseService {
 					activities!left (code, name),
 					fields!left (code, name),
 					vehicles!left (odometer_unit)
-				`)
+				`
+				)
 				.eq('vehicle_id', vehicleId)
 				.is('deleted_at', null)
 				.order('entry_date', { ascending: false })
@@ -765,13 +812,18 @@ class SupabaseService {
 	}
 
 	// Flexible date range reconciliation methods for new Tools section
-	async getDateRangeReconciliationData(startDate: string, endDate: string): Promise<ApiResponse<{
-		fuelDispensed: number;
-		bowserStart: number;
-		bowserEnd: number;
-	}>> {
+	async getDateRangeReconciliationData(
+		startDate: string,
+		endDate: string
+	): Promise<
+		ApiResponse<{
+			fuelDispensed: number;
+			bowserStart: number;
+			bowserEnd: number;
+		}>
+	> {
 		const client = this.ensureInitialized();
-		
+
 		try {
 			// One round trip instead of three sequential ones (~350ms each).
 			const [fuelResult, bowserStartResult, bowserEndResult] = await Promise.all([
@@ -806,7 +858,8 @@ class SupabaseService {
 					.limit(1)
 			]);
 
-			const fuelDispensed = fuelResult.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
+			const fuelDispensed =
+				fuelResult.data?.reduce((sum, entry) => sum + (entry.litres_dispensed || 0), 0) || 0;
 			const bowserStart = parseFloat(bowserStartResult.data?.[0]?.bowser_reading_end) || 0;
 			const bowserEnd = parseFloat(bowserEndResult.data?.[0]?.bowser_reading_end) || 0;
 
@@ -821,7 +874,8 @@ class SupabaseService {
 		} catch (error) {
 			return {
 				data: null,
-				error: error instanceof Error ? error.message : 'Failed to get date range reconciliation data'
+				error:
+					error instanceof Error ? error.message : 'Failed to get date range reconciliation data'
 			};
 		}
 	}
@@ -836,18 +890,23 @@ class SupabaseService {
 	 * the post-dip movements forward. Deliberately does NOT read tank_status
 	 * (its snapshot row is broken) or fuel_reconciliations (superseded).
 	 */
-	async getMonthCloseData(monthStart: string, monthEnd: string): Promise<ApiResponse<{
-		closingDip: { reading_value: number; reading_date: string } | null;
-		opening: { value: number; source: 'close' | 'dip'; date: string } | null;
-		deliveriesToDip: number;
-		dispensedToDip: number;
-		deliveriesAfterDip: number;
-		dispensedAfterDip: number;
-		bowserStart: number;
-		bowserEnd: number;
-		monthDispensed: number;
-		existingClose: any | null;
-	}>> {
+	async getMonthCloseData(
+		monthStart: string,
+		monthEnd: string
+	): Promise<
+		ApiResponse<{
+			closingDip: { reading_value: number; reading_date: string } | null;
+			opening: { value: number; source: 'close' | 'dip'; date: string } | null;
+			deliveriesToDip: number;
+			dispensedToDip: number;
+			deliveriesAfterDip: number;
+			dispensedAfterDip: number;
+			bowserStart: number;
+			bowserEnd: number;
+			monthDispensed: number;
+			existingClose: any | null;
+		}>
+	> {
 		const client = this.ensureInitialized();
 
 		try {
@@ -891,7 +950,11 @@ class SupabaseService {
 					this.getDateRangeReconciliationData(monthStart, monthEnd)
 				]);
 			const firstError =
-				closingRes.error || existingRes.error || prevCloseRes.error || refillsRes.error || dispensedRes.error;
+				closingRes.error ||
+				existingRes.error ||
+				prevCloseRes.error ||
+				refillsRes.error ||
+				dispensedRes.error;
 			if (firstError) throw new Error(firstError.message);
 
 			const closingDip = closingRes.data?.[0] || null;
@@ -965,7 +1028,6 @@ class SupabaseService {
 				.limit(limit)
 		);
 	}
-
 }
 
 // Export singleton instance

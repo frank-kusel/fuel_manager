@@ -1,14 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import DataExport from '$lib/components/dashboard/DataExport.svelte';
-
-	/**
-	 * Audit view — eligible litres, refund estimate, and readiness checklist.
-	 *
-	 * The rebate rate and per-activity eligibility are USER SETTINGS
-	 * (localStorage), not verified tax rules. The refund figure is an
-	 * estimate to sanity-check a claim, not a substitute for the accountant.
-	 */
+	import ActrosClaimAdjustment from '$lib/components/audit/ActrosClaimAdjustment.svelte';
+	import { calculateDieselClaim } from '$lib/utils/diesel-claim';
+	import { formatLitres, formatNumber } from '$lib/utils/formatting';
+	import type { Activity, DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
 
 	const SETTINGS_KEY = 'farmtrack_audit_settings_v1';
 	const NON_ELIGIBLE_GUESS = /transport|market|town|private|road|staff/i;
@@ -16,8 +12,18 @@
 	interface AuditSettings {
 		rateCents: number;
 		regNo: string;
-		nonEligible: string[]; // activity names treated as non-eligible
+		nonEligible: string[];
 		seeded: boolean;
+	}
+
+	interface AuditEntry {
+		litres: number;
+		activityId: string | null;
+		activityName: string;
+		activityEligible: boolean;
+		date: string;
+		vehicleId: string;
+		claimMethod: DieselClaimMethod;
 	}
 
 	let settings = $state<AuditSettings>({
@@ -26,25 +32,39 @@
 		nonEligible: [],
 		seeded: false
 	});
-
+	let legacySettingsFound = $state(false);
 	let period = $state<'month' | 'lastMonth' | 'all'>('month');
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let showEligibility = $state(false);
 	let showSettings = $state(false);
+	let savingEligibility = $state(false);
+	let eligibilityError = $state('');
+	let eligibilitySuccess = $state('');
+	let eligibilityDraft = $state<Record<string, boolean>>({});
+	let unmatchedLegacyNames = $state<string[]>([]);
+	let exportYear = $state(new Date().getFullYear());
+	let exportMonth = $state(new Date().getMonth() + 1);
 
-	let entries = $state<{ litres: number; activity: string; date: string }[]>([]);
-	let refills = $state<{ litres_added: number; delivery_date: string; invoice_number: string | null }[]>([]);
-	let activities = $state<string[]>([]);
+	let entries = $state<AuditEntry[]>([]);
+	let refills = $state<
+		{ litres_added: number; delivery_date: string; invoice_number: string | null }[]
+	>([]);
+	let activities = $state<Activity[]>([]);
+	let adjustments = $state<VehicleMonthlyClaimAdjustment[]>([]);
 	let lastDipDate = $state<string | null>(null);
-	let latestClose = $state<{ reconciliation_date: string; variance_percentage: number | null } | null>(null);
-
-	const nf = new Intl.NumberFormat('en-ZA');
+	let latestClose = $state<{
+		reconciliation_date: string;
+		variance_percentage: number | null;
+	} | null>(null);
 
 	function loadSettings() {
 		try {
 			const raw = localStorage.getItem(SETTINGS_KEY);
-			if (raw) settings = { ...settings, ...JSON.parse(raw) };
+			if (raw) {
+				settings = { ...settings, ...JSON.parse(raw) };
+				legacySettingsFound = true;
+			}
 		} catch {
 			/* keep defaults */
 		}
@@ -61,9 +81,8 @@
 	function periodRange(): { start: string | null; end: string | null } {
 		const now = new Date();
 		const iso = (d: Date) => d.toISOString().split('T')[0];
-		if (period === 'month') {
+		if (period === 'month')
 			return { start: iso(new Date(now.getFullYear(), now.getMonth(), 1)), end: iso(now) };
-		}
 		if (period === 'lastMonth') {
 			return {
 				start: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
@@ -71,6 +90,26 @@
 			};
 		}
 		return { start: null, end: null };
+	}
+
+	function one<T>(relation: T | T[] | null | undefined): T | null {
+		return Array.isArray(relation) ? (relation[0] ?? null) : (relation ?? null);
+	}
+
+	function prepareEligibilityDraft() {
+		const currentNames = new Set(activities.map((activity) => activity.name));
+		unmatchedLegacyNames = legacySettingsFound
+			? settings.nonEligible.filter((name) => !currentNames.has(name))
+			: [];
+		eligibilityDraft = Object.fromEntries(
+			activities.map((activity) => {
+				if (activity.diesel_claim_reviewed_at) return [activity.id, activity.diesel_claim_eligible];
+				if (legacySettingsFound)
+					return [activity.id, !settings.nonEligible.includes(activity.name)];
+				return [activity.id, !NON_ELIGIBLE_GUESS.test(activity.name)];
+			})
+		);
+		if (activities.some((activity) => !activity.diesel_claim_reviewed_at)) showEligibility = true;
 	}
 
 	async function load() {
@@ -84,7 +123,9 @@
 
 			let entriesQ = client
 				.from('fuel_entries')
-				.select('entry_date, litres_dispensed, activities(name)')
+				.select(
+					'entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(id, name, diesel_claim_eligible)'
+				)
 				.is('deleted_at', null);
 			let refillsQ = client
 				.from('tank_refills')
@@ -93,43 +134,60 @@
 				entriesQ = entriesQ.gte('entry_date', start).lte('entry_date', end);
 				refillsQ = refillsQ.gte('delivery_date', start).lte('delivery_date', end);
 			}
+			const adjustmentStart = start ? `${start.slice(0, 7)}-01` : undefined;
+			const adjustmentEnd = end ? `${end.slice(0, 7)}-01` : undefined;
 
-			const [entriesRes, refillsRes, actsRes, dipRes, closeRes] = await Promise.all([
-				entriesQ,
-				refillsQ,
-				client.from('activities').select('name').eq('active', true).order('name'),
-				client
-					.from('tank_readings')
-					.select('reading_date')
-					.eq('reading_type', 'dipstick')
-					.order('reading_date', { ascending: false })
-					.limit(1),
-				client
-					.from('tank_reconciliations')
-					.select('reconciliation_date, variance_percentage')
-					.order('reconciliation_date', { ascending: false })
-					.limit(1)
-			]);
-			const firstError = entriesRes.error || refillsRes.error || actsRes.error || dipRes.error;
-			if (firstError) throw new Error(firstError.message);
+			const [entriesRes, refillsRes, actsRes, dipRes, closeRes, adjustmentsRes] = await Promise.all(
+				[
+					entriesQ,
+					refillsQ,
+					supabaseService.getActivities(),
+					client
+						.from('tank_readings')
+						.select('reading_date')
+						.eq('reading_type', 'dipstick')
+						.order('reading_date', { ascending: false })
+						.limit(1),
+					client
+						.from('tank_reconciliations')
+						.select('reconciliation_date, variance_percentage')
+						.order('reconciliation_date', { ascending: false })
+						.limit(1),
+					supabaseService.getVehicleMonthlyClaimAdjustments(adjustmentStart, adjustmentEnd)
+				]
+			);
+			const firstError =
+				entriesRes.error ||
+				refillsRes.error ||
+				actsRes.error ||
+				dipRes.error ||
+				adjustmentsRes.error;
+			if (firstError)
+				throw new Error(typeof firstError === 'string' ? firstError : firstError.message);
 
-			entries = (entriesRes.data || []).map((e: any) => ({
-				litres: e.litres_dispensed || 0,
-				activity: e.activities?.name || 'Unknown',
-				date: e.entry_date
-			}));
+			entries = (entriesRes.data || []).map((row: any) => {
+				const activity = one(row.activities) as {
+					id: string;
+					name: string;
+					diesel_claim_eligible: boolean;
+				} | null;
+				const vehicle = one(row.vehicles) as { diesel_claim_method: DieselClaimMethod } | null;
+				return {
+					litres: Number(row.litres_dispensed || 0),
+					activityId: activity?.id ?? null,
+					activityName: activity?.name ?? 'Unknown',
+					activityEligible: activity?.diesel_claim_eligible === true,
+					date: row.entry_date,
+					vehicleId: row.vehicle_id,
+					claimMethod: vehicle?.diesel_claim_method ?? 'activity_only'
+				};
+			});
 			refills = refillsRes.data || [];
-			activities = (actsRes.data || []).map((a: any) => a.name);
+			activities = actsRes.data || [];
+			adjustments = adjustmentsRes.data || [];
 			lastDipDate = dipRes.data?.[0]?.reading_date ?? null;
 			latestClose = closeRes.data?.[0] ?? null;
-
-			// First run: seed the non-eligible guesses so the user starts from
-			// a conservative default instead of everything-eligible.
-			if (!settings.seeded) {
-				settings.nonEligible = activities.filter((a) => NON_ELIGIBLE_GUESS.test(a));
-				settings.seeded = true;
-				saveSettings();
-			}
+			prepareEligibilityDraft();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load audit data';
 		}
@@ -146,23 +204,94 @@
 		load();
 	}
 
-	function toggleActivity(name: string) {
-		if (settings.nonEligible.includes(name)) {
-			settings.nonEligible = settings.nonEligible.filter((n) => n !== name);
-		} else {
-			settings.nonEligible = [...settings.nonEligible, name];
-		}
-		saveSettings();
+	function toggleActivity(id: string) {
+		eligibilityDraft[id] = !eligibilityDraft[id];
+		eligibilityDraft = { ...eligibilityDraft };
+		eligibilityError = '';
+		eligibilitySuccess = '';
 	}
 
-	let eligibleLitres = $derived(
-		entries.filter((e) => !settings.nonEligible.includes(e.activity)).reduce((s, e) => s + e.litres, 0)
+	async function saveEligibility() {
+		savingEligibility = true;
+		eligibilityError = '';
+		eligibilitySuccess = '';
+		try {
+			const { default: supabaseService } = await import('$lib/services/supabase');
+			await supabaseService.init();
+			const result = await supabaseService.saveActivityClaimEligibility(
+				activities.map((activity) => ({
+					id: activity.id,
+					diesel_claim_eligible: eligibilityDraft[activity.id] !== false
+				}))
+			);
+			if (result.error) throw new Error(result.error);
+			await load();
+			eligibilitySuccess = 'Activity eligibility saved to the database.';
+			showEligibility = false;
+		} catch (err) {
+			eligibilityError = err instanceof Error ? err.message : 'Failed to save activity eligibility';
+		} finally {
+			savingEligibility = false;
+		}
+	}
+
+	let claimTotals = $derived.by(() => {
+		const adjustmentByVehicleMonth = new Map(
+			adjustments.map((item) => [`${item.vehicle_id}:${item.claim_month}`, item])
+		);
+		const groups = new Map<
+			string,
+			{
+				total: number;
+				eligible: number;
+				method: DieselClaimMethod;
+				vehicleId: string;
+				month: string;
+			}
+		>();
+		for (const entry of entries) {
+			const month = `${entry.date.slice(0, 7)}-01`;
+			const key = `${entry.vehicleId}:${month}`;
+			const group = groups.get(key) ?? {
+				total: 0,
+				eligible: 0,
+				method: entry.claimMethod,
+				vehicleId: entry.vehicleId,
+				month
+			};
+			group.total += entry.litres;
+			if (entry.activityEligible) group.eligible += entry.litres;
+			groups.set(key, group);
+		}
+		let total = 0;
+		let claimable = 0;
+		let missingAdjustments = 0;
+		for (const group of groups.values()) {
+			const result = calculateDieselClaim({
+				totalLitres: group.total,
+				baseEligibleLitres: group.eligible,
+				method: group.method,
+				adjustment: adjustmentByVehicleMonth.get(`${group.vehicleId}:${group.month}`)
+			});
+			total += result.totalLitres;
+			claimable += result.claimableLitres;
+			if (result.missingAdjustment) missingAdjustments++;
+		}
+		return { total, claimable, nonClaimable: total - claimable, missingAdjustments };
+	});
+
+	let eligibleLitres = $derived(claimTotals.claimable);
+	let nonEligibleLitres = $derived(claimTotals.nonClaimable);
+	let purchasedLitres = $derived(
+		refills.reduce((sum, refill) => sum + (refill.litres_added || 0), 0)
 	);
-	let nonEligibleLitres = $derived(
-		entries.filter((e) => settings.nonEligible.includes(e.activity)).reduce((s, e) => s + e.litres, 0)
-	);
-	let purchasedLitres = $derived(refills.reduce((s, r) => s + (r.litres_added || 0), 0));
 	let refundRands = $derived((eligibleLitres * settings.rateCents) / 100);
+	let eligibleActivityCount = $derived(
+		activities.filter((activity) => eligibilityDraft[activity.id] !== false).length
+	);
+	let unreviewedActivityCount = $derived(
+		activities.filter((activity) => !activity.diesel_claim_reviewed_at).length
+	);
 
 	let dipAgeDays = $derived.by(() => {
 		if (!lastDipDate) return null;
@@ -184,7 +313,17 @@
 		{
 			ok: settings.regNo.trim().length > 0,
 			title: 'Diesel refund registration captured',
-			detail: settings.regNo.trim() ? `Registered as ${settings.regNo}` : 'Add your DRS registration number in settings below'
+			detail: settings.regNo.trim()
+				? `Registered as ${settings.regNo}`
+				: 'Add your DRS registration number in settings below'
+		},
+		{
+			ok: unreviewedActivityCount === 0,
+			title: 'Activity eligibility reviewed',
+			detail:
+				unreviewedActivityCount === 0
+					? 'Claimable and non-claimable activities are saved in the database'
+					: `${unreviewedActivityCount} activities still need confirmation`
 		},
 		{
 			ok: entries.length > 0,
@@ -227,7 +366,11 @@
 
 	<div class="chips">
 		{#each Object.entries(periodLabels) as [key, label]}
-			<button class="chip" class:on={period === key} onclick={() => setPeriod(key as typeof period)}>
+			<button
+				class="chip"
+				class:on={period === key}
+				onclick={() => setPeriod(key as typeof period)}
+			>
 				{label}
 			</button>
 		{/each}
@@ -246,52 +389,95 @@
 			<div class="claim-main">
 				<div>
 					<div class="stat-k">Eligible litres</div>
-					<div class="stat-v brand">{nf.format(Math.round(eligibleLitres))}<span class="unit">L</span></div>
-					<div class="stat-sub">activities marked as qualifying use</div>
+					<div class="stat-v brand">{formatLitres(eligibleLitres)}<span class="unit">L</span></div>
+					<div class="stat-sub">after activity and vehicle adjustments</div>
 				</div>
 				<div>
 					<div class="stat-k">Refund estimate</div>
-					<div class="stat-v">R {nf.format(Math.round(refundRands))}</div>
+					<div class="stat-v">R {formatNumber(refundRands, 0)}</div>
 					<div class="stat-sub">@ {settings.rateCents} c/L — estimate only</div>
 				</div>
 			</div>
 			<div class="claim-row">
 				<div>
 					<span class="mini-k">Non-eligible</span>
-					<span class="mini-v red">{nf.format(Math.round(nonEligibleLitres))} L</span>
+					<span class="mini-v red">{formatLitres(nonEligibleLitres)} L</span>
 				</div>
 				<div>
 					<span class="mini-k">Purchased</span>
-					<span class="mini-v">{nf.format(Math.round(purchasedLitres))} L</span>
+					<span class="mini-v">{formatLitres(purchasedLitres)} L</span>
 				</div>
 				<div>
 					<span class="mini-k">Entries</span>
 					<span class="mini-v">{entries.length}</span>
 				</div>
 			</div>
+			{#if claimTotals.missingAdjustments > 0}
+				<p class="claim-warning">
+					{claimTotals.missingAdjustments} vehicle-month classifier result{claimTotals.missingAdjustments ===
+					1
+						? ' is'
+						: 's are'} missing and conservatively excluded.
+				</p>
+			{/if}
 		</section>
 
 		<!-- Eligibility editor -->
 		<section class="panel">
 			<button class="collapser" onclick={() => (showEligibility = !showEligibility)}>
-				<span>Activity eligibility ({activities.length - settings.nonEligible.length} eligible · {settings.nonEligible.length} excluded)</span>
-				<svg class:open={showEligibility} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+				<span
+					>Activity eligibility ({eligibleActivityCount} eligible · {activities.length -
+						eligibleActivityCount} excluded)</span
+				>
+				<svg
+					class:open={showEligibility}
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg
+				>
 			</button>
 			{#if showEligibility}
+				{#if unreviewedActivityCount > 0}
+					<p class="review-intro">
+						Review these defaults, then save once. Previous browser choices are only used to prefill
+						this unsaved list.
+					</p>
+				{/if}
 				<div class="elig-list">
-					{#each activities as a}
+					{#each activities as activity}
 						<button
 							class="elig-row"
-							class:excluded={settings.nonEligible.includes(a)}
-							onclick={() => toggleActivity(a)}
+							class:excluded={eligibilityDraft[activity.id] === false}
+							onclick={() => toggleActivity(activity.id)}
 						>
-							<span class="elig-name">{a}</span>
-							<span class="elig-state">{settings.nonEligible.includes(a) ? 'Non-eligible' : 'Eligible'}</span>
+							<span class="elig-name">{activity.name}</span>
+							<span class="elig-state"
+								>{eligibilityDraft[activity.id] === false ? 'Non-claimable' : 'Claimable'}</span
+							>
 						</button>
 					{/each}
 				</div>
-				<p class="hint">Tap an activity to toggle. Non-eligible litres are excluded from the claim estimate.</p>
+				{#if unmatchedLegacyNames.length > 0}
+					<p class="elig-message warning">
+						Previous browser settings referenced activities that no longer exist: {unmatchedLegacyNames.join(
+							', '
+						)}.
+					</p>
+				{/if}
+				{#if eligibilityError}<p class="elig-message error">{eligibilityError}</p>{/if}
+				<div class="elig-actions">
+					<p class="hint">
+						Non-claimable activities are excluded before any Actros percentage is applied.
+					</p>
+					<button type="button" onclick={saveEligibility} disabled={savingEligibility}
+						>{savingEligibility ? 'Saving...' : 'Save eligibility'}</button
+					>
+				</div>
 			{/if}
+			{#if eligibilitySuccess}<p class="elig-message success">{eligibilitySuccess}</p>{/if}
 		</section>
 
 		<!-- Readiness checklist -->
@@ -312,7 +498,15 @@
 		<section class="panel">
 			<button class="collapser" onclick={() => (showSettings = !showSettings)}>
 				<span>Claim settings</span>
-				<svg class:open={showSettings} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+				<svg
+					class:open={showSettings}
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg
+				>
 			</button>
 			{#if showSettings}
 				<div class="settings-grid">
@@ -343,9 +537,11 @@
 			{/if}
 		</section>
 
+		<ActrosClaimAdjustment year={exportYear} month={exportMonth} onsaved={load} />
+
 		<!-- Exports -->
 		<h2 class="section-heading">Exports</h2>
-		<DataExport />
+		<DataExport bind:selectedYear={exportYear} bind:selectedMonth={exportMonth} />
 
 		<!-- Manage -->
 		<h2 class="section-heading">Manage</h2>
@@ -484,6 +680,15 @@
 		flex-wrap: wrap;
 	}
 
+	.claim-warning {
+		margin: 0.75rem 0 0;
+		padding: 0.55rem 0.7rem;
+		border-radius: var(--radius-md);
+		background: #fff7e7;
+		color: #87520b;
+		font-size: var(--text-xs);
+	}
+
 	.mini-k {
 		display: block;
 		font-size: var(--text-xs);
@@ -573,6 +778,67 @@
 
 	.elig-row.excluded .elig-name {
 		color: var(--gray-500);
+	}
+
+	.review-intro {
+		margin: 0.75rem 0 0;
+		padding: 0.65rem 0.75rem;
+		border-radius: var(--radius-md);
+		background: #fff7e7;
+		color: #87520b;
+		font-size: var(--text-xs);
+		line-height: 1.5;
+	}
+
+	.elig-actions {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		margin-top: 0.75rem;
+	}
+
+	.elig-actions .hint {
+		margin: 0;
+	}
+
+	.elig-actions button {
+		flex-shrink: 0;
+		min-height: 2.5rem;
+		border: 0;
+		border-radius: var(--radius-md);
+		padding: 0.55rem 0.85rem;
+		background: var(--primary);
+		color: white;
+		font: inherit;
+		font-size: var(--text-sm);
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.elig-actions button:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+
+	.elig-message {
+		margin: 0.7rem 0 0;
+		padding: 0.55rem 0.7rem;
+		border-radius: var(--radius-md);
+		font-size: var(--text-xs);
+	}
+
+	.elig-message.warning {
+		background: #fff7e7;
+		color: #87520b;
+	}
+	.elig-message.error {
+		background: #fef2f2;
+		color: #991b1b;
+	}
+	.elig-message.success {
+		background: #eef7ef;
+		color: #24633a;
 	}
 
 	.hint {
@@ -706,15 +972,24 @@
 	}
 
 	.skeleton {
-		background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%);
+		background: linear-gradient(
+			90deg,
+			var(--gray-100) 25%,
+			var(--gray-200) 50%,
+			var(--gray-100) 75%
+		);
 		background-size: 200% 100%;
 		animation: shimmer 1.5s infinite;
 		border-radius: var(--radius-lg);
 	}
 
 	@keyframes shimmer {
-		0% { background-position: 200% 0; }
-		100% { background-position: -200% 0; }
+		0% {
+			background-position: 200% 0;
+		}
+		100% {
+			background-position: -200% 0;
+		}
 	}
 
 	@media (max-width: 768px) {
@@ -733,6 +1008,11 @@
 
 		.settings-grid {
 			grid-template-columns: 1fr;
+		}
+
+		.elig-actions {
+			align-items: stretch;
+			flex-direction: column;
 		}
 	}
 </style>

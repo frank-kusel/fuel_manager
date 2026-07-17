@@ -13,6 +13,7 @@ export interface Vehicle {
 	fuel_type?: string;
 	tank_capacity?: number;
 	odometer_unit?: string;
+	diesel_claim_method?: DieselClaimMethod;
 	// Fuel consumption tracking
 	average_consumption_l_per_100km?: number | null;
 	consumption_entries_count?: number;
@@ -32,7 +33,14 @@ export interface CurrentVehicleOdometer {
 	last_fuel_entry_id: string;
 }
 
-export type VehicleType = 'tractor' | 'bakkie' | 'truck' | 'loader' | 'harvester' | 'sprayer' | 'other';
+export type VehicleType =
+	| 'tractor'
+	| 'bakkie'
+	| 'truck'
+	| 'loader'
+	| 'harvester'
+	| 'sprayer'
+	| 'other';
 
 export interface Driver {
 	id: string;
@@ -62,17 +70,43 @@ export interface Activity {
 	category: ActivityCategory;
 	icon?: string;
 	description?: string;
+	diesel_claim_eligible: boolean;
+	diesel_claim_reviewed_at?: string | null;
 	active: boolean;
 	created_at: string;
 	updated_at: string;
 }
 
-export type ActivityCategory = 
-	| 'planting' 
-	| 'harvesting' 
-	| 'spraying' 
-	| 'fertilizing' 
-	| 'maintenance' 
+export type DieselClaimMethod = 'activity_only' | 'monthly_classifier';
+
+export interface VehicleMonthlyClaimAdjustment {
+	id: string;
+	vehicle_id: string;
+	claim_month: string;
+	classifier_measured_litres: number;
+	classifier_claimable_litres: number;
+	claimable_percentage: number;
+	source_reference?: string | null;
+	notes?: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface VehicleMonthlyClaimAdjustmentInput {
+	vehicle_id: string;
+	claim_month: string;
+	classifier_measured_litres: number;
+	classifier_claimable_litres: number;
+	source_reference?: string | null;
+	notes?: string | null;
+}
+
+export type ActivityCategory =
+	| 'planting'
+	| 'harvesting'
+	| 'spraying'
+	| 'fertilizing'
+	| 'maintenance'
 	| 'other';
 
 export interface Field {
@@ -137,16 +171,16 @@ export interface FuelEntry {
 	field_id?: string; // Legacy single field (for backward compatibility)
 	zone_id?: string;
 	bowser_id: string;
-	
+
 	// Multi-field support
 	field_selection_mode?: 'single' | 'multiple';
 	fields?: Field[]; // Populated when joining with junction table
-	
+
 	// Odometer data
 	odometer_start: number | null;
 	odometer_end: number | null;
 	gauge_working: boolean;
-	
+
 	// Fuel data
 	litres_used: number;
 	litres_dispensed: number;
@@ -154,15 +188,15 @@ export interface FuelEntry {
 	bowser_reading_end: number | null;
 	cost_per_litre?: number;
 	total_cost?: number;
-	
+
 	// Fuel consumption (calculated)
 	fuel_consumption_l_per_100km?: number | null;
-	
+
 	// Status and notes
 	notes?: string;
 	deleted_at?: string | null;
 	deleted_reason?: string | null;
-	
+
 	// System fields
 	created_at: string;
 	updated_at: string;
@@ -201,13 +235,13 @@ export interface FuelEntryWithLocation extends FuelEntry {
 	single_field_name?: string;
 	single_field_code?: string;
 	single_field_crop_type?: string;
-	
+
 	// Zone info
 	zone_id_info?: string;
 	zone_name?: string;
 	zone_code?: string;
 	zone_type?: string;
-	
+
 	// Location type and display
 	location_type: 'single_field' | 'zone' | 'multiple_fields' | 'unspecified';
 	location_display_name: string;
@@ -244,31 +278,31 @@ export interface DashboardStats {
 	weeklyFuel: number;
 	monthlyFuel: number;
 	previousMonthFuel: number;
-	
+
 	// Distance and efficiency
 	monthlyDistance: number;
 	averageEfficiency: number;
-	
+
 	// Enhanced consumption metrics
 	validConsumptionEntries: number;
 	consumptionDataQuality: number;
 	bestEfficiencyThisMonth: number | null;
 	worstEfficiencyThisMonth: number | null;
-	
+
 	// Tank monitoring
 	tankLevel: number;
 	tankCapacity: number;
 	tankPercentage: number;
-	
+
 	// Fleet status
 	activeVehicles: number;
 	vehiclesWithOdometer: number;
 	totalBowsers: number;
-	
+
 	// Recent activity
 	recentEntries: any[];
 	bowserLevels: any[];
-	
+
 	// Calculated insights
 	entriesThisWeek: number;
 	entriesThisMonth: number;
