@@ -8,11 +8,7 @@ import type {
 	FuelEntry,
 	VehicleMonthlyClaimAdjustment
 } from '$lib/types';
-import {
-	calculateClassifierVariance,
-	calculateDieselClaim,
-	roundClaimLitres
-} from '$lib/utils/diesel-claim';
+import { calculateDieselClaim, roundClaimLitres } from '$lib/utils/diesel-claim';
 
 // ---------------------------------------------------------------------------
 // Ledger-style export palette
@@ -135,39 +131,20 @@ export interface ExportData {
 }
 
 export interface MonthlySummaryData {
-	vehicleId: string;
 	code: string;
 	name: string;
 	registration: string;
 	category: string;
 	distance: number | string;
 	fuel: number;
-	baseEligibleFuel: number;
 	claimableFuel: number;
 	nonClaimableFuel: number;
-	claimablePercentage: number | null;
-	claimBasis: string;
-	missingAdjustment: boolean;
 	consumption: number | string;
 	unit: string;
 }
 
-export interface MonthlyClaimDetailData {
-	vehicleCode: string;
-	vehicleName: string;
-	activityName: string;
-	activityEligible: boolean;
-	totalFuel: number;
-	claimablePercentage: number | null;
-	claimableFuel: number;
-	nonClaimableFuel: number;
-	claimBasis: string;
-}
-
 export interface MonthlyClaimExportData {
 	summary: MonthlySummaryData[];
-	details: MonthlyClaimDetailData[];
-	adjustments: VehicleMonthlyClaimAdjustment[];
 	warnings: string[];
 }
 
@@ -540,7 +517,6 @@ class ExportService {
 				}
 			});
 
-			const details: MonthlyClaimDetailData[] = [];
 			const warnings: string[] = [];
 			const summaryData: MonthlySummaryData[] = Array.from(vehicleSummaries.values())
 				.filter((summary) => summary.totalFuel > 0) // Only include vehicles with fuel consumption
@@ -596,35 +572,13 @@ class ExportService {
 							`${summary.code}: monthly classifier result missing; all litres excluded.`
 						);
 					for (const activity of summary.activities.values()) {
-						const activityClaim = calculateDieselClaim({
-							totalLitres: activity.litres,
-							baseEligibleLitres: activity.eligible ? activity.litres : 0,
-							method: summary.claimMethod,
-							adjustment
-						});
 						if (!activity.reviewed)
 							warnings.push(`${activity.name}: activity eligibility has not been reviewed.`);
-						const detailTotal = roundClaimLitres(activityClaim.totalLitres);
-						const detailClaimable = roundClaimLitres(activityClaim.claimableLitres);
-						details.push({
-							vehicleCode: summary.code,
-							vehicleName: summary.name,
-							activityName: activity.name,
-							activityEligible: activity.eligible,
-							totalFuel: detailTotal,
-							claimablePercentage: activityClaim.claimablePercentage,
-							claimableFuel: detailClaimable,
-							nonClaimableFuel: roundClaimLitres(detailTotal - detailClaimable),
-							claimBasis: activity.eligible
-								? activityClaim.claimBasis
-								: 'Activity marked non-claimable'
-						});
 					}
 
 					const roundedTotal = roundClaimLitres(claim.totalLitres);
 					const roundedClaimable = roundClaimLitres(claim.claimableLitres);
 					return {
-						vehicleId: summary.vehicleId,
 						code: summary.code,
 						name: summary.name,
 						registration: summary.registration,
@@ -635,12 +589,8 @@ class ExportService {
 						category: cleanDocText(summary.type),
 						distance: distance,
 						fuel: roundedTotal,
-						baseEligibleFuel: roundClaimLitres(claim.baseEligibleLitres),
 						claimableFuel: roundedClaimable,
 						nonClaimableFuel: roundClaimLitres(roundedTotal - roundedClaimable),
-						claimablePercentage: claim.claimablePercentage,
-						claimBasis: claim.claimBasis,
-						missingAdjustment: claim.missingAdjustment,
 						consumption: consumption,
 						unit: unit
 					};
@@ -650,12 +600,6 @@ class ExportService {
 			return {
 				data: {
 					summary: summaryData,
-					details: details.sort(
-						(a, b) =>
-							a.vehicleCode.localeCompare(b.vehicleCode) ||
-							a.activityName.localeCompare(b.activityName)
-					),
-					adjustments,
 					warnings: [...new Set(warnings)]
 				},
 				error: null
@@ -699,7 +643,9 @@ class ExportService {
 			// Create header data
 			const headerData = [
 				[`Monthly Fuel and Diesel Claim Summary - ${companyName} - ${monthName} ${year}`],
-				[],
+				report.warnings.length > 0
+					? ['Attention: claim data needs review on the Audit page before submission.']
+					: [],
 				[
 					'Code',
 					'Name',
@@ -709,8 +655,7 @@ class ExportService {
 					'Claimable',
 					'Non-claimable',
 					'Consumption',
-					'Unit',
-					'Claim Basis'
+					'Unit'
 				]
 			];
 
@@ -724,8 +669,7 @@ class ExportService {
 				row.claimableFuel,
 				row.nonClaimableFuel,
 				row.consumption,
-				row.unit,
-				row.claimBasis
+				row.unit
 			]);
 			const totals = data.reduce(
 				(acc, row) => ({
@@ -742,7 +686,6 @@ class ExportService {
 				roundClaimLitres(totals.total),
 				roundClaimLitres(totals.claimable),
 				roundClaimLitres(totals.total - totals.claimable),
-				'',
 				'',
 				''
 			]);
@@ -763,12 +706,14 @@ class ExportService {
 				{ wch: 12 },
 				{ wch: 14 },
 				{ wch: 12 },
-				{ wch: 8 },
-				{ wch: 38 }
+				{ wch: 8 }
 			];
 
 			// Merge cells for main header
-			worksheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }];
+			worksheet['!merges'] = [
+				{ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+				{ s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }
+			];
 
 			// Clean-ledger styling: monochrome, hairline borders,
 			// red for fuel consumed (fuel out of the tank)
@@ -777,7 +722,7 @@ class ExportService {
 				headerRows: [2],
 				dataStartRow: 3,
 				rowCount: worksheetData.length,
-				colCount: 10,
+				colCount: 9,
 				columnStyles: {
 					3: { numFmt: '#,##0.00', halign: 'right' },
 					4: { numFmt: '#,##0.00', halign: 'right', fontColor: XL_RED },
@@ -790,95 +735,6 @@ class ExportService {
 
 			// Add worksheet to workbook
 			XLSX.utils.book_append_sheet(workbook, worksheet, 'Monthly Summary');
-
-			const detailRows: Array<Array<string | number>> = [
-				['Diesel Claim Detail'],
-				['Period', `${monthName} ${year}`],
-				...report.warnings.map((warning) => ['Warning', warning]),
-				[]
-			];
-			for (const adjustment of report.adjustments) {
-				const vehicle = data.find((row) => row.vehicleId === adjustment.vehicle_id);
-				const variance = calculateClassifierVariance(
-					vehicle?.fuel || 0,
-					adjustment.classifier_measured_litres
-				);
-				detailRows.push(
-					[
-						'Classifier vehicle',
-						vehicle ? `${vehicle.code} - ${vehicle.name}` : adjustment.vehicle_id
-					],
-					['Classifier measured litres', adjustment.classifier_measured_litres],
-					['Classifier claimable litres', adjustment.classifier_claimable_litres],
-					['Classifier percentage', adjustment.claimable_percentage / 100],
-					['Fuel Manager variance litres', roundClaimLitres(variance.litres)],
-					['Fuel Manager variance percentage', variance.percentage / 100],
-					['Source reference', adjustment.source_reference || ''],
-					['Notes', adjustment.notes || ''],
-					[]
-				);
-			}
-			const detailHeaderRow = detailRows.length;
-			detailRows.push(
-				[
-					'Vehicle',
-					'Vehicle Name',
-					'Activity',
-					'Activity Eligible',
-					'Total Fuel',
-					'Classifier %',
-					'Claimable',
-					'Non-claimable',
-					'Claim Basis'
-				],
-				...report.details.map((row) => [
-					row.vehicleCode,
-					row.vehicleName,
-					row.activityName,
-					row.activityEligible ? 'Yes' : 'No',
-					row.totalFuel,
-					row.claimablePercentage === null ? '' : row.claimablePercentage / 100,
-					row.claimableFuel,
-					row.nonClaimableFuel,
-					row.claimBasis
-				])
-			);
-			const detailSheet = XLSX.utils.aoa_to_sheet(detailRows);
-			detailSheet['!cols'] = [
-				{ wch: 10 },
-				{ wch: 24 },
-				{ wch: 28 },
-				{ wch: 17 },
-				{ wch: 12 },
-				{ wch: 13 },
-				{ wch: 12 },
-				{ wch: 14 },
-				{ wch: 38 }
-			];
-			applyLedgerStyles(detailSheet, {
-				titleRows: [0],
-				headerRows: [detailHeaderRow],
-				dataStartRow: detailHeaderRow + 1,
-				rowCount: detailRows.length,
-				colCount: 9,
-				columnStyles: {
-					4: { numFmt: '#,##0.00', halign: 'right' },
-					5: { numFmt: '0.00%', halign: 'right' },
-					6: { numFmt: '#,##0.00', halign: 'right' },
-					7: { numFmt: '#,##0.00', halign: 'right' }
-				}
-			});
-			for (let row = 0; row < detailHeaderRow; row++) {
-				const label = (detailSheet as any)[XLSX.utils.encode_cell({ r: row, c: 0 })];
-				const value = (detailSheet as any)[XLSX.utils.encode_cell({ r: row, c: 1 })];
-				if (
-					label?.v === 'Classifier percentage' ||
-					label?.v === 'Fuel Manager variance percentage'
-				) {
-					if (value) value.z = '0.00%';
-				}
-			}
-			XLSX.utils.book_append_sheet(workbook, detailSheet, 'Claim Detail');
 
 			// Generate filename
 			const filename = `Monthly_Vehicle_Summary_${year}_${month.toString().padStart(2, '0')}.xlsx`;
@@ -978,30 +834,41 @@ class ExportService {
 
 			pdf.setFont('helvetica', 'normal');
 			pdf.text(`Total Active Vehicles: ${data.length}`, marginX, 55);
-			pdf.text(`Total Fuel Consumption: ${totalFuel.toFixed(2)} Litres`, marginX, 60);
-			pdf.text(
-				`Claimable: ${totalClaimable.toFixed(2)} L | Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`,
-				marginX,
-				65
-			);
+			pdf.text(`Total: ${totalFuel.toFixed(2)} L`, marginX, 60);
+			pdf.text(`Claimable: ${totalClaimable.toFixed(2)} L`, 80, 60);
+			pdf.text(`Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`, 135, 60);
+			if (report.warnings.length > 0) {
+				pdf.setFontSize(7);
+				pdf.setTextColor(160, 94, 16);
+				pdf.text('Attention: claim data needs review on the Audit page.', marginX, 65);
+				pdf.setTextColor(0, 0, 0);
+			}
 
 			// Table with separate name and registration columns
 			const tableStartY = 73;
 			const tableData = data.map((vehicle) => [
 				vehicle.code,
 				vehicle.name,
+				vehicle.registration || '—',
+				vehicle.category,
+				vehicle.distance === '' ? '—' : vehicle.distance.toString(),
 				vehicle.fuel.toFixed(2),
 				vehicle.claimableFuel.toFixed(2),
 				vehicle.nonClaimableFuel.toFixed(2),
-				vehicle.claimBasis
+				vehicle.consumption === '' ? '—' : vehicle.consumption.toString(),
+				vehicle.unit || '—'
 			]);
 
 			tableData.push([
 				'',
 				'TOTAL',
+				'',
+				'',
+				'',
 				`${totalFuel.toFixed(2)}`,
 				`${totalClaimable.toFixed(2)}`,
 				`${(totalFuel - totalClaimable).toFixed(2)}`,
+				'',
 				''
 			]);
 
@@ -1009,13 +876,24 @@ class ExportService {
 			autoTable(pdf, {
 				startY: tableStartY,
 				head: [
-					['Vehicle', 'Name', 'Total (L)', 'Claimable (L)', 'Non-claimable (L)', 'Claim Basis']
+					[
+						'Vehicle',
+						'Name',
+						'Registration',
+						'Category',
+						'Distance',
+						'Total (L)',
+						'Claimable',
+						'Non-claim.',
+						'Efficiency*',
+						'Unit'
+					]
 				],
 				body: tableData,
 				theme: 'grid',
 				styles: {
-					fontSize: 9,
-					cellPadding: 1.5,
+					fontSize: 6.5,
+					cellPadding: 1,
 					lineColor: PDF_HAIRLINE,
 					lineWidth: 0.1,
 					font: 'helvetica',
@@ -1026,7 +904,7 @@ class ExportService {
 					fillColor: [255, 255, 255],
 					textColor: [0, 0, 0],
 					fontStyle: 'bold',
-					fontSize: 9,
+					fontSize: 6.5,
 					halign: 'center',
 					minCellHeight: 4,
 					lineColor: PDF_HAIRLINE,
@@ -1035,10 +913,14 @@ class ExportService {
 				columnStyles: {
 					0: { halign: 'center' },
 					1: { halign: 'left' },
-					2: { halign: 'right' },
-					3: { halign: 'right' },
+					2: { halign: 'center' },
+					3: { halign: 'left' },
 					4: { halign: 'right' },
-					5: { halign: 'left', cellWidth: 42 }
+					5: { halign: 'right' },
+					6: { halign: 'right' },
+					7: { halign: 'right' },
+					8: { halign: 'right' },
+					9: { halign: 'center' }
 				},
 				didParseCell: function (data: any) {
 					if (data.section !== 'body') return;
@@ -1370,124 +1252,13 @@ class ExportService {
 			pdf.text(`Total fuel: ${totalFuel.toFixed(2)} L`, marginX, 42);
 			pdf.text(`Claimable: ${totalClaimable.toFixed(2)} L`, 82, 42);
 			pdf.text(`Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`, 138, 42);
-
-			const claimTableData = data.map((vehicle) => [
-				vehicle.code,
-				vehicle.name,
-				vehicle.fuel.toFixed(2),
-				vehicle.claimableFuel.toFixed(2),
-				vehicle.nonClaimableFuel.toFixed(2),
-				vehicle.claimBasis
-			]);
-			claimTableData.push([
-				'',
-				'TOTAL',
-				totalFuel.toFixed(2),
-				totalClaimable.toFixed(2),
-				(totalFuel - totalClaimable).toFixed(2),
-				''
-			]);
-			autoTable(pdf, {
-				startY: 48,
-				head: [
-					['Vehicle', 'Name', 'Total (L)', 'Claimable (L)', 'Non-claimable (L)', 'Claim Basis']
-				],
-				body: claimTableData,
-				theme: 'grid',
-				styles: {
-					fontSize: 8,
-					cellPadding: 1.5,
-					lineColor: PDF_HAIRLINE,
-					lineWidth: 0.1,
-					font: 'helvetica',
-					textColor: [0, 0, 0],
-					minCellHeight: 3
-				},
-				headStyles: {
-					fillColor: [255, 255, 255],
-					textColor: [0, 0, 0],
-					fontStyle: 'bold',
-					fontSize: 9,
-					halign: 'center',
-					minCellHeight: 4,
-					lineColor: PDF_HAIRLINE,
-					lineWidth: 0.1
-				},
-				columnStyles: {
-					0: { halign: 'center', cellWidth: 15 },
-					1: { halign: 'left', cellWidth: 36 },
-					2: { halign: 'right', cellWidth: 20 },
-					3: { halign: 'right', cellWidth: 23 },
-					4: { halign: 'right', cellWidth: 27 },
-					5: { halign: 'left' }
-				},
-				didParseCell: function (data: any) {
-					if (data.section === 'body' && data.row.index === claimTableData.length - 1) {
-						data.cell.styles.fontStyle = 'bold';
-					}
-				},
-				margin: { left: marginX, right: marginX }
-			});
-
-			let claimNoteY = ((pdf as any).lastAutoTable.finalY || 90) + 7;
-			for (const adjustment of report.adjustments) {
-				const vehicle = data.find((row) => row.vehicleId === adjustment.vehicle_id);
-				const variance = calculateClassifierVariance(
-					vehicle?.fuel || 0,
-					adjustment.classifier_measured_litres
-				);
-				if (claimNoteY > pageHeight - 35) {
-					pdf.addPage();
-					claimNoteY = 20;
-				}
-				pdf.setFontSize(9);
-				pdf.setFont('helvetica', 'bold');
-				pdf.text(`${vehicle?.code || 'Classifier vehicle'} calculation`, marginX, claimNoteY);
-				claimNoteY += 5;
-				pdf.setFont('helvetica', 'normal');
-				pdf.text(
-					`${adjustment.classifier_claimable_litres.toFixed(2)} L / ${adjustment.classifier_measured_litres.toFixed(2)} L = ${adjustment.claimable_percentage.toFixed(2)}%`,
-					marginX,
-					claimNoteY
-				);
-				claimNoteY += 4;
-				pdf.setTextColor(
-					...(variance.exceedsThreshold ? ([160, 94, 16] as [number, number, number]) : PDF_GREY)
-				);
-				pdf.text(
-					`Fuel Manager vs telematics: ${variance.litres >= 0 ? '+' : ''}${variance.litres.toFixed(2)} L (${variance.percentage >= 0 ? '+' : ''}${variance.percentage.toFixed(1)}%)`,
-					marginX,
-					claimNoteY
-				);
-				pdf.setTextColor(0, 0, 0);
-				claimNoteY += 4;
-				if (adjustment.source_reference) {
-					pdf.setTextColor(...PDF_GREY);
-					pdf.text(`Source: ${cleanDocText(adjustment.source_reference)}`, marginX, claimNoteY);
-					pdf.setTextColor(0, 0, 0);
-					claimNoteY += 4;
-				}
-			}
-			for (const warning of report.warnings) {
-				if (claimNoteY > pageHeight - 25) {
-					pdf.addPage();
-					claimNoteY = 20;
-				}
-				pdf.setFontSize(8);
+			if (report.warnings.length > 0) {
+				pdf.setFontSize(7);
 				pdf.setTextColor(160, 94, 16);
-				const lines = pdf.splitTextToSize(
-					`Warning: ${cleanDocText(warning)}`,
-					pageWidth - marginX * 2
-				);
-				pdf.text(lines, marginX, claimNoteY);
-				claimNoteY += lines.length * 3.5 + 1;
+				pdf.text('Attention: claim data needs review on the Audit page.', marginX, 47);
+				pdf.setTextColor(0, 0, 0);
 			}
-			pdf.setTextColor(0, 0, 0);
 
-			pdf.addPage();
-			pdf.setFontSize(12);
-			pdf.setFont('helvetica', 'bold');
-			pdf.text('Vehicle Consumption Detail', marginX, 20);
 			const consumptionTable = data.map((vehicle) => [
 				vehicle.code,
 				vehicle.name,
@@ -1495,19 +1266,35 @@ class ExportService {
 				vehicle.category,
 				vehicle.distance === '' ? '—' : vehicle.distance.toString(),
 				vehicle.fuel.toFixed(2),
+				vehicle.claimableFuel.toFixed(2),
+				vehicle.nonClaimableFuel.toFixed(2),
 				vehicle.consumption === '' ? '—' : vehicle.consumption.toString(),
 				vehicle.unit || '—'
 			]);
+			consumptionTable.push([
+				'',
+				'TOTAL',
+				'',
+				'',
+				'',
+				totalFuel.toFixed(2),
+				totalClaimable.toFixed(2),
+				(totalFuel - totalClaimable).toFixed(2),
+				'',
+				''
+			]);
 			autoTable(pdf, {
-				startY: 26,
+				startY: report.warnings.length > 0 ? 51 : 47,
 				head: [
 					[
 						'Vehicle',
 						'Name',
 						'Registration',
-						'Classification',
+						'Category',
 						'Distance',
-						'Fuel (L)',
+						'Total (L)',
+						'Claimable',
+						'Non-claim.',
 						'Efficiency*',
 						'Unit'
 					]
@@ -1515,24 +1302,42 @@ class ExportService {
 				body: consumptionTable,
 				theme: 'grid',
 				styles: {
-					fontSize: 8,
-					cellPadding: 1.4,
+					fontSize: data.length > 25 ? 5.5 : 6.25,
+					cellPadding: data.length > 25 ? 0.55 : 0.8,
 					lineColor: PDF_HAIRLINE,
 					lineWidth: 0.1,
-					textColor: [0, 0, 0]
+					textColor: [0, 0, 0],
+					minCellHeight: 2.5
 				},
 				headStyles: {
 					fillColor: [255, 255, 255],
 					textColor: [0, 0, 0],
 					fontStyle: 'bold',
 					lineColor: PDF_HAIRLINE,
-					lineWidth: 0.1
+					lineWidth: 0.1,
+					fontSize: 6
 				},
-				columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } },
+				columnStyles: {
+					0: { halign: 'center', cellWidth: 12 },
+					1: { halign: 'left', cellWidth: 22 },
+					2: { halign: 'center', cellWidth: 18 },
+					3: { halign: 'left', cellWidth: 23 },
+					4: { halign: 'right', cellWidth: 14 },
+					5: { halign: 'right', cellWidth: 15 },
+					6: { halign: 'right', cellWidth: 17 },
+					7: { halign: 'right', cellWidth: 18 },
+					8: { halign: 'right', cellWidth: 15 },
+					9: { halign: 'center', cellWidth: 9 }
+				},
+				didParseCell: function (cell: any) {
+					if (cell.section === 'body' && cell.row.index === consumptionTable.length - 1) {
+						cell.cell.styles.fontStyle = 'bold';
+					}
+				},
 				margin: { left: marginX, right: marginX }
 			});
 			const tableEndY = (pdf as any).lastAutoTable.finalY || 80;
-			let reconciliationY = tableEndY + 15;
+			let reconciliationY = tableEndY + 11;
 
 			// Page-break guard: the reconciliation block previously ran into the
 			// fixed-position footer (or off the page) when the table was long.
