@@ -17,11 +17,15 @@ import { calculateDieselClaim, roundClaimLitres } from '$lib/utils/diesel-claim'
 //   GREEN = fuel in (deliveries / refills / positive adjustments)
 // ---------------------------------------------------------------------------
 const XL_RED = 'B91C1C';
+const XL_CLAIM_GREEN = '2F7D4F';
+const XL_NONCLAIM_RED = '9B5555';
 const XL_HEADER_FILL = 'F5F5F4';
 const XL_HAIRLINE = 'D6D3D1';
 
 const PDF_RED: [number, number, number] = [185, 28, 28];
 const PDF_GREEN: [number, number, number] = [21, 128, 61];
+const PDF_CLAIM_GREEN: [number, number, number] = [47, 125, 79];
+const PDF_NONCLAIM_RED: [number, number, number] = [155, 85, 85];
 const PDF_GREY: [number, number, number] = [120, 113, 108];
 const PDF_HAIRLINE: [number, number, number] = [214, 211, 209];
 
@@ -725,9 +729,9 @@ class ExportService {
 				colCount: 9,
 				columnStyles: {
 					3: { numFmt: '#,##0.00', halign: 'right' },
-					4: { numFmt: '#,##0.00', halign: 'right', fontColor: XL_RED },
-					5: { numFmt: '#,##0.00', halign: 'right' },
-					6: { numFmt: '#,##0.00', halign: 'right' },
+					4: { numFmt: '#,##0.00', halign: 'right' },
+					5: { numFmt: '#,##0.00', halign: 'right', fontColor: XL_CLAIM_GREEN },
+					6: { numFmt: '#,##0.00', halign: 'right', fontColor: XL_NONCLAIM_RED },
 					7: { numFmt: '#,##0.00', halign: 'right' },
 					8: { halign: 'center' }
 				}
@@ -835,14 +839,11 @@ class ExportService {
 			pdf.setFont('helvetica', 'normal');
 			pdf.text(`Total Active Vehicles: ${data.length}`, marginX, 55);
 			pdf.text(`Total: ${totalFuel.toFixed(2)} L`, marginX, 60);
+			pdf.setTextColor(...PDF_CLAIM_GREEN);
 			pdf.text(`Claimable: ${totalClaimable.toFixed(2)} L`, 80, 60);
+			pdf.setTextColor(...PDF_NONCLAIM_RED);
 			pdf.text(`Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`, 135, 60);
-			if (report.warnings.length > 0) {
-				pdf.setFontSize(7);
-				pdf.setTextColor(160, 94, 16);
-				pdf.text('Attention: claim data needs review on the Audit page.', marginX, 65);
-				pdf.setTextColor(0, 0, 0);
-			}
+			pdf.setTextColor(0, 0, 0);
 
 			// Table with separate name and registration columns
 			const tableStartY = 73;
@@ -917,17 +918,18 @@ class ExportService {
 					3: { halign: 'left' },
 					4: { halign: 'right' },
 					5: { halign: 'right' },
-					6: { halign: 'right' },
-					7: { halign: 'right' },
+					6: { halign: 'right', textColor: PDF_CLAIM_GREEN },
+					7: { halign: 'right', textColor: PDF_NONCLAIM_RED },
 					8: { halign: 'right' },
 					9: { halign: 'center' }
 				},
 				didParseCell: function (data: any) {
-					if (data.section !== 'body') return;
+					if (data.column.index === 6) data.cell.styles.textColor = PDF_CLAIM_GREEN;
+					if (data.column.index === 7) data.cell.styles.textColor = PDF_NONCLAIM_RED;
 					// Style the subtotal row (last row): bold, no fill.
 					// The Fuel column stays black — red is reserved for tank
 					// MOVEMENTS in the reconciliation, so it keeps its meaning.
-					if (data.row.index === tableData.length - 1) {
+					if (data.section === 'body' && data.row.index === tableData.length - 1) {
 						data.cell.styles.fontStyle = 'bold';
 					}
 				},
@@ -1213,11 +1215,6 @@ class ExportService {
 			];
 			const monthName = monthNames[month - 1];
 
-			// Calculate previous month's last day for opening level
-			const prevMonth = month === 1 ? 12 : month - 1;
-			const prevYear = month === 1 ? year - 1 : year;
-			const lastDayOfPrevMonth = new Date(prevYear, prevMonth, 0).getDate();
-
 			// Calculate total fuel consumption
 			const totalFuel = data.reduce((sum, vehicle) => sum + vehicle.fuel, 0);
 			const totalClaimable = data.reduce((sum, vehicle) => sum + vehicle.claimableFuel, 0);
@@ -1243,21 +1240,15 @@ class ExportService {
 			// Calculate variables needed for the new reconciliation sections below
 			const bowserDifference = reconciliationData.bowserEnd - reconciliationData.bowserStart;
 			const fuelVariance = bowserDifference - reconciliationData.fuelDispensed;
-			const labelX = marginX;
-			const valueX = 80;
-			const detailsX = 135;
 
 			pdf.setFontSize(9);
 			pdf.setFont('helvetica', 'normal');
 			pdf.text(`Total fuel: ${totalFuel.toFixed(2)} L`, marginX, 42);
+			pdf.setTextColor(...PDF_CLAIM_GREEN);
 			pdf.text(`Claimable: ${totalClaimable.toFixed(2)} L`, 82, 42);
+			pdf.setTextColor(...PDF_NONCLAIM_RED);
 			pdf.text(`Non-claimable: ${(totalFuel - totalClaimable).toFixed(2)} L`, 138, 42);
-			if (report.warnings.length > 0) {
-				pdf.setFontSize(7);
-				pdf.setTextColor(160, 94, 16);
-				pdf.text('Attention: claim data needs review on the Audit page.', marginX, 47);
-				pdf.setTextColor(0, 0, 0);
-			}
+			pdf.setTextColor(0, 0, 0);
 
 			const consumptionTable = data.map((vehicle) => [
 				vehicle.code,
@@ -1284,7 +1275,7 @@ class ExportService {
 				''
 			]);
 			autoTable(pdf, {
-				startY: report.warnings.length > 0 ? 51 : 47,
+				startY: 47,
 				head: [
 					[
 						'Vehicle',
@@ -1302,12 +1293,13 @@ class ExportService {
 				body: consumptionTable,
 				theme: 'grid',
 				styles: {
-					fontSize: data.length > 25 ? 5.5 : 6.25,
-					cellPadding: data.length > 25 ? 0.55 : 0.8,
+					fontSize: data.length > 25 ? 6 : 7,
+					cellPadding: data.length > 25 ? 0.55 : 0.9,
 					lineColor: PDF_HAIRLINE,
 					lineWidth: 0.1,
+					font: 'helvetica',
 					textColor: [0, 0, 0],
-					minCellHeight: 2.5
+					minCellHeight: 3
 				},
 				headStyles: {
 					fillColor: [255, 255, 255],
@@ -1315,21 +1307,23 @@ class ExportService {
 					fontStyle: 'bold',
 					lineColor: PDF_HAIRLINE,
 					lineWidth: 0.1,
-					fontSize: 6
+					fontSize: 6.5
 				},
 				columnStyles: {
-					0: { halign: 'center', cellWidth: 12 },
-					1: { halign: 'left', cellWidth: 22 },
-					2: { halign: 'center', cellWidth: 18 },
-					3: { halign: 'left', cellWidth: 23 },
-					4: { halign: 'right', cellWidth: 14 },
-					5: { halign: 'right', cellWidth: 15 },
-					6: { halign: 'right', cellWidth: 17 },
-					7: { halign: 'right', cellWidth: 18 },
-					8: { halign: 'right', cellWidth: 15 },
-					9: { halign: 'center', cellWidth: 9 }
+					0: { halign: 'center', cellWidth: 11 },
+					1: { halign: 'left', cellWidth: 21 },
+					2: { halign: 'center', cellWidth: 17 },
+					3: { halign: 'left', cellWidth: 20 },
+					4: { halign: 'right', cellWidth: 13 },
+					5: { halign: 'right', cellWidth: 14 },
+					6: { halign: 'right', cellWidth: 16, textColor: PDF_CLAIM_GREEN },
+					7: { halign: 'right', cellWidth: 16, textColor: PDF_NONCLAIM_RED },
+					8: { halign: 'right', cellWidth: 13 },
+					9: { halign: 'center', cellWidth: 8 }
 				},
 				didParseCell: function (cell: any) {
+					if (cell.column.index === 6) cell.cell.styles.textColor = PDF_CLAIM_GREEN;
+					if (cell.column.index === 7) cell.cell.styles.textColor = PDF_NONCLAIM_RED;
 					if (cell.section === 'body' && cell.row.index === consumptionTable.length - 1) {
 						cell.cell.styles.fontStyle = 'bold';
 					}
@@ -1337,173 +1331,13 @@ class ExportService {
 				margin: { left: marginX, right: marginX }
 			});
 			const tableEndY = (pdf as any).lastAutoTable.finalY || 80;
-			let reconciliationY = tableEndY + 11;
 
-			// Page-break guard: the reconciliation block previously ran into the
-			// fixed-position footer (or off the page) when the table was long.
-			const ensureRoom = (needed = 8) => {
-				if (reconciliationY + needed > pageHeight - 18) {
-					pdf.addPage();
-					reconciliationY = 20;
-					pdf.setFontSize(9);
-					pdf.setFont('helvetica', 'normal');
-					pdf.setTextColor(0, 0, 0);
-				}
-			};
-
-			// Add footnote about efficiency.
-			pdf.setFontSize(8);
+			pdf.setFontSize(6.5);
 			pdf.setFont('helvetica', 'italic');
 			pdf.setTextColor(...PDF_GREY);
-			pdf.text('* Efficiency: l/100km or l/hr', marginX, tableEndY + 5);
+			pdf.text('* Efficiency shown as L/100km or L/hr', marginX, tableEndY + 4.5);
 			pdf.setTextColor(0, 0, 0);
 
-			// RECONCILIATION SECTIONS MOVED HERE - after table
-			ensureRoom(36);
-			pdf.setFontSize(11);
-			pdf.setFont('helvetica', 'bold');
-			pdf.text('Fuel Reconciliation', marginX, reconciliationY);
-
-			reconciliationY += 6;
-			pdf.setFontSize(9);
-			pdf.setFont('helvetica', 'normal');
-
-			pdf.text('Fuel Dispensed:', labelX, reconciliationY);
-			pdf.setTextColor(...PDF_RED); // fuel out
-			pdf.text(
-				`${reconciliationData.fuelDispensed.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
-				valueX,
-				reconciliationY
-			);
-			pdf.setTextColor(0, 0, 0);
-			reconciliationY += 4;
-
-			const bowserOpeningDate = `1 ${monthName} ${year}`;
-			const bowserClosingDate = `${new Date(year, month, 0).getDate()} ${monthName} ${year}`;
-
-			pdf.text('Bowser Opening:', labelX, reconciliationY);
-			pdf.text(
-				`${reconciliationData.bowserStart.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
-				valueX,
-				reconciliationY
-			);
-			pdf.setTextColor(...PDF_GREY);
-			pdf.text(`(${bowserOpeningDate})`, detailsX, reconciliationY);
-			pdf.setTextColor(0, 0, 0);
-			reconciliationY += 4;
-
-			pdf.text('Bowser Closing:', labelX, reconciliationY);
-			pdf.text(
-				`${reconciliationData.bowserEnd.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
-				valueX,
-				reconciliationY
-			);
-			pdf.setTextColor(...PDF_GREY);
-			pdf.text(`(${bowserClosingDate})`, detailsX, reconciliationY);
-			pdf.setTextColor(0, 0, 0);
-			reconciliationY += 4;
-
-			pdf.text('Bowser Difference:', labelX, reconciliationY);
-			pdf.text(
-				`${bowserDifference.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
-				valueX,
-				reconciliationY
-			);
-			reconciliationY += 4;
-
-			pdf.text('Fuel Variance:', labelX, reconciliationY);
-			pdf.text(`${fuelVariance.toFixed(1)}L`, valueX, reconciliationY);
-
-			reconciliationY += 10;
-
-			// Tank Reconciliation Section
-			ensureRoom(40);
-			pdf.setFontSize(11);
-			pdf.setFont('helvetica', 'bold');
-			pdf.text('Tank Reconciliation', marginX, reconciliationY);
-
-			reconciliationY += 4;
-			pdf.setFontSize(9);
-			pdf.setFont('helvetica', 'normal');
-
-			// Show opening balance as first day of current month (value comes from previous month's closing)
-			const openingDate = `1 ${monthName} ${year}`;
-
-			pdf.setFont('helvetica', 'bold');
-			pdf.text('Opening Balance:', labelX, reconciliationY);
-			pdf.text(
-				`${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
-				valueX,
-				reconciliationY
-			);
-			pdf.setFont('helvetica', 'normal');
-			pdf.setTextColor(...PDF_GREY);
-			pdf.text(`(${openingDate})`, detailsX, reconciliationY);
-			pdf.setTextColor(0, 0, 0);
-			reconciliationY += 4;
-
-			// Tank Activities with improved formatting
-			if (reconciliationData.tankActivities.length > 0) {
-				let totalAdditions = 0;
-				reconciliationData.tankActivities.forEach(
-					(activity: { delivery_date: string; litres_added?: number; invoice_number?: string }) => {
-						ensureRoom();
-						const activityDate = new Date(activity.delivery_date).toLocaleDateString('en-ZA', {
-							day: 'numeric',
-							month: 'short'
-						});
-						const amount = activity.litres_added || 0;
-						totalAdditions += amount;
-						const sign = amount >= 0 ? '+' : '';
-						const invoiceText = activity.invoice_number || 'Adjustment';
-
-						pdf.text(`• ${activityDate}:`, labelX + 5, reconciliationY);
-						// Deliveries/refills (fuel in) -> green; negative adjustments (fuel out) -> red
-						if (amount >= 0) {
-							pdf.setTextColor(...PDF_GREEN);
-						} else {
-							pdf.setTextColor(...PDF_RED);
-						}
-						pdf.text(
-							`${sign}${amount.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
-							valueX,
-							reconciliationY
-						);
-						pdf.setTextColor(...PDF_GREY);
-						pdf.text(`(${invoiceText})`, detailsX, reconciliationY);
-						pdf.setTextColor(0, 0, 0);
-						reconciliationY += 4;
-					}
-				);
-
-				pdf.setFont('helvetica', 'bold');
-				pdf.text('Total Additions:', labelX, reconciliationY);
-				pdf.setTextColor(...PDF_GREEN); // fuel in
-				pdf.text(
-					`+${totalAdditions.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
-					valueX,
-					reconciliationY
-				);
-				pdf.setTextColor(0, 0, 0);
-				pdf.setFont('helvetica', 'normal');
-				reconciliationY += 4;
-			}
-
-			// Total Drawings (fuel dispensed)
-			ensureRoom(28);
-			pdf.setFont('helvetica', 'bold');
-			pdf.text('Total Drawings:', labelX, reconciliationY);
-			pdf.setTextColor(...PDF_RED); // fuel out
-			pdf.text(
-				`-${reconciliationData.fuelDispensed.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
-				valueX,
-				reconciliationY
-			);
-			pdf.setTextColor(0, 0, 0);
-			pdf.setFont('helvetica', 'normal');
-			reconciliationY += 4;
-
-			// Expected vs Actual calculation
 			const totalTankAdditions = reconciliationData.tankActivities.reduce(
 				(sum: number, activity: { litres_added?: number }) => sum + (activity.litres_added || 0),
 				0
@@ -1512,50 +1346,156 @@ class ExportService {
 				reconciliationData.tankStartCalculated -
 				reconciliationData.fuelDispensed +
 				totalTankAdditions;
+			const lastDayOfMonth = new Date(year, month, 0).getDate();
+			const hasDip = (reconciliationData.lastDipReading || 0) > 0;
+			const tankVariance = expectedLevel - reconciliationData.lastDipReading;
+			const shortMonth = monthName.slice(0, 3);
+			const formatLitresValue = (value: number) =>
+				`${value.toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`;
+			const formatSignedLitres = (value: number) =>
+				`${value > 0 ? '+' : ''}${value.toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`;
 
-			const calculationFormula = `(${reconciliationData.tankStartCalculated.toLocaleString('en-ZA', { minimumFractionDigits: 1 })} - ${reconciliationData.fuelDispensed.toLocaleString('en-ZA', { minimumFractionDigits: 1 })} + ${totalTankAdditions.toLocaleString('en-ZA', { minimumFractionDigits: 1 })})`;
+			type ReconciliationRow = {
+				label: string;
+				value: string;
+				color?: [number, number, number];
+				bold?: boolean;
+			};
+
+			const deliveryRows = Math.ceil(reconciliationData.tankActivities.length / 2);
+			const reconciliationHeight = 53 + deliveryRows * 4;
+			let reconciliationY = tableEndY + 11;
+			if (reconciliationY + reconciliationHeight > pageHeight - 15) {
+				pdf.addPage();
+				reconciliationY = 18;
+			}
+
+			pdf.setFontSize(9.5);
 			pdf.setFont('helvetica', 'bold');
-			pdf.text('Closing Balance:', labelX, reconciliationY);
-			pdf.text(
-				`${expectedLevel.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`,
-				valueX,
-				reconciliationY
-			);
+			pdf.setTextColor(0, 0, 0);
+			pdf.text('Monthly reconciliation', marginX, reconciliationY);
+			pdf.setFontSize(6.5);
 			pdf.setFont('helvetica', 'normal');
 			pdf.setTextColor(...PDF_GREY);
-			pdf.text(calculationFormula, detailsX, reconciliationY);
-			pdf.setTextColor(0, 0, 0);
-			reconciliationY += 4;
+			pdf.text('Meter continuity and storage balance', pageWidth - marginX, reconciliationY, {
+				align: 'right'
+			});
 
-			const lastDayOfMonth = new Date(year, month, 0).getDate();
-			const actualReadingDate = `${lastDayOfMonth} ${monthName} ${year}`;
-			// A zero dip reading almost always means "no dip taken for this
-			// month" — printing 0,0L reads as an empty tank. Show a dash and
-			// say so; the variance is then meaningless too.
-			const hasDip = (reconciliationData.lastDipReading || 0) > 0;
-			pdf.text('Actual Reading:', labelX, reconciliationY);
-			pdf.text(
-				hasDip
-					? `${reconciliationData.lastDipReading.toLocaleString('en-ZA', { minimumFractionDigits: 1 })}L`
-					: '—',
-				valueX,
-				reconciliationY
-			);
-			pdf.setTextColor(...PDF_GREY);
-			pdf.text(
-				hasDip ? `(${actualReadingDate})` : '(no dip recorded for month end)',
-				detailsX,
-				reconciliationY
-			);
-			pdf.setTextColor(0, 0, 0);
-			reconciliationY += 4;
+			const panelGap = 6;
+			const panelWidth = (pageWidth - marginX * 2 - panelGap) / 2;
+			const panelTop = reconciliationY + 4;
+			const panelHeight = 41;
+			const drawPanel = (
+				x: number,
+				y: number,
+				width: number,
+				title: string,
+				rows: ReconciliationRow[]
+			) => {
+				pdf.setFillColor(250, 250, 249);
+				pdf.setDrawColor(...PDF_HAIRLINE);
+				pdf.setLineWidth(0.15);
+				pdf.roundedRect(x, y, width, panelHeight, 1.5, 1.5, 'FD');
+				pdf.setFontSize(8.5);
+				pdf.setFont('helvetica', 'bold');
+				pdf.setTextColor(0, 0, 0);
+				pdf.text(title, x + 3, y + 6);
 
-			// Tank variance - simplified with alignment
-			const tankVariance = expectedLevel - reconciliationData.lastDipReading;
-			pdf.text('Tank Variance:', labelX, reconciliationY);
-			pdf.text(hasDip ? `${tankVariance.toFixed(1)}L` : '—', valueX, reconciliationY);
+				rows.forEach((row, index) => {
+					const rowY = y + 12 + index * 4.5;
+					pdf.setFontSize(7.2);
+					pdf.setFont('helvetica', 'normal');
+					pdf.setTextColor(...PDF_GREY);
+					pdf.text(row.label, x + 3, rowY);
+					pdf.setFont('helvetica', row.bold ? 'bold' : 'normal');
+					pdf.setTextColor(...(row.color || ([45, 45, 45] as [number, number, number])));
+					pdf.text(row.value, x + width - 3, rowY, { align: 'right' });
+				});
+			};
 
-			let footerY = reconciliationY + 15;
+			drawPanel(marginX, panelTop, panelWidth, 'Bowser readings', [
+				{
+					label: `Opening meter (1 ${shortMonth})`,
+					value: formatLitresValue(reconciliationData.bowserStart)
+				},
+				{
+					label: `Closing meter (${lastDayOfMonth} ${shortMonth})`,
+					value: formatLitresValue(reconciliationData.bowserEnd)
+				},
+				{ label: 'Meter movement', value: formatLitresValue(bowserDifference), bold: true },
+				{
+					label: 'Recorded dispensed',
+					value: formatLitresValue(reconciliationData.fuelDispensed),
+					color: PDF_RED
+				},
+				{
+					label: 'Difference',
+					value: formatSignedLitres(fuelVariance),
+					color: Math.abs(fuelVariance) > 0.05 ? PDF_NONCLAIM_RED : PDF_GREY,
+					bold: true
+				}
+			]);
+
+			drawPanel(marginX + panelWidth + panelGap, panelTop, panelWidth, 'Tank balance', [
+				{
+					label: `Opening balance (1 ${shortMonth})`,
+					value: formatLitresValue(reconciliationData.tankStartCalculated)
+				},
+				{
+					label: 'Deliveries / adjustments',
+					value: formatSignedLitres(totalTankAdditions),
+					color: totalTankAdditions >= 0 ? PDF_GREEN : PDF_RED
+				},
+				{
+					label: 'Fuel dispensed',
+					value: `-${formatLitresValue(reconciliationData.fuelDispensed)}`,
+					color: PDF_RED
+				},
+				{ label: 'Expected closing', value: formatLitresValue(expectedLevel), bold: true },
+				{
+					label: `Actual dip (${lastDayOfMonth} ${shortMonth})`,
+					value: hasDip ? formatLitresValue(reconciliationData.lastDipReading) : 'Not recorded',
+					color: hasDip ? undefined : PDF_NONCLAIM_RED
+				},
+				{
+					label: 'Variance',
+					value: hasDip ? formatSignedLitres(tankVariance) : '-',
+					color: hasDip && Math.abs(tankVariance) > 0.05 ? PDF_NONCLAIM_RED : PDF_GREY,
+					bold: true
+				}
+			]);
+
+			if (reconciliationData.tankActivities.length > 0) {
+				const deliveriesY = panelTop + panelHeight + 6;
+				pdf.setFontSize(7);
+				pdf.setFont('helvetica', 'bold');
+				pdf.setTextColor(0, 0, 0);
+				pdf.text('Delivery and adjustment detail', marginX, deliveriesY);
+
+				reconciliationData.tankActivities.forEach(
+					(
+						activity: { delivery_date: string; litres_added?: number; invoice_number?: string },
+						index: number
+					) => {
+						const amount = activity.litres_added || 0;
+						const activityDate = new Date(activity.delivery_date).toLocaleDateString('en-ZA', {
+							day: 'numeric',
+							month: 'short'
+						});
+						const column = index % 2;
+						const row = Math.floor(index / 2);
+						const x = marginX + column * (panelWidth + panelGap);
+						const y = deliveriesY + 4.5 + row * 4;
+						const reference = cleanDocText(activity.invoice_number || 'Adjustment');
+						pdf.setFontSize(6.5);
+						pdf.setFont('helvetica', 'normal');
+						pdf.setTextColor(...(amount >= 0 ? PDF_GREEN : PDF_RED));
+						pdf.text(`${activityDate}  ${formatSignedLitres(amount)}  ${reference}`, x, y, {
+							maxWidth: panelWidth
+						});
+					}
+				);
+			}
 
 			// Report generation timestamp
 			pdf.setFontSize(7);
