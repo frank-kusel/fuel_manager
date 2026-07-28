@@ -1,23 +1,21 @@
 <script lang="ts">
-	import DataExport from '$lib/components/dashboard/DataExport.svelte';
+	// The export panel that used to sit here was a duplicate of the one on
+	// /audit — and worse, it had no month bound to it, so it always defaulted to
+	// the current month rather than the one being claimed. Exports live on
+	// /audit, driven by that page's month selector.
 	import VehicleFuelHistory from '$lib/components/reports/VehicleFuelHistory.svelte';
 </script>
 
 <svelte:head>
-	<title>Reports & Exports - FarmTrack</title>
+	<title>Vehicle fuel history - FarmTrack</title>
 </svelte:head>
 
 <div class="reports-container">
 	<div class="header">
-		<h1>Reports & Exports</h1>
-		<p>Generate detailed analytics, Excel exports, and PDF reports</p>
+		<h1>Vehicle fuel history</h1>
+		<p>Per-vehicle consumption over time. Exports live on the Audit page.</p>
 	</div>
 
-	<!-- Data Export Component -->
-	<DataExport />
-
-	<!-- Vehicle Fuel History -->
-	<div class="section-divider"></div>
 	<VehicleFuelHistory />
 </div>
 
@@ -43,10 +41,6 @@
 		margin: 0.5rem 0 0;
 		color: #6b7280;
 		font-size: 1rem;
-	}
-
-	.section-divider {
-		height: 2rem;
 	}
 
 	@media (max-width: 768px) {

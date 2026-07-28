@@ -23,8 +23,8 @@
 			icon: 'settings'
 		},
 		{
-			title: 'Reports & Exports',
-			description: 'Generate detailed analytics, Excel exports, and PDF reports',
+			title: 'Vehicle fuel history',
+			description: 'Per-vehicle consumption over time (exports live on Audit)',
 			href: '/reports',
 			icon: 'report'
 		}

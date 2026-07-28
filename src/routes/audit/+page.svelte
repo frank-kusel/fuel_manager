@@ -8,10 +8,14 @@
 	import { DEFAULT_DIP_TOLERANCE_L, type CloseRow } from '$lib/utils/tank-balance';
 	import {
 		buildReadiness,
-		checkCount,
 		nextAction,
-		outstandingCount
+		outstandingCount,
+		type ReadinessTarget
 	} from '$lib/utils/audit-readiness';
+	import ReadinessBand from '$lib/components/audit/ReadinessBand.svelte';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+	import { tick } from 'svelte';
 	import { calculateDieselClaim } from '$lib/utils/diesel-claim';
 	import { formatLitres, formatNumber } from '$lib/utils/formatting';
 	import type { Activity, DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
@@ -55,8 +59,12 @@
 	let selected = $derived(months.find((m) => m.key === selectedKey) ?? months[1]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let showEligibility = $state(false);
-	let showSettings = $state(false);
+	let showClaimSetup = $state(false);
+	// Plain let, not $state: this must not re-trigger. prepareEligibilityDraft
+	// runs on EVERY load(), and load() is also the onclosed/onsaved callback —
+	// so without the guard, closing the month re-expands this panel underneath
+	// you. saveEligibility used to mask that by force-closing afterwards.
+	let autoOpenedSetup = false;
 	let savingEligibility = $state(false);
 	let eligibilityError = $state('');
 	let eligibilitySuccess = $state('');
@@ -116,7 +124,10 @@
 				return [activity.id, !NON_ELIGIBLE_GUESS.test(activity.name)];
 			})
 		);
-		if (activities.some((activity) => !activity.diesel_claim_reviewed_at)) showEligibility = true;
+		if (!autoOpenedSetup && activities.some((activity) => !activity.diesel_claim_reviewed_at)) {
+			showClaimSetup = true;
+			autoOpenedSetup = true;
+		}
 	}
 
 	async function load() {
@@ -235,7 +246,7 @@
 			if (result.error) throw new Error(result.error);
 			await load();
 			eligibilitySuccess = 'Activity eligibility saved to the database.';
-			showEligibility = false;
+			showClaimSetup = false;
 		} catch (err) {
 			eligibilityError = err instanceof Error ? err.message : 'Failed to save activity eligibility';
 		} finally {
@@ -324,7 +335,48 @@
 
 	let readinessNext = $derived(nextAction(checklist));
 	let readinessOutstanding = $derived(outstandingCount(checklist));
-	let readinessTotal = $derived(checkCount(checklist));
+	let overTolerance = $derived(selectedClose?.accepted === false);
+
+	// ---- Tabs ----
+	// URL-backed so a reload or a trip to /tank and back keeps your place.
+	// /audit has no `load`, so a same-route query change does not remount this
+	// component — the derived value just recomputes.
+	let tab = $derived(page.url.searchParams.get('tab') === 'claim' ? 'claim' : 'close');
+
+	// Claim mounts on first visit and then stays. Neither panel is ever
+	// destroyed: MonthCloseSection refetches on mount (4-5 round trips) and
+	// holds a half-typed note and the post-close banner, which a remount would
+	// silently discard. ActrosClaimAdjustment is the same shape.
+	let claimMounted = $state(false);
+	$effect(() => {
+		if (tab === 'claim') claimMounted = true;
+	});
+
+	async function showTab(next: 'close' | 'claim') {
+		await goto(`?tab=${next}`, { replaceState: true, noScroll: true, keepFocus: true });
+		await tick();
+	}
+
+	/** The band's next-action control: switch tab, open the panel, scroll to it. */
+	async function goToTarget(target: ReadinessTarget) {
+		if (target === 'close') {
+			await showTab('close');
+			document.getElementById('month-close')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			return;
+		}
+		await showTab('claim');
+		showClaimSetup = true;
+		await tick();
+		document.getElementById('claim-setup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		if (target === 'registration') {
+			(document.getElementById('drs-reg') as HTMLInputElement | null)?.focus();
+		}
+	}
+
+	async function goToExports() {
+		await showTab('claim');
+		document.getElementById('exports')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
 
 </script>
 
@@ -357,15 +409,59 @@
 	{:else if loading}
 		<div class="skeleton" style="height: 9rem"></div>
 	{:else}
-		<!-- Close the tank -->
-		<MonthCloseSection
-			month={selected}
-			toleranceL={settings.dipToleranceL}
-			onclosed={load}
+		<ReadinessBand
+			items={checklist}
+			next={readinessNext}
+			outstanding={readinessOutstanding}
+			monthLabel={selected.label}
+			{eligibleLitres}
+			{refundRands}
+			{overTolerance}
+			onact={goToTarget}
+			onexports={goToExports}
 		/>
 
-		<CloseHistory rows={closes} toleranceL={settings.dipToleranceL} />
+		<!--
+			Links, not a tablist widget: these are genuinely URL-addressable, so
+			<a> is honest and costs less than roving tabindex for a binary choice.
+			replacestate keeps back out of the tab cycle (it is the primary gesture
+			on mobile); keepfocus stops SvelteKit throwing focus to <body>.
+		-->
+		<nav class="tabs" aria-label="Month-end sections">
+			<a
+				class="tab"
+				class:on={tab === 'close'}
+				href="?tab=close"
+				aria-current={tab === 'close' ? 'page' : undefined}
+				data-sveltekit-replacestate
+				data-sveltekit-noscroll
+				data-sveltekit-keepfocus>Close</a
+			>
+			<a
+				class="tab"
+				class:on={tab === 'claim'}
+				href="?tab=claim"
+				aria-current={tab === 'claim' ? 'page' : undefined}
+				data-sveltekit-replacestate
+				data-sveltekit-noscroll
+				data-sveltekit-keepfocus>Claim</a
+			>
+		</nav>
 
+		<div class="tabpanel" hidden={tab !== 'close'}>
+			<div id="month-close">
+				<MonthCloseSection
+					month={selected}
+					toleranceL={settings.dipToleranceL}
+					onclosed={load}
+				/>
+			</div>
+
+			<CloseHistory rows={closes} toleranceL={settings.dipToleranceL} />
+		</div>
+
+		{#if claimMounted}
+		<div class="tabpanel" hidden={tab !== 'claim'}>
 		<!-- Claim stats -->
 		<h2 class="section-heading">Claim — {selected.label}</h2>
 		<section class="panel claim">
@@ -405,15 +501,24 @@
 			{/if}
 		</section>
 
-		<!-- Eligibility editor -->
-		<section class="panel">
-			<button class="collapser" onclick={() => (showEligibility = !showEligibility)}>
-				<span
-					>Activity eligibility ({eligibleActivityCount} eligible · {activities.length -
-						eligibleActivityCount} excluded)</span
-				>
+		<!--
+			One "Claim setup" panel, no nested collapses — nesting is what made
+			these two hard to find in the first place.
+		-->
+		<section class="panel" id="claim-setup">
+			<button class="collapser" onclick={() => (showClaimSetup = !showClaimSetup)}>
+				<span>
+					Claim setup
+					<span class="setup-summary">
+						{eligibleActivityCount} claimable · {settings.rateCents} c/L ·
+						{settings.regNo.trim() ? settings.regNo.trim() : 'no DRS no.'}
+					</span>
+					{#if unreviewedActivityCount > 0 || !settings.regNo.trim()}
+						<span class="setup-dot" title="Needs attention"></span>
+					{/if}
+				</span>
 				<svg
-					class:open={showEligibility}
+					class:open={showClaimSetup}
 					viewBox="0 0 24 24"
 					fill="none"
 					stroke="currentColor"
@@ -422,7 +527,9 @@
 					stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg
 				>
 			</button>
-			{#if showEligibility}
+
+			{#if showClaimSetup}
+				<h3 class="setup-h">Activity eligibility</h3>
 				{#if unreviewedActivityCount > 0}
 					<p class="review-intro">
 						Review these defaults, then save once. Previous browser choices are only used to prefill
@@ -430,7 +537,7 @@
 					</p>
 				{/if}
 				<div class="elig-list">
-					{#each activities as activity}
+					{#each activities as activity (activity.id)}
 						<button
 							class="elig-row"
 							class:excluded={eligibilityDraft[activity.id] === false}
@@ -459,50 +566,12 @@
 						>{savingEligibility ? 'Saving...' : 'Save eligibility'}</button
 					>
 				</div>
-			{/if}
-			{#if eligibilitySuccess}<p class="elig-message success">{eligibilitySuccess}</p>{/if}
-		</section>
 
-		<!-- Readiness checklist -->
-		<section class="panel">
-			<h2 class="panel-title">Audit readiness</h2>
-			{#each checklist as item (item.id)}
-				<div class="check">
-					<div class="check-box" class:y={item.state === 'ok'} class:n={item.state === 'blocker'} class:w={item.state === 'warn'} class:i={item.state === 'info'}>
-						{item.state === 'ok' ? '✓' : item.state === 'info' ? '·' : '!'}
-					</div>
-					<div>
-						<div class="check-t">{item.title}</div>
-						<div class="check-d">{item.detail}</div>
-					</div>
-				</div>
-			{/each}
-		</section>
-
-		<!-- Claim settings -->
-		<section class="panel">
-			<button class="collapser" onclick={() => (showSettings = !showSettings)}>
-				<span>Claim settings</span>
-				<svg
-					class:open={showSettings}
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg
-				>
-			</button>
-			{#if showSettings}
+				<h3 class="setup-h">Rates and registration</h3>
 				<div class="settings-grid">
 					<label class="setting">
 						<span>Rebate rate (c/L)</span>
-						<input
-							type="number"
-							step="0.1"
-							bind:value={settings.rateCents}
-							onchange={saveSettings}
-						/>
+						<input type="number" step="0.1" bind:value={settings.rateCents} onchange={saveSettings} />
 					</label>
 					<label class="setting">
 						<span>Dipstick tolerance (L)</span>
@@ -516,6 +585,7 @@
 					<label class="setting">
 						<span>DRS registration no.</span>
 						<input
+							id="drs-reg"
 							type="text"
 							placeholder="e.g. DRS-2026-…"
 							bind:value={settings.regNo}
@@ -529,13 +599,17 @@
 					claiming.
 				</p>
 			{/if}
+			{#if eligibilitySuccess}<p class="elig-message success">{eligibilitySuccess}</p>{/if}
 		</section>
 
 		<ActrosClaimAdjustment year={selected.year} month={selected.month} onsaved={load} />
 
 		<!-- Exports -->
-		<h2 class="section-heading">Exports</h2>
+		<h2 class="section-heading" id="exports">Exports</h2>
 		<DataExport selectedYear={selected.year} selectedMonth={selected.month} hideMonthPicker />
+
+		</div>
+		{/if}
 
 		<!-- Manage -->
 		<h2 class="section-heading">Manage</h2>
@@ -591,6 +665,90 @@
 		transition: all 0.15s ease;
 	}
 
+	/* ---- Tabs ---- */
+	.tabs {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.25rem;
+		padding: 0.25rem;
+		background: var(--gray-100);
+		border-radius: var(--radius-lg);
+		/* The layout header is in normal flow and is hidden entirely at >=1024px,
+		   and .main has no overflow container, so top: 0 resolves against the
+		   viewport at both breakpoints. */
+		position: sticky;
+		top: 0;
+		z-index: 5;
+	}
+
+	.tab {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 44px;
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-600);
+		text-decoration: none;
+		transition: background 0.15s ease, color 0.15s ease;
+	}
+
+	.tab.on {
+		background: var(--white);
+		color: var(--brand);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.tabpanel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.875rem;
+	}
+
+	/* The hidden ATTRIBUTE (a11y tree + tab order), which otherwise loses to
+	   the display: flex above. */
+	.tabpanel[hidden] {
+		display: none !important;
+	}
+
+	/* ---- Claim setup ---- */
+	.setup-summary {
+		display: block;
+		font-size: var(--text-xs);
+		font-weight: 400;
+		color: var(--gray-500);
+		margin-top: 0.1rem;
+	}
+
+	.setup-dot {
+		display: inline-block;
+		width: 0.45rem;
+		height: 0.45rem;
+		border-radius: 50%;
+		background: #d97706;
+		margin-left: 0.35rem;
+		vertical-align: 0.15rem;
+	}
+
+	.setup-h {
+		font-size: var(--text-xs);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--gray-400);
+		margin: 1rem 0 0.5rem;
+	}
+
+	.setup-h:first-of-type {
+		margin-top: 0.75rem;
+	}
+
+	@media (min-width: 768px) {
+		.tabs {
+			max-width: 320px;
+		}
+	}
+
 	.chip-badge {
 		display: inline-block;
 		margin-left: 0.3rem;
@@ -618,13 +776,6 @@
 		border: 1px solid var(--gray-200);
 		border-radius: var(--radius-lg);
 		padding: 1rem 1.125rem;
-	}
-
-	.panel-title {
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-600);
-		margin: 0 0 0.5rem;
 	}
 
 	.section-heading {
@@ -856,67 +1007,6 @@
 		color: var(--gray-400);
 		margin: 0.625rem 0 0;
 		line-height: 1.5;
-	}
-
-	/* Checklist */
-	.check {
-		display: flex;
-		gap: 0.75rem;
-		align-items: flex-start;
-		padding: 0.6rem 0;
-		border-bottom: 1px solid var(--gray-100);
-	}
-
-	.check:last-child {
-		border-bottom: none;
-		padding-bottom: 0;
-	}
-
-	.check-box {
-		flex-shrink: 0;
-		width: 1.5rem;
-		height: 1.5rem;
-		border-radius: var(--radius-md);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-bold);
-		margin-top: 0.1rem;
-	}
-
-	.check-box.y {
-		background: #dcfce7;
-		color: var(--success-dark);
-	}
-
-	.check-box.n {
-		background: #fee2e2;
-		color: #991b1b;
-	}
-
-	/* Closed, but outside tolerance — real, not a hard blocker. */
-	.check-box.w {
-		background: #fef3c7;
-		color: #92400e;
-	}
-
-	/* A fact worth showing that you cannot act on from here. */
-	.check-box.i {
-		background: var(--gray-100);
-		color: var(--gray-500);
-	}
-
-	.check-t {
-		font-size: var(--text-sm);
-		font-weight: 500;
-		color: var(--gray-900);
-	}
-
-	.check-d {
-		font-size: var(--text-xs);
-		color: var(--gray-500);
-		margin-top: 0.1rem;
 	}
 
 	/* Settings */

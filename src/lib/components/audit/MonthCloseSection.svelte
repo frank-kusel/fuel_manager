@@ -184,12 +184,22 @@
 		<div class="skeleton" style="height: 12rem"></div>
 	{:else if data}
 		{#if data.existingClose}
-			<div class="closed-banner">
-				<span class="closed-ic">{data.existingClose.is_rebaseline ? '⟲' : '✓'}</span>
+			<!-- A close that failed its own leak check is not a green tick. -->
+			<div class="closed-banner" class:over={data.existingClose.accepted === false}>
+				<span class="closed-ic"
+					>{data.existingClose.is_rebaseline
+						? '⟲'
+						: data.existingClose.accepted === false
+							? '!'
+							: '✓'}</span
+				>
 				<span>
 					{data.existingClose.is_rebaseline ? 'Re-baselined' : 'Closed'} on
 					{fmtFull(data.existingClose.created_at.slice(0, 10))} — carried forward
-					{nf1.format(data.existingClose.calculated_level ?? 0)} L
+					{nf1.format(data.existingClose.calculated_level ?? 0)} L{data.existingClose.accepted ===
+					false
+						? ', over tolerance'
+						: ''}
 				</span>
 			</div>
 		{/if}
@@ -382,6 +392,12 @@
 		border-radius: var(--radius-md);
 		padding: 0.5rem 0.75rem;
 		margin-bottom: 0.75rem;
+	}
+
+	.closed-banner.over {
+		color: #92400e;
+		background: #fffbeb;
+		border-color: #fde68a;
 	}
 
 

@@ -45,6 +45,22 @@
 	let pdfExportError = $state('');
 	let pdfExportSuccess = $state(false);
 
+	// When the host page owns the month (Audit), the daily-capture range has to
+	// follow it. Without this the panel stayed pinned to TODAY's month, so
+	// claiming June armed the capture export for July — the last surviving
+	// instance of the conflicting-period-state this page set out to remove.
+	// The user can still override either input by hand; this only reseeds when
+	// the selected month itself changes.
+	$effect(() => {
+		if (!hideMonthPicker) return;
+		const first = new Date(selectedYear, selectedMonth - 1, 1);
+		const last = new Date(selectedYear, selectedMonth, 0);
+		startDate = isoLocal(first);
+		endDate = isoLocal(last);
+		claimStart = isoLocal(first);
+		claimEnd = isoLocal(last);
+	});
+
 	// The export service pulls in SheetJS + jsPDF (~1 MB); load it only when
 	// an export button is actually clicked so the page chunk stays small.
 	async function loadExportDeps() {
