@@ -6,6 +6,12 @@
 	import CloseHistory from '$lib/components/audit/CloseHistory.svelte';
 	import { recentMonths, type MonthOption } from '$lib/utils/dates';
 	import { DEFAULT_DIP_TOLERANCE_L, type CloseRow } from '$lib/utils/tank-balance';
+	import {
+		buildReadiness,
+		checkCount,
+		nextAction,
+		outstandingCount
+	} from '$lib/utils/audit-readiness';
 	import { calculateDieselClaim } from '$lib/utils/diesel-claim';
 	import { formatLitres, formatNumber } from '$lib/utils/formatting';
 	import type { Activity, DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
@@ -304,51 +310,21 @@
 		closes.find((c) => c.reconciliation_date.slice(0, 7) === selected.key) ?? null
 	);
 
-	let checklist = $derived.by(() => [
-		{
-			ok: settings.regNo.trim().length > 0,
-			title: 'Diesel refund registration captured',
-			detail: settings.regNo.trim()
-				? `Registered as ${settings.regNo}`
-				: 'Add your DRS registration number in settings below'
-		},
-		{
-			ok: unreviewedActivityCount === 0,
-			title: 'Activity eligibility reviewed',
-			detail:
-				unreviewedActivityCount === 0
-					? 'Claimable and non-claimable activities are saved in the database'
-					: `${unreviewedActivityCount} activities still need confirmation`
-		},
-		{
-			ok: entries.length > 0,
-			title: 'Usage logbook maintained',
-			detail: `${entries.length} entries in ${selected.label} — litres out per vehicle, activity and location`
-		},
-		{
-			ok: refills.length > 0,
-			title: 'Storage logbook maintained',
-			detail:
-				refills.length > 0
-					? `${refills.length} ${refills.length === 1 ? 'delivery' : 'deliveries'} recorded in ${selected.label}`
-					: `No deliveries recorded in ${selected.label}`
-		},
-		{
-			ok: !!selectedClose,
-			title: `${selected.label} closed`,
-			detail: selectedClose
-				? `Carried forward ${Math.round(selectedClose.calculated_level ?? 0)} L${selectedClose.is_rebaseline ? ' (re-baselined)' : ''}`
-				: 'Run the month-end close at the top of this page'
-		},
-		{
-			ok: missingInvoices12m === 0,
-			title: 'Delivery invoice numbers on file',
-			detail:
-				missingInvoices12m === 0
-					? 'Every delivery in the last 12 months has its invoice number'
-					: `${missingInvoices12m} ${missingInvoices12m === 1 ? 'delivery' : 'deliveries'} in the last 12 months missing an invoice number`
-		}
-	]);
+	let checklist = $derived(
+		buildReadiness({
+			monthLabel: selected.label,
+			regNo: settings.regNo,
+			unreviewedActivityCount,
+			entryCount: entries.length,
+			deliveryCount: refills.length,
+			selectedClose,
+			missingInvoices12m
+		})
+	);
+
+	let readinessNext = $derived(nextAction(checklist));
+	let readinessOutstanding = $derived(outstandingCount(checklist));
+	let readinessTotal = $derived(checkCount(checklist));
 
 </script>
 
@@ -490,9 +466,11 @@
 		<!-- Readiness checklist -->
 		<section class="panel">
 			<h2 class="panel-title">Audit readiness</h2>
-			{#each checklist as item}
+			{#each checklist as item (item.id)}
 				<div class="check">
-					<div class="check-box" class:y={item.ok} class:n={!item.ok}>{item.ok ? '✓' : '!'}</div>
+					<div class="check-box" class:y={item.state === 'ok'} class:n={item.state === 'blocker'} class:w={item.state === 'warn'} class:i={item.state === 'info'}>
+						{item.state === 'ok' ? '✓' : item.state === 'info' ? '·' : '!'}
+					</div>
 					<div>
 						<div class="check-t">{item.title}</div>
 						<div class="check-d">{item.detail}</div>
@@ -915,6 +893,18 @@
 	.check-box.n {
 		background: #fee2e2;
 		color: #991b1b;
+	}
+
+	/* Closed, but outside tolerance — real, not a hard blocker. */
+	.check-box.w {
+		background: #fef3c7;
+		color: #92400e;
+	}
+
+	/* A fact worth showing that you cannot act on from here. */
+	.check-box.i {
+		background: var(--gray-100);
+		color: var(--gray-500);
 	}
 
 	.check-t {

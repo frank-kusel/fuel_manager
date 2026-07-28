@@ -313,15 +313,6 @@
 <style>
 
 
-	/* ---- Month chips (same language as Audit) ---- */
-	.chips {
-		display: flex;
-		gap: 0.5rem;
-		overflow-x: auto;
-		padding-bottom: 2px;
-	}
-
-
 	/* ---- Panels ---- */
 	.panel {
 		background: var(--white);
@@ -528,27 +519,11 @@
 	}
 
 
-	/* ---- History table ---- */
-	.table-wrap {
-		overflow-x: auto;
-	}
-
-
 	/* ---- States ---- */
 	.empty-note {
 		font-size: var(--text-sm);
 		color: var(--gray-400);
 		margin: 0;
-	}
-
-
-	.tank-link {
-		display: inline-block;
-		margin-top: 0.5rem;
-		font-size: var(--text-sm);
-		color: var(--brand);
-		text-decoration: none;
-		font-weight: 500;
 	}
 
 
