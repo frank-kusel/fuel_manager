@@ -2,6 +2,10 @@
 	import { onMount } from 'svelte';
 	import DataExport from '$lib/components/dashboard/DataExport.svelte';
 	import ActrosClaimAdjustment from '$lib/components/audit/ActrosClaimAdjustment.svelte';
+	import MonthCloseSection from '$lib/components/audit/MonthCloseSection.svelte';
+	import CloseHistory from '$lib/components/audit/CloseHistory.svelte';
+	import { recentMonths, type MonthOption } from '$lib/utils/dates';
+	import { DEFAULT_DIP_TOLERANCE_L, type CloseRow } from '$lib/utils/tank-balance';
 	import { calculateDieselClaim } from '$lib/utils/diesel-claim';
 	import { formatLitres, formatNumber } from '$lib/utils/formatting';
 	import type { Activity, DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
@@ -14,6 +18,8 @@
 		regNo: string;
 		nonEligible: string[];
 		seeded: boolean;
+		/** Dipstick resolution; variance bands never flag below this. */
+		dipToleranceL: number;
 	}
 
 	interface AuditEntry {
@@ -30,10 +36,17 @@
 		rateCents: 303.8,
 		regNo: '',
 		nonEligible: [],
-		seeded: false
+		seeded: false,
+		dipToleranceL: DEFAULT_DIP_TOLERANCE_L
 	});
 	let legacySettingsFound = $state(false);
-	let period = $state<'month' | 'lastMonth' | 'all'>('month');
+
+	// ONE period for the whole page: the close, the claim figures, the Actros
+	// classifier and the export target all follow this month. Previously these
+	// were three independent selectors that could silently disagree.
+	const months: MonthOption[] = recentMonths(6);
+	let selectedKey = $state(months[1].key); // the month you are closing
+	let selected = $derived(months.find((m) => m.key === selectedKey) ?? months[1]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let showEligibility = $state(false);
@@ -43,8 +56,6 @@
 	let eligibilitySuccess = $state('');
 	let eligibilityDraft = $state<Record<string, boolean>>({});
 	let unmatchedLegacyNames = $state<string[]>([]);
-	let exportYear = $state(new Date().getFullYear());
-	let exportMonth = $state(new Date().getMonth() + 1);
 
 	let entries = $state<AuditEntry[]>([]);
 	let refills = $state<
@@ -52,11 +63,8 @@
 	>([]);
 	let activities = $state<Activity[]>([]);
 	let adjustments = $state<VehicleMonthlyClaimAdjustment[]>([]);
-	let lastDipDate = $state<string | null>(null);
-	let latestClose = $state<{
-		reconciliation_date: string;
-		variance_percentage: number | null;
-	} | null>(null);
+	let closes = $state<CloseRow[]>([]);
+	let missingInvoices12m = $state(0);
 
 	function loadSettings() {
 		try {
@@ -78,18 +86,11 @@
 		}
 	}
 
-	function periodRange(): { start: string | null; end: string | null } {
-		const now = new Date();
-		const iso = (d: Date) => d.toISOString().split('T')[0];
-		if (period === 'month')
-			return { start: iso(new Date(now.getFullYear(), now.getMonth(), 1)), end: iso(now) };
-		if (period === 'lastMonth') {
-			return {
-				start: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
-				end: iso(new Date(now.getFullYear(), now.getMonth(), 0))
-			};
-		}
-		return { start: null, end: null };
+	// Whole calendar month, from local-calendar helpers. The old version built
+	// these with toISOString(), which in SAST rolled the start back into the
+	// previous month.
+	function periodRange(): { start: string; end: string } {
+		return { start: selected.monthStart, end: selected.monthEnd };
 	}
 
 	function one<T>(relation: T | T[] | null | undefined): T | null {
@@ -121,46 +122,46 @@
 			const client = supabaseService.getClient();
 			const { start, end } = periodRange();
 
-			let entriesQ = client
-				.from('fuel_entries')
-				.select(
-					'entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(id, name, diesel_claim_eligible)'
-				)
-				.is('deleted_at', null);
-			let refillsQ = client
-				.from('tank_refills')
-				.select('litres_added, delivery_date, invoice_number');
-			if (start && end) {
-				entriesQ = entriesQ.gte('entry_date', start).lte('entry_date', end);
-				refillsQ = refillsQ.gte('delivery_date', start).lte('delivery_date', end);
-			}
-			const adjustmentStart = start ? `${start.slice(0, 7)}-01` : undefined;
-			const adjustmentEnd = end ? `${end.slice(0, 7)}-01` : undefined;
+			// A delivery without an invoice number is a storage-logbook gap
+			// regardless of which month is on screen, so that check spans a year
+			// while everything else is month-scoped.
+			const yearAgo = `${Number(start.slice(0, 4)) - 1}${start.slice(4)}`;
 
-			const [entriesRes, refillsRes, actsRes, dipRes, closeRes, adjustmentsRes] = await Promise.all(
-				[
-					entriesQ,
-					refillsQ,
+			const [entriesRes, refillsRes, actsRes, closesRes, invoiceRes, adjustmentsRes] =
+				await Promise.all([
+					client
+						.from('fuel_entries')
+						.select(
+							'entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(id, name, diesel_claim_eligible)'
+						)
+						.is('deleted_at', null)
+						.gte('entry_date', start)
+						.lte('entry_date', end),
+					client
+						.from('tank_refills')
+						.select('litres_added, delivery_date, invoice_number')
+						.gte('delivery_date', start)
+						.lte('delivery_date', end),
 					supabaseService.getActivities(),
+					// The full window, not just the newest row: checking one row and
+					// testing its date meant closing THIS month made LAST month read
+					// as unclosed.
+					supabaseService.getTankCloseHistory(24),
 					client
-						.from('tank_readings')
-						.select('reading_date')
-						.eq('reading_type', 'dipstick')
-						.order('reading_date', { ascending: false })
-						.limit(1),
-					client
-						.from('tank_reconciliations')
-						.select('reconciliation_date, variance_percentage')
-						.order('reconciliation_date', { ascending: false })
-						.limit(1),
-					supabaseService.getVehicleMonthlyClaimAdjustments(adjustmentStart, adjustmentEnd)
-				]
-			);
+						.from('tank_refills')
+						.select('delivery_date, invoice_number')
+						.gte('delivery_date', yearAgo)
+						.is('invoice_number', null),
+					supabaseService.getVehicleMonthlyClaimAdjustments(
+						`${start.slice(0, 7)}-01`,
+						`${end.slice(0, 7)}-01`
+					)
+				]);
 			const firstError =
 				entriesRes.error ||
 				refillsRes.error ||
 				actsRes.error ||
-				dipRes.error ||
+				invoiceRes.error ||
 				adjustmentsRes.error;
 			if (firstError)
 				throw new Error(typeof firstError === 'string' ? firstError : firstError.message);
@@ -185,8 +186,8 @@
 			refills = refillsRes.data || [];
 			activities = actsRes.data || [];
 			adjustments = adjustmentsRes.data || [];
-			lastDipDate = dipRes.data?.[0]?.reading_date ?? null;
-			latestClose = closeRes.data?.[0] ?? null;
+			closes = (closesRes.data || []) as CloseRow[];
+			missingInvoices12m = (invoiceRes.data || []).length;
 			prepareEligibilityDraft();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load audit data';
@@ -199,8 +200,9 @@
 		load();
 	});
 
-	function setPeriod(p: typeof period) {
-		period = p;
+	function selectMonth(key: string) {
+		if (key === selectedKey) return;
+		selectedKey = key;
 		load();
 	}
 
@@ -293,21 +295,14 @@
 		activities.filter((activity) => !activity.diesel_claim_reviewed_at).length
 	);
 
-	let dipAgeDays = $derived.by(() => {
-		if (!lastDipDate) return null;
-		return Math.floor((Date.now() - new Date(lastDipDate).getTime()) / 86400000);
-	});
+	/** Which months have a close on record — the whole window, not just the newest. */
+	let closedMonthKeys = $derived(
+		new Set(closes.map((c) => c.reconciliation_date.slice(0, 7)))
+	);
 
-	// Month-end close status: the previous calendar month should have a
-	// tank_reconciliations row (reconciliation_date = its last day).
-	let prevMonthClose = $derived.by(() => {
-		const now = new Date();
-		const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-		const key = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
-		const label = prev.toLocaleDateString('en-ZA', { month: 'long' });
-		const closed = latestClose?.reconciliation_date?.startsWith(key) ?? false;
-		return { key, label, closed };
-	});
+	let selectedClose = $derived(
+		closes.find((c) => c.reconciliation_date.slice(0, 7) === selected.key) ?? null
+	);
 
 	let checklist = $derived.by(() => [
 		{
@@ -328,30 +323,33 @@
 		{
 			ok: entries.length > 0,
 			title: 'Usage logbook maintained',
-			detail: 'Litres out per vehicle, activity, and location'
+			detail: `${entries.length} entries in ${selected.label} — litres out per vehicle, activity and location`
 		},
 		{
-			ok: refills.length > 0 || period !== 'all',
+			ok: refills.length > 0,
 			title: 'Storage logbook maintained',
-			detail: 'Deliveries in, with supplier and invoice number'
+			detail:
+				refills.length > 0
+					? `${refills.length} ${refills.length === 1 ? 'delivery' : 'deliveries'} recorded in ${selected.label}`
+					: `No deliveries recorded in ${selected.label}`
 		},
 		{
-			ok: prevMonthClose.closed,
-			title: 'Previous month closed',
-			detail: prevMonthClose.closed
-				? `${prevMonthClose.label} closed · variance ${latestClose?.variance_percentage ?? 0}%`
-				: `${prevMonthClose.label} not closed yet — run the month-end close`
+			ok: !!selectedClose,
+			title: `${selected.label} closed`,
+			detail: selectedClose
+				? `Carried forward ${Math.round(selectedClose.calculated_level ?? 0)} L${selectedClose.is_rebaseline ? ' (re-baselined)' : ''}`
+				: 'Run the month-end close at the top of this page'
 		},
 		{
-			ok: refills.length > 0 && refills.every((r) => !!r.invoice_number),
+			ok: missingInvoices12m === 0,
 			title: 'Delivery invoice numbers on file',
-			detail: refills.some((r) => !r.invoice_number)
-				? `${refills.filter((r) => !r.invoice_number).length} deliveries missing an invoice number`
-				: 'Every delivery has its invoice number recorded'
+			detail:
+				missingInvoices12m === 0
+					? 'Every delivery in the last 12 months has its invoice number'
+					: `${missingInvoices12m} ${missingInvoices12m === 1 ? 'delivery' : 'deliveries'} in the last 12 months missing an invoice number`
 		}
 	]);
 
-	const periodLabels = { month: 'This month', lastMonth: 'Last month', all: 'All records' };
 </script>
 
 <svelte:head>
@@ -365,13 +363,12 @@
 	</div>
 
 	<div class="chips">
-		{#each Object.entries(periodLabels) as [key, label]}
-			<button
-				class="chip"
-				class:on={period === key}
-				onclick={() => setPeriod(key as typeof period)}
-			>
-				{label}
+		{#each months as m (m.key)}
+			<button class="chip" class:on={m.key === selectedKey} onclick={() => selectMonth(m.key)}>
+				{m.shortLabel}
+				<span class="chip-badge" class:closed={closedMonthKeys.has(m.key)}>
+					{closedMonthKeys.has(m.key) ? '✓' : '·'}
+				</span>
 			</button>
 		{/each}
 	</div>
@@ -384,7 +381,17 @@
 	{:else if loading}
 		<div class="skeleton" style="height: 9rem"></div>
 	{:else}
+		<!-- Close the tank -->
+		<MonthCloseSection
+			month={selected}
+			toleranceL={settings.dipToleranceL}
+			onclosed={load}
+		/>
+
+		<CloseHistory rows={closes} toleranceL={settings.dipToleranceL} />
+
 		<!-- Claim stats -->
+		<h2 class="section-heading">Claim — {selected.label}</h2>
 		<section class="panel claim">
 			<div class="claim-main">
 				<div>
@@ -520,6 +527,15 @@
 						/>
 					</label>
 					<label class="setting">
+						<span>Dipstick tolerance (L)</span>
+						<input
+							type="number"
+							step="10"
+							bind:value={settings.dipToleranceL}
+							onchange={saveSettings}
+						/>
+					</label>
+					<label class="setting">
 						<span>DRS registration no.</span>
 						<input
 							type="text"
@@ -537,18 +553,18 @@
 			{/if}
 		</section>
 
-		<ActrosClaimAdjustment year={exportYear} month={exportMonth} onsaved={load} />
+		<ActrosClaimAdjustment year={selected.year} month={selected.month} onsaved={load} />
 
 		<!-- Exports -->
 		<h2 class="section-heading">Exports</h2>
-		<DataExport bind:selectedYear={exportYear} bind:selectedMonth={exportMonth} />
+		<DataExport selectedYear={selected.year} selectedMonth={selected.month} hideMonthPicker />
 
 		<!-- Manage -->
 		<h2 class="section-heading">Manage</h2>
 		<div class="manage-links">
 			<a href="/entries" class="manage-link">All entries</a>
+			<a href="/tank" class="manage-link">Tank</a>
 			<a href="/tools/database" class="manage-link">Database management</a>
-			<a href="/tools/reconciliations" class="manage-link">Month-end close</a>
 			<a href="/menu" class="manage-link">System settings</a>
 		</div>
 	{/if}
@@ -595,6 +611,22 @@
 		border-radius: var(--radius-full);
 		cursor: pointer;
 		transition: all 0.15s ease;
+	}
+
+	.chip-badge {
+		display: inline-block;
+		margin-left: 0.3rem;
+		font-size: var(--text-xs);
+		opacity: 0.45;
+	}
+
+	.chip-badge.closed {
+		opacity: 1;
+		color: var(--success-dark);
+	}
+
+	.chip.on .chip-badge.closed {
+		color: #fff;
 	}
 
 	.chip.on {

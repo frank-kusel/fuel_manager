@@ -34,7 +34,14 @@
 	let tankStrip = $derived.by(() => {
 		const t = $insightsData?.tank;
 		if (!t || t.derivedLevel === null) return null;
-		return { name: t.name, litres: Math.round(t.derivedLevel), runway: t.runwayDays };
+		// The anchor goes in the tooltip so the strip is never a bare number of
+		// unknown provenance — same rule as the Tank page trust line.
+		const anchor = t.anchor
+			? t.anchor.kind === 'close'
+				? `anchored to the ${t.anchor.date} close`
+				: `anchored to the dip on ${t.anchor.date}`
+			: null;
+		return { name: t.name, litres: Math.round(t.derivedLevel), runway: t.runwayDays, anchor };
 	});
 
 	// Action menu state
@@ -159,10 +166,6 @@
 
 		<div class="sb-group">
 			<div class="sb-group-label"><span class="sb-label">Admin</span></div>
-			<a href="/tools/reconciliations" class="sb-item" title="Month-end close" class:active={pathname.startsWith('/tools/reconciliations')}>
-				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg>
-				<span class="sb-label">Month-end close</span>
-			</a>
 			<a href="/tools/database" class="sb-item" title="Database" class:active={pathname.startsWith('/tools/database')}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
 				<span class="sb-label">Database</span>
@@ -172,7 +175,7 @@
 		<div class="sb-spacer"></div>
 
 		{#if tankStrip}
-			<a class="sb-tank" href="/tank" title="{tankStrip.name}: {nfSidebar.format(tankStrip.litres)} L{tankStrip.runway !== null ? ` · ~${tankStrip.runway} days` : ''}">
+			<a class="sb-tank" href="/tank" title="{tankStrip.name}: {nfSidebar.format(tankStrip.litres)} L{tankStrip.runway !== null ? ` · ~${tankStrip.runway} days` : ''}{tankStrip.anchor ? ` · ${tankStrip.anchor}` : ''}">
 				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5C12 2.5 5.5 9.8 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 9.8 12 2.5 12 2.5Z"/></svg>
 				<span class="sb-label">
 					{nfSidebar.format(tankStrip.litres)} L{tankStrip.runway !== null ? ` · ~${tankStrip.runway}d` : ''}

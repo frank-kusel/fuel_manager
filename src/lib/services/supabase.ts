@@ -21,6 +21,18 @@ import type {
 	VehicleMonthlyClaimAdjustmentInput,
 	ApiResponse
 } from '$lib/types';
+import { todayIso } from '$lib/utils/dates';
+import {
+	BURN_WINDOW_DAYS,
+	buildMonthLedger,
+	resolveAnchor,
+	type CloseRow,
+	type DipRow,
+	type DispenseRow,
+	type MonthLedger,
+	type RefillRow,
+	type TankAnchor
+} from '$lib/utils/tank-balance';
 
 class SupabaseService {
 	private client: SupabaseClient | null = null;
@@ -752,12 +764,18 @@ class SupabaseService {
 
 	// variance and variance_percentage are GENERATED columns in the live table
 	// (calculated − measured, % relative to the measured dip) — never insert them.
-	// `accepted` can be passed in when the sign-off judgement is based on a
-	// different figure than calculated−measured (the leak check at dip date).
+	//
+	// Those generated columns are NOT the leak check: calculated_level carries
+	// post-dip movements forward, so they equal "leak + movements after the dip".
+	// book_at_dip / dip_date (migration 020) record the real numerator, and
+	// `accepted` is judged on that. See database/migrations/020_close_leak_columns.sql.
 	private tankReconciliationFields(data: {
 		reconciliationDate: string;
 		calculatedLevel: number;
 		measuredLevel: number;
+		bookAtDip?: number;
+		dipDate?: string;
+		isRebaseline?: boolean;
 		accepted?: boolean;
 		notes?: string;
 	}) {
@@ -768,25 +786,57 @@ class SupabaseService {
 			reconciliation_date: data.reconciliationDate,
 			calculated_level: data.calculatedLevel,
 			measured_level: data.measuredLevel,
+			book_at_dip: data.bookAtDip ?? null,
+			dip_date: data.dipDate ?? null,
+			is_rebaseline: data.isRebaseline ?? false,
 			accepted: data.accepted ?? Math.abs(variancePct) <= 5,
 			notes: data.notes
 		};
+	}
+
+	/**
+	 * Migration 020 adds book_at_dip / dip_date / is_rebaseline. Until it is
+	 * applied, PostgREST rejects the whole statement with 42703. Rather than
+	 * break closing a month on an un-migrated database, drop the new columns and
+	 * retry — the close still records everything it did before.
+	 */
+	private isMissingColumnError(error: string | null): boolean {
+		return !!error && (error.includes('42703') || /column .* does not exist/i.test(error));
+	}
+
+	private withoutMigration020<T extends Record<string, unknown>>(fields: T) {
+		const { book_at_dip, dip_date, is_rebaseline, ...rest } = fields as Record<string, unknown>;
+		void book_at_dip;
+		void dip_date;
+		void is_rebaseline;
+		return rest;
 	}
 
 	async createTankReconciliation(data: {
 		reconciliationDate: string;
 		calculatedLevel: number;
 		measuredLevel: number;
+		bookAtDip?: number;
+		dipDate?: string;
+		isRebaseline?: boolean;
 		accepted?: boolean;
 		notes?: string;
 	}): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();
-		return this.query(() =>
-			client
-				.from('tank_reconciliations')
-				.insert(this.tankReconciliationFields(data))
-				.select()
-				.single()
+		const fields = this.tankReconciliationFields(data);
+		const result = await this.query<any>(() =>
+			client.from('tank_reconciliations').insert(fields).select().single()
+		);
+		if (!this.isMissingColumnError(result.error)) return result;
+
+		console.warn('tank_reconciliations is missing migration 020 columns — closing without them');
+		return this.query(
+			async () =>
+				await client
+					.from('tank_reconciliations')
+					.insert(this.withoutMigration020(fields))
+					.select()
+					.single()
 		);
 	}
 
@@ -796,18 +846,29 @@ class SupabaseService {
 			reconciliationDate: string;
 			calculatedLevel: number;
 			measuredLevel: number;
+			bookAtDip?: number;
+			dipDate?: string;
+			isRebaseline?: boolean;
 			accepted?: boolean;
 			notes?: string;
 		}
 	): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();
-		return this.query(() =>
-			client
-				.from('tank_reconciliations')
-				.update(this.tankReconciliationFields(data))
-				.eq('id', id)
-				.select()
-				.single()
+		const fields = this.tankReconciliationFields(data);
+		const result = await this.query<any>(() =>
+			client.from('tank_reconciliations').update(fields).eq('id', id).select().single()
+		);
+		if (!this.isMissingColumnError(result.error)) return result;
+
+		console.warn('tank_reconciliations is missing migration 020 columns — updating without them');
+		return this.query(
+			async () =>
+				await client
+					.from('tank_reconciliations')
+					.update(this.withoutMigration020(fields))
+					.eq('id', id)
+					.select()
+					.single()
 		);
 	}
 
@@ -881,26 +942,128 @@ class SupabaseService {
 	}
 
 	/**
+	 * The shared inputs for the live tank balance: the anchor (latest close, or
+	 * the latest dip when nothing has ever been closed) plus every movement
+	 * after it. The arithmetic lives in $lib/utils/tank-balance so the Tank
+	 * page, the dashboard, the close and the PDF all agree.
+	 *
+	 * Note there is deliberately no `deleted_at` filter on tank_refills or
+	 * tank_readings: neither table has that column (only fuel_entries does), and
+	 * PostgREST 400s on a filter naming a column that does not exist.
+	 */
+	async getTankBalanceInputs(asOf: string = todayIso()): Promise<
+		ApiResponse<{
+			anchor: TankAnchor | null;
+			latestClose: CloseRow | null;
+			latestDip: DipRow | null;
+			refills: RefillRow[];
+			dispenses: DispenseRow[];
+			burnDispenses: DispenseRow[];
+		}>
+	> {
+		const client = this.ensureInitialized();
+
+		try {
+			const [closeRes, dipRes] = await Promise.all([
+				client
+					.from('tank_reconciliations')
+					.select('*')
+					.lte('reconciliation_date', asOf)
+					.order('reconciliation_date', { ascending: false })
+					.order('created_at', { ascending: false })
+					.limit(1),
+				client
+					.from('tank_readings')
+					.select('reading_value, reading_date')
+					.eq('reading_type', 'dipstick')
+					.lte('reading_date', asOf)
+					.order('reading_date', { ascending: false })
+					.order('created_at', { ascending: false })
+					.limit(1)
+			]);
+			if (closeRes.error) throw new Error(closeRes.error.message);
+			if (dipRes.error) throw new Error(dipRes.error.message);
+
+			const latestClose = (closeRes.data?.[0] as CloseRow) ?? null;
+			const latestDip = (dipRes.data?.[0] as DipRow) ?? null;
+			const anchor = resolveAnchor({ latestClose, latestDip });
+
+			if (!anchor) {
+				return {
+					data: { anchor: null, latestClose, latestDip, refills: [], dispenses: [], burnDispenses: [] },
+					error: null
+				};
+			}
+
+			const burnStartDate = new Date(`${asOf}T12:00:00`);
+			burnStartDate.setDate(burnStartDate.getDate() - BURN_WINDOW_DAYS);
+			const burnStart = burnStartDate.toLocaleDateString('en-CA');
+
+			const [refillsRes, dispensedRes, burnRes] = await Promise.all([
+				client
+					.from('tank_refills')
+					.select('litres_added, delivery_date')
+					.gt('delivery_date', anchor.date)
+					.lte('delivery_date', asOf),
+				client
+					.from('fuel_entries')
+					.select('litres_dispensed, entry_date')
+					.is('deleted_at', null)
+					.gt('entry_date', anchor.date)
+					.lte('entry_date', asOf),
+				client
+					.from('fuel_entries')
+					.select('litres_dispensed, entry_date')
+					.is('deleted_at', null)
+					.gte('entry_date', burnStart)
+					.lte('entry_date', asOf)
+			]);
+			const firstError = refillsRes.error || dispensedRes.error || burnRes.error;
+			if (firstError) throw new Error(firstError.message);
+
+			return {
+				data: {
+					anchor,
+					latestClose,
+					latestDip,
+					refills: (refillsRes.data || []) as RefillRow[],
+					dispenses: (dispensedRes.data || []) as DispenseRow[],
+					burnDispenses: (burnRes.data || []) as DispenseRow[]
+				},
+				error: null
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to load tank balance inputs'
+			};
+		}
+	}
+
+	/**
 	 * Everything the Month-end close screen needs for one month, as a RUNNING
-	 * TALLY: opening = previous month's carried-forward close balance, then
-	 * the month's movements, with the month's last dip as the leak check —
-	 * NOT the reference (a dip taken near month end would trivially agree
-	 * with a dip-anchored book). Movements are split at the dip date so the
-	 * leak check compares like with like, and the month-end balance carries
-	 * the post-dip movements forward. Deliberately does NOT read tank_status
-	 * (its snapshot row is broken) or fuel_reconciliations (superseded).
+	 * TALLY: opening = the most recent close on or before the previous month end,
+	 * then every movement after it, with the month's last dip as the leak check —
+	 * NOT the reference (a dip taken near month end would trivially agree with a
+	 * dip-anchored book).
+	 *
+	 * The opening is matched with `lte`, not `eq`, and movements are counted from
+	 * the anchor's own date rather than the month start. Both halves matter
+	 * together: with `eq` a skipped month silently broke the chain, and without
+	 * the matching window a recovered chain would double-count the gap month.
+	 *
+	 * Deliberately does NOT read tank_status (its snapshot row is broken) or
+	 * fuel_reconciliations (superseded).
 	 */
 	async getMonthCloseData(
 		monthStart: string,
-		monthEnd: string
+		monthEnd: string,
+		toleranceL?: number
 	): Promise<
 		ApiResponse<{
-			closingDip: { reading_value: number; reading_date: string } | null;
-			opening: { value: number; source: 'close' | 'dip'; date: string } | null;
-			deliveriesToDip: number;
-			dispensedToDip: number;
-			deliveriesAfterDip: number;
-			dispensedAfterDip: number;
+			ledger: MonthLedger | null;
+			closingDip: DipRow | null;
+			anchor: TankAnchor | null;
 			bowserStart: number;
 			bowserEnd: number;
 			monthDispensed: number;
@@ -912,99 +1075,108 @@ class SupabaseService {
 		try {
 			const [y, m] = monthStart.split('-').map(Number);
 			const prevEndDate = new Date(y, m - 1, 0); // last day of previous month
-			const prevEnd = `${prevEndDate.getFullYear()}-${String(prevEndDate.getMonth() + 1).padStart(2, '0')}-${String(prevEndDate.getDate()).padStart(2, '0')}`;
+			const prevEnd = prevEndDate.toLocaleDateString('en-CA');
 
-			const [closingRes, existingRes, prevCloseRes, refillsRes, dispensedRes, meterRes] =
-				await Promise.all([
-					client
-						.from('tank_readings')
-						.select('reading_value, reading_date')
-						.eq('reading_type', 'dipstick')
-						.gte('reading_date', monthStart)
-						.lte('reading_date', monthEnd)
-						.order('reading_date', { ascending: false })
-						.limit(1),
-					client
-						.from('tank_reconciliations')
-						.select('*')
-						.eq('reconciliation_date', monthEnd)
-						.order('created_at', { ascending: false })
-						.limit(1),
-					client
-						.from('tank_reconciliations')
-						.select('calculated_level, reconciliation_date')
-						.eq('reconciliation_date', prevEnd)
-						.order('created_at', { ascending: false })
-						.limit(1),
-					client
-						.from('tank_refills')
-						.select('litres_added, delivery_date')
-						.gte('delivery_date', monthStart)
-						.lte('delivery_date', monthEnd),
-					client
-						.from('fuel_entries')
-						.select('litres_dispensed, entry_date')
-						.is('deleted_at', null)
-						.gte('entry_date', monthStart)
-						.lte('entry_date', monthEnd),
-					this.getDateRangeReconciliationData(monthStart, monthEnd)
-				]);
-			const firstError =
-				closingRes.error ||
-				existingRes.error ||
-				prevCloseRes.error ||
-				refillsRes.error ||
-				dispensedRes.error;
+			const [closingRes, existingRes, prevCloseRes, meterRes] = await Promise.all([
+				client
+					.from('tank_readings')
+					.select('reading_value, reading_date')
+					.eq('reading_type', 'dipstick')
+					.gte('reading_date', monthStart)
+					.lte('reading_date', monthEnd)
+					.order('reading_date', { ascending: false })
+					.order('created_at', { ascending: false })
+					.limit(1),
+				client
+					.from('tank_reconciliations')
+					.select('*')
+					.eq('reconciliation_date', monthEnd)
+					.order('created_at', { ascending: false })
+					.limit(1),
+				client
+					.from('tank_reconciliations')
+					.select('*')
+					.lte('reconciliation_date', prevEnd)
+					.order('reconciliation_date', { ascending: false })
+					.order('created_at', { ascending: false })
+					.limit(1),
+				this.getDateRangeReconciliationData(monthStart, monthEnd)
+			]);
+			const firstError = closingRes.error || existingRes.error || prevCloseRes.error;
 			if (firstError) throw new Error(firstError.message);
 
-			const closingDip = closingRes.data?.[0] || null;
+			const closingDip = (closingRes.data?.[0] as DipRow) ?? null;
+			const prevClose = (prevCloseRes.data?.[0] as CloseRow) ?? null;
 
-			// Opening balance: carried forward from the previous close; before
-			// the chain existed, fall back to the last dip before month start.
-			let opening: { value: number; source: 'close' | 'dip'; date: string } | null = null;
-			const prevClose = prevCloseRes.data?.[0] || null;
-			if (prevClose) {
-				opening = { value: prevClose.calculated_level || 0, source: 'close', date: prevEnd };
-			} else {
+			// Before the close chain existed, fall back to the last dip before the
+			// month started so the very first close still has something to open from.
+			let fallbackDip: DipRow | null = null;
+			if (!prevClose) {
 				const fallbackRes = await client
 					.from('tank_readings')
 					.select('reading_value, reading_date')
 					.eq('reading_type', 'dipstick')
 					.lt('reading_date', monthStart)
 					.order('reading_date', { ascending: false })
+					.order('created_at', { ascending: false })
 					.limit(1);
 				if (fallbackRes.error) throw new Error(fallbackRes.error.message);
-				const dip = fallbackRes.data?.[0];
-				if (dip) opening = { value: dip.reading_value || 0, source: 'dip', date: dip.reading_date };
+				fallbackDip = (fallbackRes.data?.[0] as DipRow) ?? null;
 			}
 
-			// Split the month's movements at the dip date (dip day inclusive)
-			const splitDate = closingDip?.reading_date ?? monthEnd;
-			let deliveriesToDip = 0;
-			let dispensedToDip = 0;
-			let deliveriesAfterDip = 0;
-			let dispensedAfterDip = 0;
-			for (const r of refillsRes.data || []) {
-				if (r.delivery_date <= splitDate) deliveriesToDip += r.litres_added || 0;
-				else deliveriesAfterDip += r.litres_added || 0;
+			const anchor = resolveAnchor({ latestClose: prevClose, latestDip: fallbackDip });
+			const existingClose = existingRes.data?.[0] ?? null;
+
+			if (!anchor) {
+				return {
+					data: {
+						ledger: null,
+						closingDip,
+						anchor: null,
+						bowserStart: meterRes.data?.bowserStart ?? 0,
+						bowserEnd: meterRes.data?.bowserEnd ?? 0,
+						monthDispensed: meterRes.data?.fuelDispensed ?? 0,
+						existingClose
+					},
+					error: null
+				};
 			}
-			for (const e of dispensedRes.data || []) {
-				if (e.entry_date <= splitDate) dispensedToDip += e.litres_dispensed || 0;
-				else dispensedAfterDip += e.litres_dispensed || 0;
-			}
+
+			// Windowed from the anchor, not the month start — see the note above.
+			const [refillsRes, dispensedRes] = await Promise.all([
+				client
+					.from('tank_refills')
+					.select('litres_added, delivery_date')
+					.gt('delivery_date', anchor.date)
+					.lte('delivery_date', monthEnd),
+				client
+					.from('fuel_entries')
+					.select('litres_dispensed, entry_date')
+					.is('deleted_at', null)
+					.gt('entry_date', anchor.date)
+					.lte('entry_date', monthEnd)
+			]);
+			if (refillsRes.error) throw new Error(refillsRes.error.message);
+			if (dispensedRes.error) throw new Error(dispensedRes.error.message);
+
+			const ledger = buildMonthLedger({
+				anchor,
+				closingDip,
+				refills: (refillsRes.data || []) as RefillRow[],
+				dispenses: (dispensedRes.data || []) as DispenseRow[],
+				monthEnd,
+				toleranceL
+			});
 
 			return {
 				data: {
+					ledger,
 					closingDip,
-					opening,
-					deliveriesToDip,
-					dispensedToDip,
-					deliveriesAfterDip,
-					dispensedAfterDip,
+					anchor,
 					bowserStart: meterRes.data?.bowserStart ?? 0,
 					bowserEnd: meterRes.data?.bowserEnd ?? 0,
 					monthDispensed: meterRes.data?.fuelDispensed ?? 0,
-					existingClose: existingRes.data?.[0] || null
+					existingClose
 				},
 				error: null
 			};

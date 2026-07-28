@@ -8,6 +8,14 @@
 		insightsLoading
 	} from '$lib/stores/dashboard-insights';
 	import { onVisible } from '$lib/stores/freshness';
+	import { fmtDayMonth, fmtFull } from '$lib/utils/dates';
+	import {
+		bandVariance,
+		dipAgeDays,
+		isDipStale,
+		varianceTrend,
+		type CloseRow
+	} from '$lib/utils/tank-balance';
 
 	let showDipModal = $state(false);
 	let showRefillModal = $state(false);
@@ -15,14 +23,23 @@
 	let recentRefills = $state<
 		{ litres_added: number; delivery_date: string; supplier: string | null; invoice_number: string | null }[]
 	>([]);
+	let closes = $state<CloseRow[]>([]);
 
 	const nf = new Intl.NumberFormat('en-ZA');
+	const nf1 = new Intl.NumberFormat('en-ZA', {
+		minimumFractionDigits: 1,
+		maximumFractionDigits: 1
+	});
+
+	function signed(value: number): string {
+		return `${value > 0 ? '+' : ''}${nf.format(Math.round(value))}`;
+	}
 
 	async function loadHistory() {
 		const { default: supabaseService } = await import('$lib/services/supabase');
 		await supabaseService.init();
 		const client = supabaseService.getClient();
-		const [dips, refills] = await Promise.all([
+		const [dips, refills, history] = await Promise.all([
 			client
 				.from('tank_readings')
 				.select('reading_value, reading_date')
@@ -33,10 +50,12 @@
 				.from('tank_refills')
 				.select('litres_added, delivery_date, supplier, invoice_number')
 				.order('delivery_date', { ascending: false })
-				.limit(5)
+				.limit(5),
+			supabaseService.getTankCloseHistory(24)
 		]);
 		recentDips = dips.data || [];
 		recentRefills = refills.data || [];
+		closes = (history.data || []) as CloseRow[];
 	}
 
 	onMount(() => {
@@ -52,19 +71,27 @@
 	}
 
 	let tank = $derived($insightsData?.tank ?? null);
+	let anchor = $derived(tank?.anchor ?? null);
 
 	let tankPct = $derived.by(() => {
 		if (!tank || tank.derivedLevel === null || !tank.capacity) return null;
 		return Math.max(0, Math.min(100, (tank.derivedLevel / tank.capacity) * 100));
 	});
 
-	/** Variance between derived book balance and the last physical dip is zero
-	 * by construction at dip time; what matters operationally is dip age and
-	 * whether the derived level is plausible. */
-	let dipAgeDays = $derived.by(() => {
-		if (!tank?.lastDipDate) return null;
-		return Math.floor((Date.now() - new Date(tank.lastDipDate).getTime()) / 86400000);
+	let dipAge = $derived(dipAgeDays(tank?.lastDipDate ?? null));
+
+	/**
+	 * The accuracy answer. The book is anchored to the last close, so a dip taken
+	 * since then is an independent check rather than a new starting point — this
+	 * is what says whether the number on screen can be trusted.
+	 */
+	let dipBand = $derived.by(() => {
+		const check = tank?.dipCheck;
+		if (!check) return null;
+		return bandVariance(check.varianceLitres, check.dipLitres);
 	});
+
+	let trend = $derived(varianceTrend(closes));
 </script>
 
 <svelte:head>
@@ -107,8 +134,12 @@
 			<table class="ledger">
 				<tbody>
 					<tr>
-						<td>Opening — dip on {tank.lastDipDate}</td>
-						<td class="ledger-val">{nf.format(Math.round(tank.lastDipLitres || 0))} L</td>
+						<td>
+							Opening — {anchor?.kind === 'close'
+								? `${fmtDayMonth(anchor.date)} close`
+								: `dip on ${anchor ? fmtDayMonth(anchor.date) : '—'}`}
+						</td>
+						<td class="ledger-val">{nf.format(Math.round(anchor?.litres ?? 0))} L</td>
 					</tr>
 					<tr>
 						<td>+ Deliveries since</td>
@@ -126,22 +157,67 @@
 			</table>
 		</section>
 
-		<!-- Dip freshness -->
-		{#if dipAgeDays !== null}
-			<section class="panel recon" class:warn={dipAgeDays > 14}>
-				<div class="recon-ic">{dipAgeDays > 14 ? '!' : '✓'}</div>
-				<div>
-					<div class="recon-t">
-						{dipAgeDays > 14 ? `Last dip is ${dipAgeDays} days old` : `Dip is ${dipAgeDays} ${dipAgeDays === 1 ? 'day' : 'days'} old`}
+		<!--
+			Trust line — the accuracy answer. The balance is anchored to the last
+			close (the signed-off book), so a dip taken since then is an independent
+			check rather than a new starting point.
+		-->
+		<section
+			class="panel trust"
+			class:warn={dipBand?.key === 'acceptable' || isDipStale(dipAge)}
+			class:bad={dipBand?.key === 'high'}
+		>
+			<div class="trust-ic">{dipBand?.key === 'high' || isDipStale(dipAge) ? '!' : '✓'}</div>
+			<div class="trust-body">
+				{#if anchor?.kind === 'close'}
+					<div class="trust-t">
+						Anchored to the {fmtFull(anchor.date)} close · {nf.format(Math.round(anchor.litres))} L
 					</div>
-					<div class="recon-d">
-						{dipAgeDays > 14
-							? 'Take a fresh physical dip — a book balance is only credible against a recent measurement.'
-							: 'Book balance is anchored to a recent physical measurement.'}
+				{:else if anchor}
+					<div class="trust-t">
+						No month-end close yet — anchored to the dip on {fmtFull(anchor.date)}
 					</div>
+				{:else}
+					<div class="trust-t">Nothing to anchor the book to yet</div>
+				{/if}
+
+				<div class="trust-d">
+					{#if tank.dipCheck}
+						Last dip {dipAge} {dipAge === 1 ? 'day' : 'days'} ago read {nf.format(
+							Math.round(tank.dipCheck.dipLitres)
+						)} L — <strong class="v {dipBand?.key || ''}"
+							>{signed(tank.dipCheck.varianceLitres)} L</strong
+						> vs book{#if tank.dipCheck.variancePct !== null}&nbsp;({nf1.format(
+								tank.dipCheck.variancePct
+							)}%){/if}{#if dipBand?.key === 'good'}, within dipstick tolerance{/if}.
+					{:else if isDipStale(dipAge)}
+						Last dip is {dipAge} days old — take a fresh one to check the book.
+					{:else if dipAge !== null}
+						Last dip was {dipAge} {dipAge === 1 ? 'day' : 'days'} ago, before this anchor.
+					{:else}
+						No dipstick reading on record.
+					{/if}
 				</div>
-			</section>
-		{/if}
+
+				{#if trend.latestGapLitres !== null && trend.months > 1}
+					{@const driftText =
+						trend.driftLitres !== null ? ` · drift ${signed(trend.driftLitres)} L` : ''}
+					<div class="trust-trend">
+						<span>
+							Standing gap {signed(trend.latestGapLitres)} L across {trend.months} closes{driftText}
+						</span>
+						{#if trend.anyApproximate}
+							<span
+								class="approx"
+								title="Derived from the legacy variance column, which folds post-dip movements into the difference"
+								>approx.</span
+							>
+						{/if}
+						<a href="/audit">Leak trend →</a>
+					</div>
+				{/if}
+			</div>
+		</section>
 
 		<!-- Actions -->
 		<div class="actions">
@@ -197,7 +273,7 @@
 			</section>
 		</div>
 
-		<a class="tools-link" href="/tools/reconciliations">
+		<a class="tools-link" href="/audit">
 			Month-end close
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
 		</a>
@@ -352,13 +428,14 @@
 	}
 
 	/* Reconciliation banner */
-	.recon {
+	/* Trust line — anchor, dip check, standing gap */
+	.trust {
 		display: flex;
 		gap: 0.75rem;
 		align-items: flex-start;
 	}
 
-	.recon-ic {
+	.trust-ic {
 		flex-shrink: 0;
 		width: 2rem;
 		height: 2rem;
@@ -371,22 +448,67 @@
 		color: var(--success-dark);
 	}
 
-	.recon.warn .recon-ic {
+	.trust.warn .trust-ic {
 		background: #fef3c7;
 		color: var(--warning-dark);
 	}
 
-	.recon-t {
+	.trust.bad .trust-ic {
+		background: #fee2e2;
+		color: var(--danger-dark, #991b1b);
+	}
+
+	.trust-body {
+		min-width: 0;
+	}
+
+	.trust-t {
 		font-weight: var(--font-weight-semibold);
 		color: var(--gray-900);
 		font-size: var(--text-sm);
 	}
 
-	.recon-d {
+	.trust-d {
 		font-size: var(--text-sm);
 		color: var(--gray-500);
 		margin-top: 0.125rem;
 		line-height: 1.45;
+	}
+
+	.trust-d .v {
+		font-variant-numeric: tabular-nums;
+		color: var(--gray-700);
+	}
+
+	.trust-d .v.acceptable {
+		color: var(--warning-dark);
+	}
+
+	.trust-d .v.high {
+		color: var(--danger-dark, #991b1b);
+	}
+
+	.trust-trend {
+		margin-top: 0.4rem;
+		font-size: var(--text-xs);
+		color: var(--gray-500);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.trust-trend .approx {
+		font-style: italic;
+		opacity: 0.75;
+	}
+
+	.trust-trend a {
+		color: var(--brand);
+		text-decoration: none;
+		margin-left: 0.35rem;
+		white-space: nowrap;
+	}
+
+	.trust-trend a:hover {
+		text-decoration: underline;
 	}
 
 	/* Actions */

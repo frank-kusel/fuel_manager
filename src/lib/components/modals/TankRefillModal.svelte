@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { todayIso } from '$lib/utils/dates';
 	import Button from '$lib/components/ui/Button.svelte';
 	import supabaseService from '$lib/services/supabase';
 	import { markFuelDataStale } from '$lib/stores/freshness';
@@ -15,7 +16,7 @@
 	// Form fields
 	let refillLitres = $state('');
 	let refillSupplier = $state('');
-	let refillDate = $state(new Date().toISOString().split('T')[0]);
+	let refillDate = $state(todayIso());
 	let refillInvoice = $state('');
 	let refillCost = $state('');
 	let refillNotes = $state('');
@@ -48,7 +49,7 @@
 				refillInvoice = '';
 				refillCost = '';
 				refillNotes = '';
-				refillDate = new Date().toISOString().split('T')[0];
+				refillDate = todayIso();
 
 				// Deliveries move the derived tank level everywhere — modal-level
 				// so FAB/sidebar launches count, not just the Tank page's onSuccess.
@@ -77,7 +78,7 @@
 		refillInvoice = '';
 		refillCost = '';
 		refillNotes = '';
-		refillDate = new Date().toISOString().split('T')[0];
+		refillDate = todayIso();
 		onClose();
 	}
 </script>

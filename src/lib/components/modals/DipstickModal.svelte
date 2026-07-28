@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { todayIso } from '$lib/utils/dates';
 	import Button from '$lib/components/ui/Button.svelte';
 	import supabaseService from '$lib/services/supabase';
 	import { markFuelDataStale } from '$lib/stores/freshness';
@@ -14,7 +15,7 @@
 
 	// Form fields
 	let dipstickReading = $state('');
-	let dipstickDate = $state(new Date().toISOString().split('T')[0]);
+	let dipstickDate = $state(todayIso());
 	let dipstickNotes = $state('');
 	let submitting = $state(false);
 
@@ -39,7 +40,7 @@
 				// Reset form
 				dipstickReading = '';
 				dipstickNotes = '';
-				dipstickDate = new Date().toISOString().split('T')[0];
+				dipstickDate = todayIso();
 
 				// Dips move the derived tank level everywhere — modal-level so
 				// FAB/sidebar launches count, not just the Tank page's onSuccess.
@@ -65,7 +66,7 @@
 		// Reset form
 		dipstickReading = '';
 		dipstickNotes = '';
-		dipstickDate = new Date().toISOString().split('T')[0];
+		dipstickDate = todayIso();
 		onClose();
 	}
 </script>

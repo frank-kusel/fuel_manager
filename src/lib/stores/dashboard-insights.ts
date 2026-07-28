@@ -1,4 +1,14 @@
 import { writable, derived } from 'svelte/store';
+import { todayIso } from '$lib/utils/dates';
+import {
+	burnRate,
+	computeVariance,
+	deriveBalance,
+	dipAgeDays,
+	isDipStale,
+	runwayDays as calcRunwayDays,
+	type TankAnchor
+} from '$lib/utils/tank-balance';
 
 /**
  * Dashboard insights store — month-scoped operational view.
@@ -39,12 +49,33 @@ export interface TankInsight {
 	capacity: number | null;
 	lastDipLitres: number | null;
 	lastDipDate: string | null;
+	/** Deliveries and litres out since the ANCHOR, not since the dip. */
 	refillsSinceDip: number;
 	dispensedSinceDip: number;
-	/** Derived level = dip + refills − dispensed; null without a dip */
+	/** anchor + deliveries − dispensed; null when nothing can anchor it */
 	derivedLevel: number | null;
 	/** Days of fuel left at the recent daily burn rate; null if unknown */
 	runwayDays: number | null;
+	/**
+	 * What the balance rests on — the latest month-end close, or a dip only
+	 * when nothing has ever been closed. Rendered wherever the number appears
+	 * so it is never a bare figure of unknown provenance.
+	 */
+	anchor: TankAnchor | null;
+	/** Date the movements were counted through. */
+	asOf: string;
+	/**
+	 * The latest dip measured against the book on that same date — the answer
+	 * to "is this number accurate?". Null when the only dip predates the
+	 * anchor, in which case the close already accounts for it.
+	 */
+	dipCheck: {
+		date: string;
+		dipLitres: number;
+		bookAtDip: number;
+		varianceLitres: number;
+		variancePct: number | null;
+	} | null;
 }
 
 export interface DailyPoint {
@@ -78,7 +109,7 @@ interface InsightsState {
 }
 
 const CACHE_MS = 5 * 60 * 1000;
-const STORAGE_KEY = 'farmtrack_insights_cache_v1';
+const STORAGE_KEY = 'farmtrack_insights_cache_v2';
 
 // Hydrate from localStorage so a cold app-open paints the dashboard (and the
 // sidebar tank strip) instantly; fresh data replaces it silently.
@@ -104,8 +135,6 @@ function persistInsights(data: DashboardInsights | null, timestamp: number | nul
 	}
 }
 const OUTLIER_THRESHOLD_PCT = 15;
-const DIP_STALE_DAYS = 14;
-const BURN_WINDOW_DAYS = 14;
 
 function isoDate(d: Date): string {
 	// Local date, not UTC — toISOString() shifts SAST dates back a day,
@@ -188,7 +217,7 @@ function createInsightsStore() {
 			const monthStartIso = isoDate(win.start);
 			const windowEnd = win.end;
 
-			const [prevRes, vehiclesRes, dipRes, bowsersRes, futureRes] = await Promise.all([
+			const [prevRes, vehiclesRes, bowsersRes, futureRes] = await Promise.all([
 				client
 					.from('fuel_entries')
 					.select('entry_date, litres_dispensed')
@@ -199,12 +228,6 @@ function createInsightsStore() {
 					.from('vehicles')
 					.select('id, code, name, average_consumption_l_per_100km')
 					.eq('active', true),
-				client
-					.from('tank_readings')
-					.select('reading_value, reading_date, tank_id')
-					.eq('reading_type', 'dipstick')
-					.order('reading_date', { ascending: false })
-					.limit(1),
 				client.from('bowsers').select('name, capacity').eq('active', true).limit(1),
 				client
 					.from('fuel_entries')
@@ -213,13 +236,12 @@ function createInsightsStore() {
 					.gt('entry_date', isoDate(now))
 			]);
 
-			const firstError = prevRes.error || vehiclesRes.error || dipRes.error || bowsersRes.error;
+			const firstError = prevRes.error || vehiclesRes.error || bowsersRes.error;
 			if (firstError) throw new Error(firstError.message);
 
 			const entries = entriesRes.data || [];
 			const prevEntries = prevRes.data || [];
 			const vehicles = vehiclesRes.data || [];
-			const lastDip = dipRes.data?.[0] || null;
 			const bowser = bowsersRes.data?.[0] || null;
 
 			// ---- Totals ----
@@ -311,53 +333,60 @@ function createInsightsStore() {
 				daily.push({ date: key, litres: dailyTotals.get(key) || 0 });
 			}
 
-			// ---- Tank (derived level + runway) ----
+			// ---- Tank (anchored balance + runway) ----
+			// Anchored to the latest month-end close, NOT the latest dip: a close
+			// is the signed-off book, and re-anchoring on every dip would reset a
+			// slow leak into dipstick noise. See $lib/utils/tank-balance.
 			let tank: TankInsight | null = null;
-			if (lastDip) {
-				const dipDate = lastDip.reading_date as string;
-				// Burn window must span the real trailing 14 days — the month-scoped
-				// `entries` array can't reach past the 1st, which understated the
-				// burn rate (and overstated runway) early in a month.
-				const burnStart = new Date(now);
-				burnStart.setDate(burnStart.getDate() - BURN_WINDOW_DAYS);
-				const [refillsRes, dispensedRes, burnRes] = await Promise.all([
-					client.from('tank_refills').select('litres_added').gt('delivery_date', dipDate),
-					client.from('fuel_entries').select('litres_dispensed').is('deleted_at', null).gt('entry_date', dipDate),
-					client
-						.from('fuel_entries')
-						.select('litres_dispensed')
-						.is('deleted_at', null)
-						.gte('entry_date', isoDate(burnStart))
-						.lte('entry_date', isoDate(now))
-				]);
-				const refillsSinceDip = (refillsRes.data || []).reduce(
-					(s, r) => s + (r.litres_added || 0),
-					0
-				);
-				const dispensedSinceDip = (dispensedRes.data || []).reduce(
-					(s, e) => s + (e.litres_dispensed || 0),
-					0
-				);
-				const derivedLevel = (lastDip.reading_value || 0) + refillsSinceDip - dispensedSinceDip;
+			const asOf = todayIso(now);
+			const balanceRes = await supabaseService.getTankBalanceInputs(asOf);
+			if (balanceRes.error) throw new Error(balanceRes.error);
 
-				// Burn rate over the trailing window
-				const recentLitres = (burnRes.data || []).reduce(
-					(s, e) => s + (e.litres_dispensed || 0),
-					0
-				);
-				const dailyBurn = recentLitres / BURN_WINDOW_DAYS;
-				const runwayDays =
-					derivedLevel > 0 && dailyBurn > 0 ? Math.floor(derivedLevel / dailyBurn) : null;
+			const balanceInputs = balanceRes.data;
+			if (balanceInputs?.anchor) {
+				const balance = deriveBalance({
+					anchor: balanceInputs.anchor,
+					refills: balanceInputs.refills,
+					dispenses: balanceInputs.dispenses,
+					asOf
+				});
+				const dailyBurn = burnRate(balanceInputs.burnDispenses);
+
+				// A dip taken after the anchor is a free accuracy check: derive the
+				// book on the dip's own date and compare. A dip before the anchor is
+				// already baked into the close it produced.
+				const dip = balanceInputs.latestDip;
+				let dipCheck: TankInsight['dipCheck'] = null;
+				if (dip && dip.reading_date > balanceInputs.anchor.date) {
+					const bookAtDip = deriveBalance({
+						anchor: balanceInputs.anchor,
+						refills: balanceInputs.refills,
+						dispenses: balanceInputs.dispenses,
+						asOf: dip.reading_date
+					}).litres;
+					const dipLitres = dip.reading_value || 0;
+					const check = computeVariance(bookAtDip, dipLitres);
+					dipCheck = {
+						date: dip.reading_date,
+						dipLitres,
+						bookAtDip,
+						varianceLitres: check.litres,
+						variancePct: check.pct
+					};
+				}
 
 				tank = {
 					name: bowser?.name || 'Tank',
 					capacity: bowser?.capacity ?? null,
-					lastDipLitres: lastDip.reading_value ?? null,
-					lastDipDate: dipDate,
-					refillsSinceDip,
-					dispensedSinceDip,
-					derivedLevel,
-					runwayDays
+					lastDipLitres: balanceInputs.latestDip?.reading_value ?? null,
+					lastDipDate: balanceInputs.latestDip?.reading_date ?? null,
+					refillsSinceDip: balance.deliveries,
+					dispensedSinceDip: balance.dispensed,
+					derivedLevel: balance.litres,
+					runwayDays: calcRunwayDays(balance.litres, dailyBurn),
+					anchor: balanceInputs.anchor,
+					asOf,
+					dipCheck
 				};
 			}
 
@@ -386,16 +415,12 @@ function createInsightsStore() {
 					});
 				}
 			}
-			if (tank?.lastDipDate) {
-				const ageDays = Math.floor(
-					(now.getTime() - new Date(tank.lastDipDate).getTime()) / 86400000
-				);
-				if (ageDays > DIP_STALE_DAYS) {
-					attention.push({
-						severity: 'warning',
-						text: `Last dipstick reading is ${ageDays} days old — take a fresh dip`
-					});
-				}
+			const ageDays = dipAgeDays(tank?.lastDipDate ?? null, now);
+			if (isDipStale(ageDays)) {
+				attention.push({
+					severity: 'warning',
+					text: `Last dipstick reading is ${ageDays} days old — take a fresh dip`
+				});
 			}
 			if (brokenGaugeCount > 0) {
 				attention.push({

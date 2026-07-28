@@ -9,6 +9,15 @@ import type {
 	VehicleMonthlyClaimAdjustment
 } from '$lib/types';
 import { calculateDieselClaim, roundClaimLitres } from '$lib/utils/diesel-claim';
+import {
+	bandVariance,
+	computeVariance,
+	deriveBalance,
+	resolveAnchor,
+	type CloseRow,
+	type DispenseRow,
+	type RefillRow
+} from '$lib/utils/tank-balance';
 
 // ---------------------------------------------------------------------------
 // Ledger-style export palette
@@ -925,7 +934,25 @@ class ExportService {
 				lastDipReading: 0,
 				lastDipDate: null as string | null,
 				tankActivities: [],
-				reconciled: false
+				reconciled: false,
+				/**
+				 * Derived by $lib/utils/tank-balance from the resolved anchor, so
+				 * the PDF cannot disagree with the Tank page or the close screen.
+				 * Movements are counted from the ANCHOR's date, not from
+				 * startDate — when the nearest close predates the period, the
+				 * gap between them belongs in the balance.
+				 */
+				expectedLevel: 0,
+				anchorKind: 'close' as 'close' | 'dip',
+				/**
+				 * The movements deriveBalance actually counted, i.e. from the
+				 * anchor rather than from startDate. Displayed instead of the
+				 * period-scoped figures so the panel's rows always sum to
+				 * "Expected closing" — for a whole month they are identical, but
+				 * for a custom period or a skipped month they are not.
+				 */
+				deliveriesFromAnchor: 0,
+				dispensedFromAnchor: 0
 			};
 
 			try {
@@ -945,19 +972,23 @@ class ExportService {
 								.select('*')
 								.lte('reconciliation_date', dayBeforeStart)
 								.order('reconciliation_date', { ascending: false })
+								.order('created_at', { ascending: false })
 								.limit(1)
 								.maybeSingle()
 						),
 
-						// Actual dip reading from tank_readings table (last reading in the period)
+						// Actual dip reading (last DIPSTICK reading in the period —
+						// tank_readings also holds other reading types)
 						supabaseService.query(() =>
 							supabaseService
 								.ensureInitialized()
 								.from('tank_readings')
 								.select('*')
+								.eq('reading_type', 'dipstick')
 								.gte('reading_date', startDate)
 								.lte('reading_date', endDate)
 								.order('reading_date', { ascending: false })
+								.order('created_at', { ascending: false })
 								.limit(1)
 								.maybeSingle()
 						),
@@ -993,6 +1024,40 @@ class ExportService {
 
 				if (tankActivitiesResult.data) {
 					reconciliationData.tankActivities = tankActivitiesResult.data || [];
+				}
+
+				// One balance model for the whole app. The anchor may sit before
+				// startDate, so re-fetch movements from the anchor's own date —
+				// windowing from startDate silently dropped the gap between them.
+				const anchor = resolveAnchor({
+					latestClose: (tankStartReconResult.data as CloseRow) ?? null,
+					latestDip: null
+				});
+				if (anchor) {
+					const client = supabaseService.ensureInitialized();
+					const [anchorRefills, anchorDispensed] = await Promise.all([
+						client
+							.from('tank_refills')
+							.select('litres_added, delivery_date')
+							.gt('delivery_date', anchor.date)
+							.lte('delivery_date', endDate),
+						client
+							.from('fuel_entries')
+							.select('litres_dispensed, entry_date')
+							.is('deleted_at', null)
+							.gt('entry_date', anchor.date)
+							.lte('entry_date', endDate)
+					]);
+					const balance = deriveBalance({
+						anchor,
+						refills: (anchorRefills.data || []) as RefillRow[],
+						dispenses: (anchorDispensed.data || []) as DispenseRow[],
+						asOf: endDate
+					});
+					reconciliationData.expectedLevel = balance.litres;
+					reconciliationData.deliveriesFromAnchor = balance.deliveries;
+					reconciliationData.dispensedFromAnchor = balance.dispensed;
+					reconciliationData.anchorKind = anchor.kind;
 				}
 			} catch (reconError) {
 				console.warn('Could not fetch reconciliation data:', reconError);
@@ -1252,16 +1317,13 @@ class ExportService {
 			// ---- Monthly reconciliation ----
 			const bowserDifference = reconciliationData.bowserEnd - reconciliationData.bowserStart;
 			const fuelVariance = bowserDifference - reconciliationData.fuelDispensed;
-			const totalTankAdditions = reconciliationData.tankActivities.reduce(
-				(sum: number, activity: { litres_added?: number }) => sum + (activity.litres_added || 0),
-				0
-			);
-			const expectedLevel =
-				reconciliationData.tankStartCalculated -
-				reconciliationData.fuelDispensed +
-				totalTankAdditions;
+			const expectedLevel = reconciliationData.expectedLevel;
 			const hasDip = (reconciliationData.lastDipReading || 0) > 0;
-			const tankVariance = expectedLevel - reconciliationData.lastDipReading;
+			const tankCheck = computeVariance(expectedLevel, reconciliationData.lastDipReading);
+			const tankVariance = tankCheck.litres;
+			const tankBand = hasDip
+				? bandVariance(tankVariance, reconciliationData.lastDipReading)
+				: null;
 			const tankOpenLabel = dayMonth(reconciliationData.tankStartDate || isoDayBefore(startDate));
 			const dipLabel = reconciliationData.lastDipDate
 				? `Actual dip (${dayMonth(reconciliationData.lastDipDate)})`
@@ -1278,6 +1340,11 @@ class ExportService {
 				`${formatSignedLitres(variance)}  (${variancePct(variance, base).toLocaleString('en-ZA', { maximumFractionDigits: 2 })}%)`;
 			const varianceColor = (variance: number, base: number): [number, number, number] =>
 				variancePct(variance, base) > 0.5 ? PDF_NONCLAIM_RED : PDF_GREY;
+			// The tank check is banded by $lib/utils/tank-balance, which floors the
+			// threshold at the dipstick's resolution — a pure percentage flags
+			// noise at low stock.
+			const tankVarianceColor: [number, number, number] =
+				tankBand?.key === 'high' ? PDF_NONCLAIM_RED : PDF_GREY;
 
 			type ReconciliationRow = {
 				label: string;
@@ -1368,12 +1435,12 @@ class ExportService {
 				},
 				{
 					label: 'Deliveries / adjustments',
-					value: formatSignedLitres(totalTankAdditions),
-					color: totalTankAdditions >= 0 ? PDF_GREEN : PDF_RED
+					value: formatSignedLitres(reconciliationData.deliveriesFromAnchor),
+					color: reconciliationData.deliveriesFromAnchor >= 0 ? PDF_GREEN : PDF_RED
 				},
 				{
 					label: 'Fuel dispensed',
-					value: `-${formatLitresValue(reconciliationData.fuelDispensed)}`,
+					value: `-${formatLitresValue(reconciliationData.dispensedFromAnchor)}`,
 					color: PDF_RED
 				},
 				{ label: 'Expected closing', value: formatLitresValue(expectedLevel), bold: true },
@@ -1383,9 +1450,13 @@ class ExportService {
 					color: hasDip ? undefined : PDF_NONCLAIM_RED
 				},
 				{
+					// Measured against the dip, matching the close screen — the
+					// dip is the physical count the book is being checked against.
 					label: 'Variance',
-					value: hasDip ? formatVariance(tankVariance, expectedLevel) : '—',
-					color: hasDip ? varianceColor(tankVariance, expectedLevel) : PDF_GREY,
+					value: hasDip
+						? formatVariance(tankVariance, reconciliationData.lastDipReading)
+						: '—',
+					color: hasDip ? tankVarianceColor : PDF_GREY,
 					bold: true
 				}
 			]);

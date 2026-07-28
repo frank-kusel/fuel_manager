@@ -6,7 +6,10 @@
 
 const LOCALE = 'en-ZA';
 
-const integerFormat = new Intl.NumberFormat(LOCALE);
+// maximumFractionDigits must be pinned: Intl defaults it to 3, so the
+// decimals === 0 fast path below was rendering "R 24 571,344" for whole-rand
+// figures like the refund estimate.
+const integerFormat = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
 
 export function formatNumber(value: number | null | undefined, decimals: number = 0): string {
 	if (value === null || value === undefined || isNaN(value)) return '0';

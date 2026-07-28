@@ -13,11 +13,18 @@
 	interface Props {
 		selectedYear?: number;
 		selectedMonth?: number;
+		/**
+		 * Hide the year/month selects when the host page already owns the month
+		 * (Audit drives everything from one selector). The custom-period mode
+		 * stays available either way.
+		 */
+		hideMonthPicker?: boolean;
 	}
 
 	let {
 		selectedYear = $bindable(now.getFullYear()),
-		selectedMonth = $bindable(now.getMonth() + 1)
+		selectedMonth = $bindable(now.getMonth() + 1),
+		hideMonthPicker = false
 	}: Props = $props();
 
 	// State management
@@ -231,6 +238,11 @@
 			</div>
 
 			{#if claimMode === 'month'}
+				{#if hideMonthPicker}
+					<p class="month-locked">
+						Using the month selected above. Switch to <strong>Custom period</strong> for any other range.
+					</p>
+				{:else}
 				<div class="month-inputs">
 					<div class="month-field">
 						<label for="export-year">Year</label>
@@ -269,6 +281,7 @@
 						</select>
 					</div>
 				</div>
+				{/if}
 			{:else}
 				<div class="month-inputs">
 					<div class="month-field">
@@ -587,6 +600,12 @@
 		margin-bottom: 1rem;
 	}
 
+	.month-locked {
+		font-size: var(--text-sm);
+		color: var(--gray-500);
+		margin: 0;
+	}
+
 	.month-inputs {
 		display: flex;
 		gap: 1rem;
@@ -730,7 +749,13 @@
 			width: 100%;
 		}
 
-		.month-inputs {
+		.month-locked {
+		font-size: var(--text-sm);
+		color: var(--gray-500);
+		margin: 0;
+	}
+
+	.month-inputs {
 			display: grid;
 			grid-template-columns: 1fr 1fr;
 			gap: 0.75rem;

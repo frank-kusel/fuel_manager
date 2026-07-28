@@ -9,6 +9,7 @@
 	import { onVisible } from '$lib/stores/freshness';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { fmtDayMonth } from '$lib/utils/dates';
 
 	onMount(() => {
 		dashboardInsightsStore.load();
@@ -123,10 +124,14 @@
 							</div>
 						{/if}
 						<div class="tank-meta">
-							Derived from dip on {d.tank.lastDipDate} + refills − dispensed
+							{d.tank.anchor?.kind === 'close'
+								? `From the ${fmtDayMonth(d.tank.anchor.date)} close + deliveries − dispensed`
+								: d.tank.anchor
+									? `From the dip on ${fmtDayMonth(d.tank.anchor.date)} + deliveries − dispensed`
+									: 'Derived from deliveries − dispensed'}
 						</div>
 					{:else}
-						<div class="tank-meta">No dipstick reading recorded yet</div>
+						<div class="tank-meta">Nothing to anchor the book to yet</div>
 					{/if}
 				</div>
 			{/if}

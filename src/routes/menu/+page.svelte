@@ -5,9 +5,9 @@
 
 	const menuItems = [
 		{
-			title: 'Reconciliations',
-			description: 'Fuel usage and tank level reconciliation with flexible date ranges',
-			href: '/tools/reconciliations',
+			title: 'Month-end close',
+			description: 'Close the tank against a physical dip, review the leak trend and the claim',
+			href: '/audit',
 			icon: 'scale'
 		},
 		{
