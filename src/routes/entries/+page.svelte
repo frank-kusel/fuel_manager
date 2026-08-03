@@ -23,7 +23,7 @@
 	const nf = new Intl.NumberFormat('en-ZA');
 	const nf1 = new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 1 });
 
-	type PeriodKey = '30d' | 'month' | 'lastMonth' | 'fyToDate' | 'custom';
+	type PeriodKey = '30d' | 'month' | 'lastMonth' | 'fyToDate' | 'fyPrev' | 'custom';
 	let period = $state<PeriodKey>('30d');
 	let customStart = $state('');
 	let customEnd = $state('');
@@ -53,11 +53,26 @@
 		return new Date(year, 2, 1);
 	}
 
+	/** "2025/26" for the financial year that 1 March `start` opens. */
+	function fyLabel(start: Date): string {
+		const y = start.getFullYear();
+		return `${y}/${String((y + 1) % 100).padStart(2, '0')}`;
+	}
+
+	const thisFyStart = $derived(financialYearStart(new Date()));
+	// 1 March a year earlier through the last day of February
+	const prevFyStart = $derived(new Date(thisFyStart.getFullYear() - 1, 2, 1));
+	// Day 0 of March = the last day of February, leap years included
+	const prevFyEnd = $derived(new Date(thisFyStart.getFullYear(), 2, 0));
+
 	function periodRange(): { start: string; end: string } {
 		const now = new Date();
 		const iso = (d: Date) => d.toLocaleDateString('en-CA');
 		if (period === 'fyToDate') {
 			return { start: iso(financialYearStart(now)), end: iso(now) };
+		}
+		if (period === 'fyPrev') {
+			return { start: iso(prevFyStart), end: iso(prevFyEnd) };
 		}
 		if (period === 'month') {
 			return { start: iso(new Date(now.getFullYear(), now.getMonth(), 1)), end: iso(now) };
@@ -301,6 +316,14 @@
 
 	function issuesFor(e: any): { key: IssueKey; label: string }[] {
 		return ISSUE_DEFS.filter((d) => d.test(e)).map(({ key, label }) => ({ key, label }));
+	}
+
+	// One amber for anything wrong with the odometer pair — a broken gauge and a
+	// missing reading are the same kind of "don't trust this number".
+	const ODO_ISSUES: IssueKey[] = ['noOdoStart', 'noOdoEnd', 'noMovement', 'gaugeBroken'];
+
+	function odoIssue(e: any): boolean {
+		return ISSUE_DEFS.some((d) => ODO_ISSUES.includes(d.key) && d.test(e));
 	}
 
 	function inReview(e: any): boolean {
@@ -606,7 +629,22 @@
 			<button class="chip" class:on={period === '30d'} onclick={() => setPeriod('30d')}>Last 30 days</button>
 			<button class="chip" class:on={period === 'month'} onclick={() => setPeriod('month')}>This month</button>
 			<button class="chip" class:on={period === 'lastMonth'} onclick={() => setPeriod('lastMonth')}>Last month</button>
-			<button class="chip" class:on={period === 'fyToDate'} onclick={() => setPeriod('fyToDate')} title="Financial year to date (from 1 March)">Year to date</button>
+			<button
+				class="chip"
+				class:on={period === 'fyToDate'}
+				onclick={() => setPeriod('fyToDate')}
+				title="1 March {thisFyStart.getFullYear()} to today"
+			>FY {fyLabel(thisFyStart)} to date</button>
+			<button
+				class="chip"
+				class:on={period === 'fyPrev'}
+				onclick={() => setPeriod('fyPrev')}
+				title="1 March {prevFyStart.getFullYear()} to {prevFyEnd.toLocaleDateString('en-ZA', {
+					day: 'numeric',
+					month: 'long',
+					year: 'numeric'
+				})}"
+			>FY {fyLabel(prevFyStart)}</button>
 			<button class="chip" class:on={period === 'custom'} onclick={() => setPeriod('custom')}>Custom</button>
 		</div>
 		{#if period === 'custom'}
@@ -833,7 +871,7 @@
 								{/if}
 							</td>
 
-							<td class="ed num" class:gauge-bad={e.gauge_working === false} onclick={() => startEdit(e, 'odometer_start')}>
+							<td class="ed num" class:gauge-bad={odoIssue(e)} onclick={() => startEdit(e, 'odometer_start')}>
 								<span class="cell-val" class:under-editor={isEditing(e.id, 'odometer_start')}>
 									{fmtNum(e.odometer_start)}
 									{#if e.gauge_working === false}<span class="gauge-warn" title="Gauge broken">⚠</span>{/if}
@@ -854,7 +892,7 @@
 								{/if}
 							</td>
 
-							<td class="ed num" class:gauge-bad={e.gauge_working === false} onclick={() => startEdit(e, 'odometer_end')}>
+							<td class="ed num" class:gauge-bad={odoIssue(e)} onclick={() => startEdit(e, 'odometer_end')}>
 								<span class="cell-val" class:under-editor={isEditing(e.id, 'odometer_end')}>
 									{fmtNum(e.odometer_end)}
 								</span>
@@ -1250,7 +1288,11 @@
 		font-size: var(--text-xs);
 	}
 
-	td.gauge-bad {
+	/* `tr.band td` (0,1,2) out-specifies a bare `td.gauge-bad` (0,1,1), so on
+	 * banded days the warning tint silently lost — the same flag looked yellow
+	 * on one row and plain on the next. Match the banded selector's weight. */
+	td.gauge-bad,
+	tr.band td.gauge-bad {
 		background: #fef3c7;
 	}
 
