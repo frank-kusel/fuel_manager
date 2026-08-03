@@ -1106,12 +1106,16 @@ class ExportService {
 			const totalNonClaimable = totalFuel - totalClaimable;
 			const claimShare = totalFuel > 0 ? totalClaimable / totalFuel : 0;
 
-			// One locale for the whole document (en-ZA: space thousands, comma
-			// decimals) — the reconciliation panels already use it, and a claim
-			// document that formats the same litres two ways reads as sloppy.
+			// One number format for the whole document: space thousands (en-ZA)
+			// but a full stop for decimals, which is what the claim reader
+			// expects. A document that formats the same litres two ways reads as
+			// sloppy, so every figure below goes through these.
+			const dec = (formatted: string) => formatted.replace(/,/g, '.');
+			const num = (value: number, opts: Intl.NumberFormatOptions) =>
+				dec(value.toLocaleString('en-ZA', opts));
 			const n2 = (value: number) =>
-				value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-			const n1max = (value: number) => value.toLocaleString('en-ZA', { maximumFractionDigits: 1 });
+				num(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+			const n1max = (value: number) => num(value, { maximumFractionDigits: 1 });
 
 			const marginX = 16;
 			const contentW = pageWidth - marginX * 2;
@@ -1171,7 +1175,7 @@ class ExportService {
 			pdf.setFont('helvetica', 'normal');
 			pdf.setTextColor(...PDF_GREY);
 			pdf.text(
-				`${(claimShare * 100).toLocaleString('en-ZA', { maximumFractionDigits: 1 })}% of total fuel is claimable`,
+				`${num(claimShare * 100, { maximumFractionDigits: 1 })}% of total fuel is claimable`,
 				pageWidth - marginX,
 				barY + barH + 3.4,
 				{ align: 'right' }
@@ -1180,28 +1184,45 @@ class ExportService {
 
 			// ---- Vehicle ledger ----
 			// Usage and efficiency carry their unit in the cell, so the reader
-			// never has to cross-reference a Unit column six columns away.
-			const usageCell = (vehicle: MonthlySummaryData) =>
+			// never has to cross-reference a Unit column six columns away. The
+			// number and the unit are kept apart and drawn in didDrawCell: the
+			// figures right-align against a fixed unit gutter, and the units
+			// left-align inside it, so neither drifts with string length.
+			type UnitValue = { value: string; unit: string };
+			const usageCell = (vehicle: MonthlySummaryData): UnitValue =>
 				vehicle.distance === '' || vehicle.distance === null
-					? '—'
-					: `${n1max(Number(vehicle.distance))} ${vehicle.unit || ''}`.trim();
-			const efficiencyCell = (vehicle: MonthlySummaryData) =>
+					? { value: '—', unit: '' }
+					: { value: n1max(Number(vehicle.distance)), unit: vehicle.unit || '' };
+			const efficiencyCell = (vehicle: MonthlySummaryData): UnitValue =>
 				vehicle.consumption === '' || vehicle.consumption === null
-					? '—'
-					: `${Number(vehicle.consumption).toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${
-							vehicle.unit === 'km' ? 'L/100km' : 'L/hr'
-						}`;
+					? { value: '—', unit: '' }
+					: {
+							value: num(Number(vehicle.consumption), {
+								minimumFractionDigits: 1,
+								maximumFractionDigits: 1
+							}),
+							unit: vehicle.unit === 'km' ? 'L/100km' : 'L/hr'
+						};
+
+			// Row index → the split cells, read back when those columns are drawn
+			const USAGE_COL = 4;
+			const EFFICIENCY_COL = 8;
+			const splitCells = new Map<string, UnitValue>();
+			data.forEach((vehicle, index) => {
+				splitCells.set(`${index}:${USAGE_COL}`, usageCell(vehicle));
+				splitCells.set(`${index}:${EFFICIENCY_COL}`, efficiencyCell(vehicle));
+			});
 
 			const consumptionTable = data.map((vehicle) => [
 				vehicle.code,
 				vehicle.name,
 				vehicle.registration || '—',
 				vehicle.category,
-				usageCell(vehicle),
+				'',
 				n2(vehicle.fuel),
 				vehicle.claimableFuel === 0 ? '—' : n2(vehicle.claimableFuel),
 				vehicle.nonClaimableFuel === 0 ? '—' : n2(vehicle.nonClaimableFuel),
-				efficiencyCell(vehicle)
+				''
 			]);
 			consumptionTable.push([
 				'',
@@ -1214,6 +1235,22 @@ class ExportService {
 				n2(totalNonClaimable),
 				''
 			]);
+
+			// Unit gutters are as wide as the widest unit actually present, so the
+			// units start on one line down the column instead of hugging the
+			// border on long values and floating on short ones.
+			const bodyFontSize = data.length > 25 ? 6 : 7;
+			const widestUnit = (units: string[]) => {
+				pdf.setFontSize(bodyFontSize);
+				pdf.setFont('helvetica', 'normal');
+				return units.reduce((widest, unit) => Math.max(widest, pdf.getTextWidth(unit)), 0);
+			};
+			const usageUnitW = widestUnit(
+				[...new Set(data.map((vehicle) => usageCell(vehicle).unit))].filter(Boolean)
+			);
+			const efficiencyUnitW = widestUnit(
+				[...new Set(data.map((vehicle) => efficiencyCell(vehicle).unit))].filter(Boolean)
+			);
 
 			autoTable(pdf, {
 				startY: 55,
@@ -1251,22 +1288,30 @@ class ExportService {
 					lineWidth: 0.1,
 					fontSize: 6.5
 				},
+				// Widths total the 178mm content box. Usage and efficiency are
+				// widest because they carry a number *and* a unit gutter — a
+				// four-figure L/100km used to overrun into the next cell.
 				columnStyles: {
-					0: { halign: 'center', cellWidth: 12 },
-					1: { halign: 'left', cellWidth: 30, overflow: 'linebreak' },
-					2: { halign: 'center', cellWidth: 20 },
+					0: { halign: 'left', cellWidth: 12 },
+					1: { halign: 'left', cellWidth: 27, overflow: 'linebreak' },
+					2: { halign: 'left', cellWidth: 18 },
 					3: { halign: 'left', cellWidth: 22, overflow: 'linebreak' },
-					4: { halign: 'right', cellWidth: 20 },
+					4: { halign: 'right', cellWidth: 22 },
 					5: { halign: 'right', cellWidth: 18 },
 					6: { halign: 'right', cellWidth: 18 },
 					7: { halign: 'right', cellWidth: 18 },
-					8: { halign: 'right', cellWidth: 20 }
+					8: { halign: 'right', cellWidth: 23 }
 				},
 				didParseCell: function (cell: any) {
 					const isTotalRow = cell.section === 'body' && cell.row.index === consumptionTable.length - 1;
 					if ([5, 6, 7].includes(cell.column.index)) {
 						cell.cell.styles.fillColor =
 							cell.section === 'head' ? [238, 238, 235] : [247, 247, 245];
+					}
+					// Registration is a lookup detail, not a figure — keep it
+					// present but quieter than the columns that carry meaning.
+					if (cell.column.index === 2 && cell.section === 'body') {
+						cell.cell.styles.textColor = PDF_GREY;
 					}
 					// Colour only carries meaning where litres exist: zeros are
 					// muted dashes so red/green never shouts about nothing.
@@ -1289,6 +1334,27 @@ class ExportService {
 						pdf.setLineWidth(0.35);
 						pdf.line(cell.cell.x, cell.cell.y, cell.cell.x + cell.cell.width, cell.cell.y);
 					}
+
+					// Number and unit drawn as two aligned columns inside one cell
+					if (cell.section !== 'body') return;
+					const split = splitCells.get(`${cell.row.index}:${cell.column.index}`);
+					if (!split) return;
+
+					const bodyFontSize = data.length > 25 ? 6 : 7;
+					const gutter = cell.column.index === USAGE_COL ? usageUnitW : efficiencyUnitW;
+					const pad = 1.6;
+					const unitX = cell.cell.x + cell.cell.width - pad - gutter;
+					const baselineY = cell.cell.y + cell.cell.height / 2 + bodyFontSize * 0.3528 * 0.35;
+
+					pdf.setFontSize(bodyFontSize);
+					pdf.setFont('helvetica', 'normal');
+					pdf.setTextColor(...(split.unit ? ([0, 0, 0] as [number, number, number]) : PDF_GREY));
+					pdf.text(split.value, unitX - 1.2, baselineY, { align: 'right' });
+					if (split.unit) {
+						pdf.setTextColor(...PDF_GREY);
+						pdf.text(split.unit, unitX, baselineY);
+					}
+					pdf.setTextColor(0, 0, 0);
 				},
 				margin: { left: marginX, right: marginX }
 			});
@@ -1329,15 +1395,15 @@ class ExportService {
 				? `Actual dip (${dayMonth(reconciliationData.lastDipDate)})`
 				: 'Actual dip';
 			const formatLitresValue = (value: number) =>
-				`${value.toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`;
+				`${num(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`;
 			const formatSignedLitres = (value: number) =>
-				`${value > 0 ? '+' : ''}${value.toLocaleString('en-ZA', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`;
+				`${value > 0 ? '+' : ''}${num(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L`;
 			// A variance is only alarming relative to the volume it sits on:
 			// 3 L on a 9 000 L month is meter noise, not a red flag.
 			const variancePct = (variance: number, base: number) =>
 				base > 0 ? Math.abs(100 * variance / base) : 0;
 			const formatVariance = (variance: number, base: number) =>
-				`${formatSignedLitres(variance)}  (${variancePct(variance, base).toLocaleString('en-ZA', { maximumFractionDigits: 2 })}%)`;
+				`${formatSignedLitres(variance)}  (${num(variancePct(variance, base), { maximumFractionDigits: 2 })}%)`;
 			const varianceColor = (variance: number, base: number): [number, number, number] =>
 				variancePct(variance, base) > 0.5 ? PDF_NONCLAIM_RED : PDF_GREY;
 			// The tank check is banded by $lib/utils/tank-balance, which floors the
@@ -1346,15 +1412,124 @@ class ExportService {
 			const tankVarianceColor: [number, number, number] =
 				tankBand?.key === 'high' ? PDF_NONCLAIM_RED : PDF_GREY;
 
+			type SubRow = { label: string; value: string; color?: [number, number, number] };
 			type ReconciliationRow = {
 				label: string;
 				value: string;
 				color?: [number, number, number];
 				bold?: boolean;
+				/** Indented breakdown drawn immediately above this row */
+				sub?: SubRow[];
 			};
 
-			const deliveryRows = reconciliationData.tankActivities.length;
-			const reconciliationHeight = 53 + (deliveryRows > 0 ? 10 + deliveryRows * 4 : 0);
+			// The delivery breakdown lives inside the tank card, directly above the
+			// line it sums into. A month can carry more lines than a half-page card
+			// can hold, so long lists are capped with an explicit "N more" line
+			// rather than silently trimmed.
+			const MAX_DELIVERY_LINES = 10;
+			const activities = reconciliationData.tankActivities as {
+				delivery_date: string;
+				litres_added?: number;
+				invoice_number?: string;
+			}[];
+			const shownActivities = activities.slice(0, MAX_DELIVERY_LINES);
+			const hiddenActivities = activities.slice(MAX_DELIVERY_LINES);
+			const deliverySubRows: SubRow[] = shownActivities.map((activity) => {
+				const amount = activity.litres_added || 0;
+				const when = new Date(`${activity.delivery_date}T00:00:00`).toLocaleDateString('en-ZA', {
+					day: '2-digit',
+					month: 'short'
+				});
+				return {
+					label: `${when}   ${cleanDocText(activity.invoice_number || 'Adjustment')}`,
+					value: formatSignedLitres(amount),
+					color: amount >= 0 ? PDF_GREEN : PDF_RED
+				};
+			});
+			if (hiddenActivities.length > 0) {
+				const rest = hiddenActivities.reduce(
+					(sum, activity) => sum + (activity.litres_added || 0),
+					0
+				);
+				deliverySubRows.push({
+					label: `+ ${hiddenActivities.length} more`,
+					value: formatSignedLitres(rest),
+					color: PDF_GREY
+				});
+			}
+
+			const ROW_H = 4.5;
+			const SUB_H = 3.6;
+			const PANEL_HEAD = 12; // title block above the first row
+			const PANEL_FOOT = 9; // rule + pinned check row at the bottom
+
+			const panelContentHeight = (rows: ReconciliationRow[]) =>
+				rows.reduce((total, row) => total + ROW_H + (row.sub?.length || 0) * SUB_H, 0);
+
+			const bowserRows: ReconciliationRow[] = [
+				{
+					label: `Opening meter (${dayMonth(startDate)})`,
+					value: formatLitresValue(reconciliationData.bowserStart)
+				},
+				{
+					label: `Closing meter (${dayMonth(endDate)})`,
+					value: formatLitresValue(reconciliationData.bowserEnd)
+				},
+				{ label: 'Meter movement', value: formatLitresValue(bowserDifference), bold: true },
+				{
+					label: 'Recorded dispensed',
+					value: formatLitresValue(reconciliationData.fuelDispensed),
+					color: PDF_RED
+				}
+			];
+			const bowserCheck: ReconciliationRow = {
+				label: 'Difference',
+				value: formatVariance(fuelVariance, reconciliationData.fuelDispensed),
+				color: varianceColor(fuelVariance, reconciliationData.fuelDispensed),
+				bold: true
+			};
+
+			const tankRows: ReconciliationRow[] = [
+				{
+					label: `Opening balance (${tankOpenLabel})`,
+					value: formatLitresValue(reconciliationData.tankStartCalculated)
+				},
+				{
+					label: 'Deliveries / adjustments',
+					value: formatSignedLitres(reconciliationData.deliveriesFromAnchor),
+					color: reconciliationData.deliveriesFromAnchor >= 0 ? PDF_GREEN : PDF_RED,
+					sub: deliverySubRows
+				},
+				{
+					label: 'Fuel dispensed',
+					value: `-${formatLitresValue(reconciliationData.dispensedFromAnchor)}`,
+					color: PDF_RED
+				},
+				{ label: 'Expected closing', value: formatLitresValue(expectedLevel), bold: true },
+				{
+					label: dipLabel,
+					value: hasDip ? formatLitresValue(reconciliationData.lastDipReading) : 'Not recorded',
+					color: hasDip ? undefined : PDF_NONCLAIM_RED
+				}
+			];
+			const tankCheckRow: ReconciliationRow = {
+				// Measured against the dip, matching the close screen — the dip is
+				// the physical count the book is being checked against.
+				label: 'Variance',
+				value: hasDip ? formatVariance(tankVariance, reconciliationData.lastDipReading) : '—',
+				color: hasDip ? tankVarianceColor : PDF_GREY,
+				bold: true
+			};
+
+			// Both cards share one height so the two check lines sit on the same
+			// baseline — the whole point is comparing them at a glance.
+			const panelHeight =
+				PANEL_HEAD +
+				Math.max(panelContentHeight(bowserRows), panelContentHeight(tankRows)) +
+				2 +
+				PANEL_FOOT;
+
+			const reconciliationHeight = panelHeight + 12;
 			let reconciliationY = cursorY + 5;
 			if (reconciliationY + reconciliationHeight > pageHeight - 20) {
 				pdf.addPage();
@@ -1376,13 +1551,13 @@ class ExportService {
 			const panelWidth = (pageWidth - marginX * 2 - panelGap) / 2;
 			const tankPanelX = marginX + panelWidth + panelGap;
 			const panelTop = reconciliationY + 4;
-			const panelHeight = 41;
 			const drawPanel = (
 				x: number,
 				y: number,
 				width: number,
 				title: string,
-				rows: ReconciliationRow[]
+				rows: ReconciliationRow[],
+				check: ReconciliationRow
 			) => {
 				pdf.setFillColor(250, 250, 249);
 				pdf.setDrawColor(...PDF_HAIRLINE);
@@ -1393,107 +1568,43 @@ class ExportService {
 				pdf.setTextColor(0, 0, 0);
 				pdf.text(title, x + 3, y + 6);
 
-				rows.forEach((row, index) => {
-					const rowY = y + 12 + index * 4.5;
-					pdf.setFontSize(7.2);
+				const drawLine = (
+					row: ReconciliationRow | SubRow,
+					lineY: number,
+					opts: { indent?: boolean; bold?: boolean } = {}
+				) => {
+					pdf.setFontSize(opts.indent ? 6.4 : 7.2);
 					pdf.setFont('helvetica', 'normal');
 					pdf.setTextColor(...PDF_GREY);
-					pdf.text(row.label, x + 3, rowY);
-					pdf.setFont('helvetica', row.bold ? 'bold' : 'normal');
+					pdf.text(row.label, x + 3 + (opts.indent ? 4 : 0), lineY);
+					pdf.setFont('helvetica', opts.bold ? 'bold' : 'normal');
 					pdf.setTextColor(...(row.color || ([45, 45, 45] as [number, number, number])));
-					pdf.text(row.value, x + width - 3, rowY, { align: 'right' });
-				});
+					pdf.text(row.value, x + width - 3, lineY, { align: 'right' });
+				};
+
+				let lineY = y + PANEL_HEAD;
+				for (const row of rows) {
+					// Breakdown first, then the line it adds up to — the reader
+					// meets the parts before the subtotal, ledger-style.
+					for (const sub of row.sub || []) {
+						drawLine(sub, lineY, { indent: true });
+						lineY += SUB_H;
+					}
+					drawLine(row, lineY, { bold: row.bold });
+					lineY += ROW_H;
+				}
+
+				// The check line is pinned to the bottom of every card, so the two
+				// cards' answers line up however many rows sit above them.
+				const checkY = y + panelHeight - 4;
+				pdf.setDrawColor(...PDF_HAIRLINE);
+				pdf.setLineWidth(0.15);
+				pdf.line(x + 3, checkY - 4, x + width - 3, checkY - 4);
+				drawLine(check, checkY, { bold: true });
 			};
 
-			drawPanel(marginX, panelTop, panelWidth, 'Bowser readings', [
-				{
-					label: `Opening meter (${dayMonth(startDate)})`,
-					value: formatLitresValue(reconciliationData.bowserStart)
-				},
-				{
-					label: `Closing meter (${dayMonth(endDate)})`,
-					value: formatLitresValue(reconciliationData.bowserEnd)
-				},
-				{ label: 'Meter movement', value: formatLitresValue(bowserDifference), bold: true },
-				{
-					label: 'Recorded dispensed',
-					value: formatLitresValue(reconciliationData.fuelDispensed),
-					color: PDF_RED
-				},
-				{
-					label: 'Difference',
-					value: formatVariance(fuelVariance, reconciliationData.fuelDispensed),
-					color: varianceColor(fuelVariance, reconciliationData.fuelDispensed),
-					bold: true
-				}
-			]);
-
-			drawPanel(tankPanelX, panelTop, panelWidth, 'Tank balance', [
-				{
-					label: `Opening balance (${tankOpenLabel})`,
-					value: formatLitresValue(reconciliationData.tankStartCalculated)
-				},
-				{
-					label: 'Deliveries / adjustments',
-					value: formatSignedLitres(reconciliationData.deliveriesFromAnchor),
-					color: reconciliationData.deliveriesFromAnchor >= 0 ? PDF_GREEN : PDF_RED
-				},
-				{
-					label: 'Fuel dispensed',
-					value: `-${formatLitresValue(reconciliationData.dispensedFromAnchor)}`,
-					color: PDF_RED
-				},
-				{ label: 'Expected closing', value: formatLitresValue(expectedLevel), bold: true },
-				{
-					label: dipLabel,
-					value: hasDip ? formatLitresValue(reconciliationData.lastDipReading) : 'Not recorded',
-					color: hasDip ? undefined : PDF_NONCLAIM_RED
-				},
-				{
-					// Measured against the dip, matching the close screen — the
-					// dip is the physical count the book is being checked against.
-					label: 'Variance',
-					value: hasDip
-						? formatVariance(tankVariance, reconciliationData.lastDipReading)
-						: '—',
-					color: hasDip ? tankVarianceColor : PDF_GREY,
-					bold: true
-				}
-			]);
-
-			// ---- Deliveries and adjustments: full width, invoice references ----
-			if (deliveryRows > 0) {
-				const deliveriesY = panelTop + panelHeight + 8;
-				pdf.setFontSize(7.5);
-				pdf.setFont('helvetica', 'bold');
-				pdf.setTextColor(0, 0, 0);
-				pdf.text('Deliveries and adjustments', marginX, deliveriesY);
-
-				reconciliationData.tankActivities.forEach(
-					(
-						activity: { delivery_date: string; litres_added?: number; invoice_number?: string },
-						index: number
-					) => {
-						const amount = activity.litres_added || 0;
-						const activityDate = new Date(activity.delivery_date).toLocaleDateString('en-ZA', {
-							day: 'numeric',
-							month: 'short'
-						});
-						const y = deliveriesY + 5 + index * 4;
-						const reference = cleanDocText(activity.invoice_number || 'Adjustment');
-						pdf.setFontSize(6.8);
-						pdf.setFont('helvetica', 'normal');
-						pdf.setTextColor(...PDF_GREY);
-						pdf.text(activityDate, marginX + 1, y);
-						pdf.setFont('helvetica', 'bold');
-						pdf.setTextColor(...(amount >= 0 ? PDF_GREEN : PDF_RED));
-						pdf.text(formatSignedLitres(amount), marginX + 34, y, { align: 'right' });
-						pdf.setFont('helvetica', 'normal');
-						pdf.setTextColor(60, 60, 60);
-						pdf.text(reference, marginX + 40, y);
-					}
-				);
-			}
+			drawPanel(marginX, panelTop, panelWidth, 'Bowser readings', bowserRows, bowserCheck);
+			drawPanel(tankPanelX, panelTop, panelWidth, 'Tank balance', tankRows, tankCheckRow);
 
 			// ---- Footer band on every page ----
 			const generatedAt = new Date().toLocaleString('en-ZA', {
