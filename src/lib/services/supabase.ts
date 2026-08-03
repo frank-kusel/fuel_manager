@@ -281,32 +281,51 @@ class SupabaseService {
 	// Fuel entry operations
 	async getFuelEntries(startDate?: string, endDate?: string): Promise<ApiResponse<FuelEntry[]>> {
 		const client = this.ensureInitialized();
+		// Wide ranges (a financial year) run past PostgREST's 1000-row cap, which
+		// would silently truncate the tail — page until a short page comes back
+		// or MAX_ROWS is reached. `truncated` tells the caller the tail was cut.
+		const PAGE = 1000;
+		const MAX_ROWS = 5000;
+		const rows: FuelEntry[] = [];
+		let truncated = false;
 
-		let query = client
-			.from('fuel_entries')
-			.select(
+		for (let from = 0; from < MAX_ROWS; from += PAGE) {
+			let query = client
+				.from('fuel_entries')
+				.select(
+					`
+					*,
+					vehicles!left (code, name, registration, odometer_unit),
+					drivers!left (employee_code, name),
+					activities!left (code, name),
+					fields!left (code, name),
+					zones!left (code, name),
+					bowsers!left (name)
 				`
-				*,
-				vehicles!left (code, name, registration, odometer_unit),
-				drivers!left (employee_code, name),
-				activities!left (code, name),
-				fields!left (code, name),
-				zones!left (code, name),
-				bowsers!left (name)
-			`
-			)
-			.is('deleted_at', null)
-			.order('entry_date', { ascending: false })
-			.order('time', { ascending: false });
+				)
+				.is('deleted_at', null)
+				.order('entry_date', { ascending: false })
+				.order('time', { ascending: false })
+				.order('id', { ascending: false }) // stable tiebreak across pages
+				.range(from, Math.min(from + PAGE, MAX_ROWS) - 1);
 
-		if (startDate) {
-			query = query.gte('entry_date', startDate);
-		}
-		if (endDate) {
-			query = query.lte('entry_date', endDate);
+			if (startDate) {
+				query = query.gte('entry_date', startDate);
+			}
+			if (endDate) {
+				query = query.lte('entry_date', endDate);
+			}
+
+			const page = await this.query<FuelEntry[]>(() => query);
+			if (page.error) return page;
+
+			const data = page.data || [];
+			rows.push(...data);
+			if (data.length < PAGE) break;
+			if (rows.length >= MAX_ROWS) truncated = true;
 		}
 
-		return this.query(() => query);
+		return { data: rows, error: null, truncated };
 	}
 
 	async createFuelEntry(

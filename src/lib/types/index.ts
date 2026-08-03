@@ -346,6 +346,8 @@ export interface ApiResponse<T = any> {
 	data: T | null;
 	error: string | null;
 	count?: number;
+	/** Set when a paged fetch stopped at its row ceiling — the tail is missing. */
+	truncated?: boolean;
 }
 
 export interface SupabaseError {

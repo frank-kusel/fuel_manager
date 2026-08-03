@@ -23,13 +23,14 @@
 	const nf = new Intl.NumberFormat('en-ZA');
 	const nf1 = new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 1 });
 
-	type PeriodKey = '30d' | 'month' | 'lastMonth' | 'custom';
+	type PeriodKey = '30d' | 'month' | 'lastMonth' | 'fyToDate' | 'custom';
 	let period = $state<PeriodKey>('30d');
 	let customStart = $state('');
 	let customEnd = $state('');
 	let vehicleFilter = $state('');
 
 	let entries = $state<any[]>([]);
+	let truncatedLoad = $state(false);
 	let fieldIdsByEntry = $state<Record<string, string[]>>({});
 	let loading = $state(true);
 	let error = $state<string | null>(null);
@@ -46,9 +47,18 @@
 
 	const today = () => new Date().toLocaleDateString('en-CA');
 
+	/** Financial year starts 1 March — before then we're still in last year's. */
+	function financialYearStart(now: Date): Date {
+		const year = now.getMonth() >= 2 ? now.getFullYear() : now.getFullYear() - 1;
+		return new Date(year, 2, 1);
+	}
+
 	function periodRange(): { start: string; end: string } {
 		const now = new Date();
 		const iso = (d: Date) => d.toLocaleDateString('en-CA');
+		if (period === 'fyToDate') {
+			return { start: iso(financialYearStart(now)), end: iso(now) };
+		}
 		if (period === 'month') {
 			return { start: iso(new Date(now.getFullYear(), now.getMonth(), 1)), end: iso(now) };
 		}
@@ -68,6 +78,41 @@
 
 	let lastLoadedAt = 0;
 
+	// A year of entries is thousands of ids; one `.in(...)` would blow past the
+	// URL length limit (the request 414s and every Field cell silently reads
+	// "—"), and one page would stop at PostgREST's 1000-row cap.
+	const ID_CHUNK = 100;
+	const ROW_PAGE = 1000;
+
+	async function loadFieldIds(ids: string[]): Promise<Record<string, string[]>> {
+		const client = supabaseService.getClient();
+		const chunks: string[][] = [];
+		for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
+
+		const results = await Promise.all(
+			chunks.map(async (chunk) => {
+				const rows: any[] = [];
+				for (let from = 0; ; from += ROW_PAGE) {
+					const { data, error: jerr } = await client
+						.from('fuel_entry_fields')
+						.select('fuel_entry_id, field_id')
+						.in('fuel_entry_id', chunk)
+						.range(from, from + ROW_PAGE - 1);
+					if (jerr) throw new Error(jerr.message);
+					rows.push(...(data || []));
+					if (!data || data.length < ROW_PAGE) break;
+				}
+				return rows;
+			})
+		);
+
+		const map: Record<string, string[]> = {};
+		for (const r of results.flat()) {
+			(map[r.fuel_entry_id] ??= []).push(r.field_id);
+		}
+		return map;
+	}
+
 	async function load(silent = false) {
 		if (!silent) loading = true;
 		error = null;
@@ -77,23 +122,25 @@
 			const res = await supabaseService.getFuelEntries(start, end);
 			if (res.error) throw new Error(res.error);
 			entries = res.data || [];
+			// A silently cut-off tail is exactly the bug this page had before —
+			// if the ceiling is hit, say so rather than quietly showing less.
+			truncatedLoad = res.truncated === true;
 
 			// Multi-field detection via the junction table
 			const ids = entries.map((e) => e.id);
 			if (ids.length > 0) {
-				const client = supabaseService.getClient();
-				const jr = await client
-					.from('fuel_entry_fields')
-					.select('fuel_entry_id, field_id')
-					.in('fuel_entry_id', ids);
-				const map: Record<string, string[]> = {};
-				for (const r of jr.data || []) {
-					(map[r.fuel_entry_id] ??= []).push(r.field_id);
+				try {
+					fieldIdsByEntry = await loadFieldIds(ids);
+				} catch (jerr) {
+					// Field names degrade to the legacy join rather than the whole
+					// table failing — but say so instead of showing silent dashes.
+					fieldIdsByEntry = {};
+					showToast('err', jerr instanceof Error ? jerr.message : 'Could not load field details');
 				}
-				fieldIdsByEntry = map;
 			} else {
 				fieldIdsByEntry = {};
 			}
+			pruneColFilters();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load entries';
 		} finally {
@@ -140,11 +187,33 @@
 		return fieldCell(e).text; // field
 	}
 
-	/** Distinct values for a column's popover, from the period's entries
-	 * (respecting the toolbar vehicle filter but not this column's own). */
+	function distinct(col: FilterCol, list: any[]): string[] {
+		return [...new Set(list.map((e) => cellValueFor(col, e)))].sort();
+	}
+
+	/** Every value in the period, ignoring all filters. The baseline for "is
+	 * this column fully checked" and for pruning — never the popover list. */
+	function allOptions(col: FilterCol): string[] {
+		return distinct(col, entries);
+	}
+
+	/** The popover list: values still reachable given every *other* filter, so
+	 * filtering to two vehicles narrows the Activity list to their activities.
+	 * The column's own filter is skipped — otherwise unchecking a value would
+	 * remove it from its own list and you could never check it back on.
+	 *
+	 * Checked-but-unreachable values stay in colFilters rather than being
+	 * dropped, so widening the vehicle filter again restores the old activity
+	 * list instead of silently having reset it. */
 	function filterOptions(col: FilterCol): string[] {
-		const base = vehicleFilter ? entries.filter((e) => e.vehicle_id === vehicleFilter) : entries;
-		return [...new Set(base.map((e) => cellValueFor(col, e)))].sort();
+		let list = vehicleFilter ? entries.filter((e) => e.vehicle_id === vehicleFilter) : entries;
+		for (const other of FILTER_COLS) {
+			if (other === col) continue;
+			const f = colFilters[other];
+			if (f !== null) list = list.filter((e) => f.includes(cellValueFor(other, e)));
+		}
+		if (reviewOn) list = list.filter(inReview);
+		return distinct(col, list);
 	}
 
 	function isChecked(col: FilterCol, val: string): boolean {
@@ -152,7 +221,10 @@
 	}
 
 	function toggleFilterValue(col: FilterCol, val: string) {
-		const options = filterOptions(col);
+		// Against the full value set, not the cascaded list: unchecking one row
+		// of a narrowed popover must not silently drop the values another
+		// filter is currently hiding.
+		const options = allOptions(col);
 		const current = colFilters[col] ?? options; // null = all checked
 		const next = current.includes(val) ? current.filter((v) => v !== val) : [...current, val];
 		colFilters = { ...colFilters, [col]: next.length >= options.length ? null : next };
@@ -169,13 +241,104 @@
 		openFilter = null;
 	}
 
-	// ---- Display rows: filters, per-day numbers, day banding ----
-	const displayRows = $derived.by(() => {
+	/** After a reload the period may hold none of the previously checked values —
+	 * a filter that matches nothing would blank the table, so drop it. */
+	function pruneColFilters() {
+		let next = colFilters;
+		for (const col of FILTER_COLS) {
+			const f = next[col];
+			if (f === null) continue;
+			// allOptions, not the cascaded list — pruning is about values the new
+			// period no longer has, not values another filter is hiding.
+			const options = allOptions(col);
+			const kept = f.filter((v) => options.includes(v));
+			const value = kept.length === 0 || kept.length >= options.length ? null : kept;
+			if (value !== f) next = { ...next, [col]: value };
+		}
+		colFilters = next;
+	}
+
+	// ---- Review: entries worth a second look ----
+	// Deliberately narrow — only things that are wrong or missing on the entry
+	// itself, so the count stays a worklist rather than background noise.
+	type IssueKey = 'noOdoEnd' | 'noOdoStart' | 'noMovement' | 'gaugeBroken' | 'noBowser';
+
+	const ISSUE_DEFS: { key: IssueKey; label: string; test: (e: any) => boolean }[] = [
+		{
+			key: 'noOdoEnd',
+			label: 'No odo end',
+			test: (e) => e.gauge_working !== false && e.odometer_end === null
+		},
+		{
+			key: 'noOdoStart',
+			label: 'No odo start',
+			test: (e) => e.gauge_working !== false && e.odometer_start === null
+		},
+		{
+			key: 'noMovement',
+			// Odometer didn't move (or went backwards) — usage can't be derived
+			label: 'No movement',
+			test: (e) =>
+				e.gauge_working !== false &&
+				e.odometer_start !== null &&
+				e.odometer_end !== null &&
+				e.odometer_end <= e.odometer_start
+		},
+		{ key: 'gaugeBroken', label: 'Gauge broken', test: (e) => e.gauge_working === false },
+		{
+			key: 'noBowser',
+			label: 'No bowser reading',
+			test: (e) => e.bowser_reading_start === null || e.bowser_reading_end === null
+		}
+	];
+
+	let reviewOn = $state(false);
+	let issueFilter = $state<IssueKey | 'all'>('all');
+
+	// Reordering positions an entry within its day, and the day's positions are
+	// counted from the visible rows — so it's only safe on the unfiltered list.
+	let anyRowFilter = $derived(!!vehicleFilter || anyColFilter || reviewOn);
+
+	function issuesFor(e: any): { key: IssueKey; label: string }[] {
+		return ISSUE_DEFS.filter((d) => d.test(e)).map(({ key, label }) => ({ key, label }));
+	}
+
+	function inReview(e: any): boolean {
+		if (issueFilter === 'all') return ISSUE_DEFS.some((d) => d.test(e));
+		const def = ISSUE_DEFS.find((d) => d.key === issueFilter)!;
+		return def.test(e);
+	}
+
+	// The vehicle/column-filtered set, before the review filter — issue counts
+	// describe what you're looking at, not the whole period.
+	const filteredEntries = $derived.by(() => {
 		let list = vehicleFilter ? entries.filter((e) => e.vehicle_id === vehicleFilter) : entries;
 		for (const col of FILTER_COLS) {
 			const f = colFilters[col];
 			if (f !== null) list = list.filter((e) => f.includes(cellValueFor(col, e)));
 		}
+		return list;
+	});
+
+	const issueCounts = $derived.by(() => {
+		const counts: Record<string, number> = { all: 0 };
+		for (const d of ISSUE_DEFS) counts[d.key] = 0;
+		for (const e of filteredEntries) {
+			let any = false;
+			for (const d of ISSUE_DEFS) {
+				if (d.test(e)) {
+					counts[d.key]++;
+					any = true;
+				}
+			}
+			if (any) counts.all++;
+		}
+		return counts;
+	});
+
+	// ---- Display rows: filters, per-day numbers, day banding ----
+	const displayRows = $derived.by(() => {
+		const list = reviewOn ? filteredEntries.filter(inReview) : filteredEntries;
 
 		// Chronological number within each day (list is date desc, time desc)
 		const numById = new Map<string, number>();
@@ -443,6 +606,7 @@
 			<button class="chip" class:on={period === '30d'} onclick={() => setPeriod('30d')}>Last 30 days</button>
 			<button class="chip" class:on={period === 'month'} onclick={() => setPeriod('month')}>This month</button>
 			<button class="chip" class:on={period === 'lastMonth'} onclick={() => setPeriod('lastMonth')}>Last month</button>
+			<button class="chip" class:on={period === 'fyToDate'} onclick={() => setPeriod('fyToDate')} title="Financial year to date (from 1 March)">Year to date</button>
 			<button class="chip" class:on={period === 'custom'} onclick={() => setPeriod('custom')}>Custom</button>
 		</div>
 		{#if period === 'custom'}
@@ -460,6 +624,24 @@
 					<option value={v.id}>{v.code} — {v.name}</option>
 				{/each}
 			</select>
+			<button
+				class="review-chip"
+				class:on={reviewOn}
+				title="Show only entries with missing or contradictory readings"
+				onclick={() => (reviewOn = !reviewOn)}
+			>
+				⚠ Review <span class="review-count">{issueCounts.all}</span>
+			</button>
+			{#if reviewOn}
+				<select class="issue-filter" bind:value={issueFilter}>
+					<option value="all">All issues ({issueCounts.all})</option>
+					{#each ISSUE_DEFS as d}
+						<option value={d.key} disabled={issueCounts[d.key] === 0}>
+							{d.label} ({issueCounts[d.key]})
+						</option>
+					{/each}
+				</select>
+			{/if}
 			<span class="totals">
 				{displayRows.length} {displayRows.length === 1 ? 'entry' : 'entries'} · {nf.format(Math.round(totalLitres))} L
 			</span>
@@ -480,6 +662,13 @@
 
 	{#if error}
 		<div class="error-banner">{error}</div>
+	{/if}
+
+	{#if truncatedLoad}
+		<div class="warn-banner">
+			Showing the most recent {nf.format(entries.length)} entries — this period has more. Narrow the
+			dates to see the rest.
+		</div>
 	{/if}
 
 	{#if loading && entries.length === 0}
@@ -542,19 +731,24 @@
 						<th class="num">Litres</th>
 						<th class="num">L/100</th>
 						<th class="num">Bowser</th>
+						{#if reviewOn}<th>Issue</th>{/if}
 						<th></th>
 					</tr>
 				</thead>
 				<tbody>
 					{#if displayRows.length === 0}
-						<tr><td colspan="13" class="no-match">No entries match the filters.</td></tr>
+						<tr>
+							<td colspan={reviewOn ? 14 : 13} class="no-match">
+								{reviewOn ? 'Nothing to review — no entries with issues here.' : 'No entries match the filters.'}
+							</td>
+						</tr>
 					{/if}
 					{#each displayRows as { e, num, dayCount, band } (e.id)}
 						<tr class:band class:flash-ok={rowFlash[e.id] === 'ok'} class:flash-err={rowFlash[e.id] === 'err'}>
 							<td class="cell-date" title={e.entry_date}>
 								<!-- Always rendered so single-entry days keep the same indent -->
 								<span class="order-btns">
-									{#if dayCount > 1}
+									{#if dayCount > 1 && !anyRowFilter}
 										<button
 											class="ord"
 											title="Move up (later in the day)"
@@ -709,6 +903,14 @@
 								{fmtNum(e.bowser_reading_start)} → {fmtNum(e.bowser_reading_end)}
 							</td>
 
+							{#if reviewOn}
+								<td class="cell-issues">
+									{#each issuesFor(e) as iss}
+										<span class="issue-tag">{iss.label}</span>
+									{/each}
+								</td>
+							{/if}
+
 							<td class="cell-actions">
 								<button class="row-act" title="Full edit (date, time, bowser…)" onclick={() => openModal(e)}>⋯</button>
 								<button class="row-act del" title="Delete entry" onclick={() => deleteEntry(e)}>✕</button>
@@ -843,6 +1045,70 @@
 		font-size: var(--text-sm);
 		color: var(--gray-500);
 		font-variant-numeric: tabular-nums;
+	}
+
+	/* ---- Review mode ---- */
+	.review-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		white-space: nowrap;
+		font-size: var(--text-sm);
+		font-weight: 500;
+		color: var(--gray-600);
+		background: var(--white);
+		border: 1px solid var(--gray-300);
+		padding: 0.4rem 0.75rem;
+		border-radius: var(--radius-full);
+		cursor: pointer;
+	}
+
+	.review-chip:hover {
+		border-color: var(--warning, #d97706);
+		color: var(--gray-800);
+	}
+
+	.review-chip.on {
+		background: #fffbeb;
+		border-color: #fcd34d;
+		color: #92400e;
+	}
+
+	.review-count {
+		font-size: var(--text-xs);
+		font-variant-numeric: tabular-nums;
+		background: var(--gray-100);
+		border-radius: var(--radius-full);
+		padding: 0.05rem 0.4rem;
+	}
+
+	.review-chip.on .review-count {
+		background: #fde68a;
+		color: #78350f;
+	}
+
+	.issue-filter {
+		padding: 0.4rem 0.6rem;
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+		color: var(--gray-700);
+		background: var(--white);
+	}
+
+	.cell-issues {
+		white-space: nowrap;
+	}
+
+	.issue-tag {
+		display: inline-block;
+		background: #fffbeb;
+		border: 1px solid #fde68a;
+		color: #92400e;
+		border-radius: var(--radius-full);
+		font-size: var(--text-xs);
+		padding: 0.05rem 0.45rem;
+		margin-right: 0.25rem;
 	}
 
 	/* ---- Table ---- */
@@ -1040,8 +1306,13 @@
 	}
 
 	/* ---- Column filters (Excel-style header popovers) ---- */
+	/* Sticky (not relative) — `position: relative` here would out-specify
+	 * `.grid th`'s sticky and let these four headers scroll away while the
+	 * rest stayed pinned. Sticky is positioned, so the popover still anchors. */
 	th.filterable {
-		position: relative;
+		position: sticky;
+		top: 0;
+		z-index: 3; /* above the plain headers, so an open menu isn't clipped by them */
 	}
 
 	.th-wrap {
@@ -1188,6 +1459,15 @@
 		color: var(--gray-400);
 		margin: 0;
 		padding: 1rem 1.125rem;
+	}
+
+	.warn-banner {
+		background: #fffbeb;
+		border: 1px solid #fde68a;
+		color: #92400e;
+		border-radius: var(--radius-md);
+		padding: 0.5rem 0.75rem;
+		font-size: var(--text-sm);
 	}
 
 	.error-banner {
