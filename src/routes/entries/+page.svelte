@@ -526,7 +526,7 @@
 			</th>
 		{/snippet}
 
-		<div class="table-wrap panel">
+		<div class="table-wrap panel" class:menu-open={openFilter !== null}>
 			<table class="grid">
 				<thead>
 					<tr>
@@ -818,13 +818,25 @@
 	}
 
 	.vehicle-filter {
-		padding: 0.45rem 0.6rem;
+		padding: 0.45rem 2rem 0.45rem 0.6rem;
 		border: 1px solid var(--gray-200);
 		border-radius: var(--radius-md);
 		font-size: var(--text-sm);
 		color: var(--gray-700);
-		background: var(--white);
 		max-width: 260px;
+		cursor: pointer;
+		-webkit-appearance: none;
+		-moz-appearance: none;
+		appearance: none;
+		background-color: var(--white);
+		background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%23666' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+		background-repeat: no-repeat;
+		background-position: right 0.6rem center;
+		background-size: 0.6rem;
+	}
+
+	.vehicle-filter:hover {
+		border-color: var(--gray-300);
 	}
 
 	.totals {
@@ -843,6 +855,12 @@
 	.table-wrap {
 		overflow: auto;
 		max-height: calc(100vh - 250px);
+	}
+
+	/* An open header menu is absolutely positioned inside the scroll box, so a
+	 * short (or empty) result set would otherwise clip it away. */
+	.table-wrap.menu-open {
+		min-height: 400px;
 	}
 
 	.grid {
