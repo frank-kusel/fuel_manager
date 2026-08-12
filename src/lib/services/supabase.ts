@@ -300,7 +300,8 @@ class SupabaseService {
 					activities!left (code, name),
 					fields!left (code, name),
 					zones!left (code, name),
-					bowsers!left (name)
+					bowsers!left (name),
+					fuel_entry_fields (field_id)
 				`
 				)
 				.is('deleted_at', null)

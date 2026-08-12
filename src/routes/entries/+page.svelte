@@ -93,37 +93,17 @@
 
 	let lastLoadedAt = 0;
 
-	// A year of entries is thousands of ids; one `.in(...)` would blow past the
-	// URL length limit (the request 414s and every Field cell silently reads
-	// "—"), and one page would stop at PostgREST's 1000-row cap.
-	const ID_CHUNK = 100;
-	const ROW_PAGE = 1000;
-
-	async function loadFieldIds(ids: string[]): Promise<Record<string, string[]>> {
-		const client = supabaseService.getClient();
-		const chunks: string[][] = [];
-		for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK));
-
-		const results = await Promise.all(
-			chunks.map(async (chunk) => {
-				const rows: any[] = [];
-				for (let from = 0; ; from += ROW_PAGE) {
-					const { data, error: jerr } = await client
-						.from('fuel_entry_fields')
-						.select('fuel_entry_id, field_id')
-						.in('fuel_entry_id', chunk)
-						.range(from, from + ROW_PAGE - 1);
-					if (jerr) throw new Error(jerr.message);
-					rows.push(...(data || []));
-					if (!data || data.length < ROW_PAGE) break;
-				}
-				return rows;
-			})
-		);
-
+	// The junction rows ride along on the entries query as a PostgREST embed
+	// (`fuel_entry_fields (field_id)`), so this is a local reshape rather than a
+	// second round trip to Frankfurt. It replaced a chunked `.in(...)` fetch that
+	// had to work around both the URL length limit and the 1000-row page cap.
+	function mapFieldIds(rows: any[]): Record<string, string[]> {
 		const map: Record<string, string[]> = {};
-		for (const r of results.flat()) {
-			(map[r.fuel_entry_id] ??= []).push(r.field_id);
+		for (const e of rows) {
+			const linked = e.fuel_entry_fields;
+			if (Array.isArray(linked) && linked.length > 0) {
+				map[e.id] = linked.map((l: { field_id: string }) => l.field_id);
+			}
 		}
 		return map;
 	}
@@ -141,20 +121,8 @@
 			// if the ceiling is hit, say so rather than quietly showing less.
 			truncatedLoad = res.truncated === true;
 
-			// Multi-field detection via the junction table
-			const ids = entries.map((e) => e.id);
-			if (ids.length > 0) {
-				try {
-					fieldIdsByEntry = await loadFieldIds(ids);
-				} catch (jerr) {
-					// Field names degrade to the legacy join rather than the whole
-					// table failing — but say so instead of showing silent dashes.
-					fieldIdsByEntry = {};
-					showToast('err', jerr instanceof Error ? jerr.message : 'Could not load field details');
-				}
-			} else {
-				fieldIdsByEntry = {};
-			}
+			// Multi-field detection via the junction table, embedded above
+			fieldIdsByEntry = mapFieldIds(entries);
 			pruneColFilters();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load entries';
