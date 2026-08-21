@@ -1110,12 +1110,16 @@ class ExportService {
 			// but a full stop for decimals, which is what the claim reader
 			// expects. A document that formats the same litres two ways reads as
 			// sloppy, so every figure below goes through these.
-			const dec = (formatted: string) => formatted.replace(/,/g, '.');
+			// en-ZA groups thousands with U+00A0, which jsPDF measures about 2pt
+			// wider than it renders: a right-aligned figure carrying a separator
+			// lands short of the column edge while a sub-1000 one sits flush, so
+			// the column looks ragged. A plain space measures as it renders.
+			const dec = (formatted: string) =>
+				formatted.replace(/,/g, '.').replace(/\u00A0/g, ' ');
 			const num = (value: number, opts: Intl.NumberFormatOptions) =>
 				dec(value.toLocaleString('en-ZA', opts));
 			const n2 = (value: number) =>
 				num(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-			const n1max = (value: number) => num(value, { maximumFractionDigits: 1 });
 
 			const marginX = 16;
 			const contentW = pageWidth - marginX * 2;
@@ -1192,7 +1196,7 @@ class ExportService {
 			const usageCell = (vehicle: MonthlySummaryData): UnitValue =>
 				vehicle.distance === '' || vehicle.distance === null
 					? { value: '—', unit: '' }
-					: { value: n1max(Number(vehicle.distance)), unit: vehicle.unit || '' };
+					: { value: n2(Number(vehicle.distance)), unit: vehicle.unit || '' };
 			const efficiencyCell = (vehicle: MonthlySummaryData): UnitValue =>
 				vehicle.consumption === '' || vehicle.consumption === null
 					? { value: '—', unit: '' }
@@ -1463,8 +1467,15 @@ class ExportService {
 			const PANEL_HEAD = 12; // title block above the first row
 			const PANEL_FOOT = 9; // rule + pinned check row at the bottom
 
+			// A breakdown block runs at the tighter SUB_H, but the subtotal closing
+			// it is full-size text and needs the same ROW_H lead-in every other row
+			// gets. Without it the subtotal sits glued to the last delivery line
+			// while the rest of the card breathes, which reads as broken spacing.
+			const subBlockHeight = (row: ReconciliationRow) =>
+				row.sub?.length ? row.sub.length * SUB_H + (ROW_H - SUB_H) : 0;
+
 			const panelContentHeight = (rows: ReconciliationRow[]) =>
-				rows.reduce((total, row) => total + ROW_H + (row.sub?.length || 0) * SUB_H, 0);
+				rows.reduce((total, row) => total + ROW_H + subBlockHeight(row), 0);
 
 			const bowserRows: ReconciliationRow[] = [
 				{
@@ -1590,6 +1601,7 @@ class ExportService {
 						drawLine(sub, lineY, { indent: true });
 						lineY += SUB_H;
 					}
+					if (row.sub?.length) lineY += ROW_H - SUB_H;
 					drawLine(row, lineY, { bold: row.bold });
 					lineY += ROW_H;
 				}
