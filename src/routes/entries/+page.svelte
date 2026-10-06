@@ -954,7 +954,7 @@
 	}
 
 	.page-header h1 {
-		font-size: var(--text-xl);
+		font-size: 2rem;
 		font-weight: var(--font-weight-bold);
 		color: var(--gray-900);
 		margin: 0;

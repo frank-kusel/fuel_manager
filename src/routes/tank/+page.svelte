@@ -724,13 +724,54 @@
 		100% { background-position: -200% 0; }
 	}
 
+	/* Desktop: balance on the left; what to do about it on the right */
+	@media (min-width: 1100px) {
+		.tank-page {
+			max-width: 1180px;
+			display: grid;
+			grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+			grid-template-areas:
+				'head head'
+				'hero actions'
+				'hero trust'
+				'hist hist';
+			grid-template-rows: auto auto 1fr auto;
+			gap: 1rem;
+		}
+
+		.page-header {
+			grid-area: head;
+		}
+
+		.hero {
+			grid-area: hero;
+		}
+
+		.actions {
+			grid-area: actions;
+		}
+
+		.trust {
+			grid-area: trust;
+		}
+
+		.two-col {
+			grid-area: hist;
+			gap: 1rem;
+		}
+
+		.panel {
+			padding: 1.25rem 1.5rem;
+		}
+	}
+
 	@media (max-width: 768px) {
 		.tank-page {
 			padding: 0.5rem;
 		}
 
 		.page-header h1 {
-			font-size: 1.5rem;
+			font-size: 1.75rem;
 		}
 
 		.hero-value {

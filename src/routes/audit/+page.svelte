@@ -448,7 +448,7 @@
 			>
 		</nav>
 
-		<div class="tabpanel" hidden={tab !== 'close'}>
+		<div class="tabpanel close-panel" hidden={tab !== 'close'}>
 			<div id="month-close">
 				<MonthCloseSection
 					month={selected}
@@ -461,7 +461,7 @@
 		</div>
 
 		{#if claimMounted}
-		<div class="tabpanel" hidden={tab !== 'claim'}>
+		<div class="tabpanel claim-panel" hidden={tab !== 'claim'}>
 		<!-- Claim stats -->
 		<h2 class="section-heading">Claim — {selected.label}</h2>
 		<section class="panel claim">
@@ -602,17 +602,21 @@
 			{#if eligibilitySuccess}<p class="elig-message success">{eligibilitySuccess}</p>{/if}
 		</section>
 
-		<ActrosClaimAdjustment year={selected.year} month={selected.month} onsaved={load} />
+		<div class="actros-slot">
+			<ActrosClaimAdjustment year={selected.year} month={selected.month} onsaved={load} />
+		</div>
 
 		<!-- Exports -->
 		<h2 class="section-heading" id="exports">Exports</h2>
-		<DataExport selectedYear={selected.year} selectedMonth={selected.month} hideMonthPicker />
+		<div class="exports-slot">
+			<DataExport selectedYear={selected.year} selectedMonth={selected.month} hideMonthPicker />
+		</div>
 
 		</div>
 		{/if}
 
-		<!-- Manage -->
-		<h2 class="section-heading">Manage</h2>
+		<!-- Manage — the desktop sidebar already carries every one of these -->
+		<h2 class="section-heading manage-heading">Manage</h2>
 		<div class="manage-links">
 			{#each [
 				{ href: '/entries', t: 'All entries', d: 'Spreadsheet view — fix any cell in place' },
@@ -726,6 +730,55 @@
 	   the display: flex above. */
 	.tabpanel[hidden] {
 		display: none !important;
+	}
+
+	/* ---- Desktop: use the width ---- */
+	@media (min-width: 1100px) {
+		.audit-page {
+			max-width: 1180px;
+		}
+
+		/* The close on the left, the leak trend it feeds on the right */
+		.close-panel {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+			gap: 1rem;
+			align-items: start;
+		}
+
+		.claim-panel {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+			/* heading, claim, setup (takes the slack beside the tall Actros
+			   form), exports heading, exports */
+			grid-template-rows: auto auto 1fr auto auto;
+			gap: 1rem;
+			align-items: start;
+		}
+
+		.claim-panel > .section-heading,
+		.claim-panel > .exports-slot {
+			grid-column: 1 / -1;
+		}
+
+		/* Figures and setup on the left; the Actros adjustment (a long form)
+		   fills the right column beside them */
+		.claim-panel > .claim,
+		.claim-panel > #claim-setup {
+			grid-column: 1;
+		}
+
+		.claim-panel > .actros-slot {
+			grid-column: 2;
+			grid-row: 2 / span 2;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.manage-heading,
+		.manage-links {
+			display: none;
+		}
 	}
 
 	/* ---- Claim setup ---- */
@@ -888,9 +941,10 @@
 		background: none;
 		border: none;
 		padding: 0;
-		font-size: var(--text-sm);
+		text-align: left;
+		font-size: 1rem;
 		font-weight: var(--font-weight-semibold);
-		color: var(--gray-700);
+		color: var(--gray-900);
 		cursor: pointer;
 	}
 
@@ -1159,7 +1213,7 @@
 		}
 
 		.page-header h1 {
-			font-size: 1.5rem;
+			font-size: 1.75rem;
 		}
 
 		.claim-main {

@@ -11,6 +11,7 @@
 	<div class="dashboard-header">
 		<div class="header-content">
 			<h1>Dashboard</h1>
+			<p>Where this month's diesel went, and what needs a look</p>
 		</div>
 	</div>
 
@@ -36,10 +37,16 @@
 	}
 
 	.header-content h1 {
-		font-size: 2.25rem;
+		font-size: 2rem;
 		font-weight: 700;
 		color: var(--color-text-primary);
 		line-height: 1.2;
+	}
+
+	.header-content p {
+		margin: 0.25rem 0 0;
+		color: var(--gray-500);
+		font-size: var(--text-base);
 	}
 
 	/* Mobile Responsiveness */

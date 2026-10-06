@@ -41,7 +41,8 @@
 				? `anchored to the ${t.anchor.date} close`
 				: `anchored to the dip on ${t.anchor.date}`
 			: null;
-		return { name: t.name, litres: Math.round(t.derivedLevel), runway: t.runwayDays, anchor };
+		const pct = t.capacity ? Math.max(0, Math.min(100, (t.derivedLevel / t.capacity) * 100)) : null;
+		return { name: t.name, litres: Math.round(t.derivedLevel), runway: t.runwayDays, anchor, pct };
 	});
 
 	// Action menu state
@@ -145,7 +146,6 @@
 		</div>
 
 		<div class="sb-group">
-			<div class="sb-group-label"><span class="sb-label">Navigate</span></div>
 			<a href="/entries" class="sb-item" title="Log" class:active={pathname === '/summary' || pathname === '/' || pathname.startsWith('/entries')}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
 				<span class="sb-label">Log</span>
@@ -158,7 +158,7 @@
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M5 13h14"/><path d="M9 7h6"/></svg>
 				<span class="sb-label">Tank</span>
 			</a>
-			<a href="/audit" class="sb-item" title="Audit" class:active={pathname.startsWith('/audit') || pathname.startsWith('/menu') || pathname.startsWith('/reports')}>
+			<a href="/audit" class="sb-item" title="Audit"class:active={pathname.startsWith('/audit') || pathname.startsWith('/reports')}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><path d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z"/></svg>
 				<span class="sb-label">Audit</span>
 			</a>
@@ -170,15 +170,25 @@
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
 				<span class="sb-label">Database</span>
 			</a>
+			<a href="/menu" class="sb-item" title="Menu" class:active={pathname.startsWith('/menu')}>
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+				<span class="sb-label">Menu</span>
+			</a>
 		</div>
 
 		<div class="sb-spacer"></div>
 
 		{#if tankStrip}
-			<a class="sb-tank" href="/tank" title="{tankStrip.name}: {nfSidebar.format(tankStrip.litres)} L{tankStrip.runway !== null ? ` · ~${tankStrip.runway} days` : ''}{tankStrip.anchor ? ` · ${tankStrip.anchor}` : ''}">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5C12 2.5 5.5 9.8 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 9.8 12 2.5 12 2.5Z"/></svg>
-				<span class="sb-label">
-					{nfSidebar.format(tankStrip.litres)} L{tankStrip.runway !== null ? ` · ~${tankStrip.runway}d` : ''}
+			<a class="sb-tank" href="/tank" title="{tankStrip.name}: {nfSidebar.format(tankStrip.litres)} L{tankStrip.runway !== null ? `, about ${tankStrip.runway} days` : ''}{tankStrip.anchor ? `, ${tankStrip.anchor}` : ''}">
+				<svg class="sb-tank-ic" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5C12 2.5 5.5 9.8 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 9.8 12 2.5 12 2.5Z"/></svg>
+				<span class="sb-label sb-tank-body">
+					<span class="sb-tank-row">
+						<span class="sb-tank-l">{nfSidebar.format(tankStrip.litres)}<small>L</small></span>
+						{#if tankStrip.runway !== null}<span class="sb-tank-d">{tankStrip.runway} days</span>{/if}
+					</span>
+					{#if tankStrip.pct !== null}
+						<span class="sb-tank-stick"><span style="width: {tankStrip.pct}%"></span></span>
+					{/if}
 				</span>
 			</a>
 		{/if}
@@ -486,17 +496,7 @@
 		font-weight: 600;
 	}
 
-	.mobile-nav-btn.active::before {
-		content: '';
-		position: absolute;
-		top: -0.5rem;
-		left: 50%;
-		transform: translateX(-50%);
-		width: 24px;
-		height: 3px;
-		background: var(--brand);
-		border-radius: 0 0 6px 6px;
-	}
+
 
 	.nav-icon {
 		width: 24px;
@@ -761,9 +761,11 @@
 			left: 0;
 			bottom: 0;
 			width: var(--sidebar-w);
-			background: var(--white);
-			border-right: 1px solid var(--gray-200);
-			padding: 0.875rem 0.5rem;
+			/* Same plane as the page: the sidebar is part of the canvas, not a
+			   second panel — only the white content sheets and the current
+			   page's key are raised. */
+			background: var(--gray-100);
+			padding: 1rem 0.625rem;
 			z-index: 100;
 			overflow: hidden;
 			transition: width 0.15s ease;
@@ -771,7 +773,7 @@
 
 		.main {
 			margin-left: var(--sidebar-w);
-			padding: 1rem 1.5rem;
+			padding: 1.75rem 2.25rem 2.5rem 1.5rem;
 			transition: margin-left 0.15s ease;
 		}
 	}
@@ -795,7 +797,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		padding-bottom: 0.625rem;
+		padding-bottom: 1.25rem;
 	}
 
 	.sb-group-label {
@@ -837,14 +839,22 @@
 	}
 
 	.sb-item:hover {
-		background: var(--gray-50);
-		color: var(--gray-800);
+		background: rgba(28, 25, 23, 0.05);
+		color: var(--gray-900);
 	}
 
+	/* Current page: a raised white key on the stone canvas */
 	.sb-item.active {
-		background: var(--brand-tint-weak);
+		background: var(--white);
+		color: var(--gray-900);
+		font-weight: var(--font-weight-semibold);
+		box-shadow:
+			0 0 0 1px rgba(28, 25, 23, 0.07),
+			0 1px 2px rgba(28, 25, 23, 0.08);
+	}
+
+	.sb-item.active svg {
 		color: var(--brand);
-		box-shadow: inset 2px 0 0 var(--brand);
 	}
 
 	.sb-primary {
@@ -872,24 +882,81 @@
 	}
 
 	.sb-tank {
-		background: var(--gray-50);
-		font-size: var(--text-xs);
+		align-items: flex-start;
+		background: var(--white);
+		box-shadow: 0 0 0 1px rgba(28, 25, 23, 0.07);
+		padding: 0.625rem 0.75rem;
+		margin-bottom: 0.25rem;
 		color: var(--gray-600);
 		font-variant-numeric: tabular-nums;
 	}
 
 	.sb-tank:hover {
+		box-shadow: 0 0 0 1px rgba(28, 25, 23, 0.14);
+	}
+
+	.sb-tank-ic {
+		color: var(--brand);
+		margin-top: 0.2rem;
+	}
+
+	.sb-tank-body {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+	}
+
+	.sb-tank-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.sb-tank-l {
+		font-size: 1.125rem;
+		font-weight: 750;
+		font-stretch: var(--figure-stretch);
+		color: var(--gray-900);
+		line-height: 1;
+	}
+
+	.sb-tank-l small {
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--gray-500);
+		margin-left: 0.1rem;
+	}
+
+	.sb-tank-d {
+		font-size: var(--text-xs);
+		color: var(--gray-500);
+	}
+
+	.sb-tank-stick {
+		display: block;
+		height: 5px;
 		background: var(--gray-100);
+		border-radius: 2px;
+		overflow: hidden;
+	}
+
+	.sb-tank-stick span {
+		display: block;
+		height: 100%;
+		background: var(--brand);
 	}
 
 	.sb-collapse {
-		color: var(--gray-400);
+		color: var(--gray-500);
 		font-size: var(--text-xs);
 	}
 
 	.sb-collapse:hover {
-		color: var(--gray-600);
-		background: var(--gray-50);
+		color: var(--gray-800);
+		background: rgba(28, 25, 23, 0.05);
 	}
 
 	.sb-chevron {

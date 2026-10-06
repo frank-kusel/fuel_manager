@@ -9,7 +9,6 @@
 	import { onVisible } from '$lib/stores/freshness';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { fmtDayMonth } from '$lib/utils/dates';
 
 	onMount(() => {
 		dashboardInsightsStore.load();
@@ -29,11 +28,12 @@
 	const nf = new Intl.NumberFormat('en-ZA');
 	const nf1 = new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 1 });
 
-	// Stacked-bar shades, darkest = biggest slice
-	const SLICE_COLORS = ['#75232b', '#8e2b34', '#b06570', '#cf96a0', '#f3dee1'];
-
 	let maxDaily = $derived(
 		$insightsData ? Math.max(1, ...$insightsData.daily.map((d) => d.litres)) : 1
+	);
+
+	let maxActivityPct = $derived(
+		$insightsData ? Math.max(1, ...$insightsData.byActivity.map((x) => x.pct)) : 1
 	);
 
 	let tankPct = $derived.by(() => {
@@ -109,80 +109,125 @@
 	{:else if $insightsData}
 		{@const d = $insightsData}
 
-		<!-- Month overview -->
-		<section class="month-head">
-			<div class="month-total">
-				<div class="month-label">Used in {d.monthLabel}, {d.entryCount} entries</div>
-				<div class="total-row">
-					<span class="total-value">{nf.format(Math.round(d.totalLitres))}<span class="total-unit">L</span></span>
-					{#if d.momPct !== null}
-						<span class="mom" class:up={d.momPct > 0} class:down={d.momPct <= 0}>
-							{d.momPct > 0 ? '▲' : '▼'} {Math.abs(d.momPct)}% on the same days last month
-						</span>
-					{/if}
-				</div>
+		<!-- Month overview: the three numbers you open the page for -->
+		<section class="overview">
+			<div class="ov-cell ov-main">
+				<div class="ov-k">Used in {d.monthLabel}</div>
+				<div class="ov-v">{nf.format(Math.round(d.totalLitres))}<span class="ov-unit">L</span></div>
+				{#if d.momPct !== null}
+					<div class="mom" class:up={d.momPct > 0} class:down={d.momPct <= 0}>
+						{d.momPct > 0 ? '▲' : '▼'} {Math.abs(d.momPct)}% on the same days last month
+					</div>
+				{/if}
 			</div>
-
+			<div class="ov-cell">
+				<div class="ov-k">Entries</div>
+				<div class="ov-v ov-v-sm">{nf.format(d.entryCount)}</div>
+				<div class="ov-sub">{d.fleet.length} {d.fleet.length === 1 ? 'vehicle' : 'vehicles'} fuelled</div>
+			</div>
 			{#if d.tank}
-				<div class="tank-box">
-					<div class="tank-title">{d.tank.name} book balance</div>
+				<a class="ov-cell ov-tank" href="/tank">
+					<div class="ov-k">{d.tank.name} book balance</div>
 					{#if d.tank.derivedLevel !== null}
-						<div class="tank-level" class:tank-negative={d.tank.derivedLevel <= 0}>
-							{nf.format(Math.round(d.tank.derivedLevel))}<span class="tank-unit">L</span>
-							{#if d.tank.runwayDays !== null}
-								<span class="tank-runway">about {d.tank.runwayDays} days left</span>
-							{/if}
+						<div class="ov-v ov-v-sm" class:tank-negative={d.tank.derivedLevel <= 0}>
+							{nf.format(Math.round(d.tank.derivedLevel))}<span class="ov-unit">L</span>
 						</div>
 						{#if tankPct !== null}
-							<div class="tank-track">
-								<div
-									class="tank-fill"
-									class:low={tankPct < 15}
-									style="width: {tankPct}%"
-								></div>
+							<div class="tank-track" title="{Math.round(tankPct)}% full">
+								<div class="tank-fill" class:low={tankPct < 15} style="width: {tankPct}%"></div>
 							</div>
 						{/if}
-						<div class="tank-meta">
-							{d.tank.anchor?.kind === 'close'
-								? `From the ${fmtDayMonth(d.tank.anchor.date)} close + deliveries − dispensed`
-								: d.tank.anchor
-									? `From the dip on ${fmtDayMonth(d.tank.anchor.date)} + deliveries − dispensed`
-									: 'Derived from deliveries − dispensed'}
+						<div class="ov-sub">
+							{d.tank.runwayDays !== null ? `About ${d.tank.runwayDays} days left` : `${Math.round(tankPct ?? 0)}% full`}
 						</div>
 					{:else}
-						<div class="tank-meta">Nothing to anchor the book to yet</div>
+						<div class="ov-sub">Nothing to anchor the book to yet</div>
 					{/if}
-				</div>
+				</a>
 			{/if}
 		</section>
 
-		<!-- Where fuel went -->
-		{#if d.byActivity.length > 0}
-			<section class="panel">
-				<h2 class="panel-title">Where fuel went</h2>
-				<div class="stack-bar">
-					{#each d.byActivity as slice, i}
-						<div
-							class="stack-seg"
-							style="width: {Math.max(slice.pct, 2)}%; background: {SLICE_COLORS[i % SLICE_COLORS.length]}"
-							title="{slice.name}: {nf.format(Math.round(slice.litres))} L ({slice.pct}%)"
-						></div>
+		<!--
+			DOM order is the phone reading order (what needs doing, then the
+			month's shape). On wide screens the grid areas rearrange it.
+		-->
+		<div class="board">
+			<section class="panel p-attention">
+				<h2 class="panel-title">Needs attention</h2>
+				<ul class="attention-list">
+					{#each d.attention as item}
+						<li class="attention-item {item.severity}">
+							<span class="attention-dot"></span>
+							{#if item.href}
+								<a class="attention-link" href={item.href}>
+									<span>{item.text}</span>
+									<svg class="attention-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+								</a>
+							{:else}
+								<span>{item.text}</span>
+							{/if}
+						</li>
 					{/each}
-				</div>
-				<div class="stack-legend">
-					{#each d.byActivity as slice, i}
-						<span class="legend-item">
-							<span class="legend-dot" style="background: {SLICE_COLORS[i % SLICE_COLORS.length]}"></span>
-							{slice.name} {slice.pct}%
-						</span>
-					{/each}
-				</div>
+				</ul>
 			</section>
-		{/if}
 
-		<div class="two-col">
-			<!-- Fleet -->
-			<section class="panel">
+			<section class="panel p-daily">
+			<div class="daily-head">
+				<h2 class="panel-title daily-title">Daily usage <span class="title-note">{d.monthLabel}</span></h2>
+				{#if selectedDayInfo}
+					<span class="daily-selected">{selectedDayInfo.label} — {nf1.format(selectedDayInfo.litres)} L</span>
+				{/if}
+			</div>
+			<div class="daily-bars">
+				{#each dailySlots as day}
+					{#if day.future}
+						<span class="daily-cell future" aria-hidden="true"><span class="daily-bar"></span></span>
+					{:else}
+					<button
+						class="daily-cell"
+						class:selected={selectedDay === day.date}
+						onclick={() => toggleDay(day.date)}
+						title="{day.date}: {nf1.format(day.litres)} L"
+					>
+						{#if day.litres > 0}
+							<span class="daily-value" class:peak-value={day.litres === maxDaily}>
+								{nf.format(Math.round(day.litres))}
+							</span>
+						{/if}
+						<span
+							class="daily-bar"
+							class:weekend={isWeekend(day.date)}
+							class:peak={day.litres === maxDaily && day.litres > 0}
+							style="height: {Math.max((day.litres / maxDaily) * 75, day.litres > 0 ? 3 : 1.5)}%"
+						></span>
+					</button>
+					{/if}
+				{/each}
+			</div>
+			<div class="daily-axis">
+				{#each dailySlots as day}
+					<span class="axis-cell" class:future={day.future}>{isAxisTick(day.date) ? dayLabel(day.date) : ''}</span>
+				{/each}
+			</div>
+			</section>
+
+			{#if d.byActivity.length > 0}
+				<section class="panel p-activity">
+					<h2 class="panel-title">Where fuel went</h2>
+					<ul class="act-list">
+						{#each d.byActivity as slice}
+							<li class="act-row" class:other={slice.name === 'Other'}>
+								<span class="act-name">{slice.name}</span>
+								<span class="act-l">{nf.format(Math.round(slice.litres))} L</span>
+								<span class="act-pct">{slice.pct}%</span>
+								<span class="act-bar"><span style="width: {(slice.pct / maxActivityPct) * 100}%"></span></span>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
+
+			<section class="panel p-fleet">
 				<h2 class="panel-title">Top consumers <span class="title-note">against their own average</span></h2>
 				<table class="fleet-table">
 					<tbody>
@@ -248,68 +293,7 @@
 					{/if}
 				</div>
 			</section>
-
-			<!-- Needs attention -->
-			<section class="panel">
-				<h2 class="panel-title">Needs attention</h2>
-				<ul class="attention-list">
-					{#each d.attention as item}
-						<li class="attention-item {item.severity}">
-							<span class="attention-dot"></span>
-							{#if item.href}
-								<a class="attention-link" href={item.href}>
-									<span>{item.text}</span>
-									<svg class="attention-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
-								</a>
-							{:else}
-								<span>{item.text}</span>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-			</section>
 		</div>
-
-		<!-- Daily usage -->
-		<section class="panel">
-			<div class="daily-head">
-				<h2 class="panel-title daily-title">Daily usage <span class="title-note">{d.monthLabel}</span></h2>
-				{#if selectedDayInfo}
-					<span class="daily-selected">{selectedDayInfo.label} — {nf1.format(selectedDayInfo.litres)} L</span>
-				{/if}
-			</div>
-			<div class="daily-bars">
-				{#each dailySlots as day}
-					{#if day.future}
-						<span class="daily-cell future" aria-hidden="true"><span class="daily-bar"></span></span>
-					{:else}
-					<button
-						class="daily-cell"
-						class:selected={selectedDay === day.date}
-						onclick={() => toggleDay(day.date)}
-						title="{day.date}: {nf1.format(day.litres)} L"
-					>
-						{#if day.litres > 0}
-							<span class="daily-value" class:peak-value={day.litres === maxDaily}>
-								{nf.format(Math.round(day.litres))}
-							</span>
-						{/if}
-						<span
-							class="daily-bar"
-							class:weekend={isWeekend(day.date)}
-							class:peak={day.litres === maxDaily && day.litres > 0}
-							style="height: {Math.max((day.litres / maxDaily) * 75, day.litres > 0 ? 3 : 1.5)}%"
-						></span>
-					</button>
-					{/if}
-				{/each}
-			</div>
-			<div class="daily-axis">
-				{#each dailySlots as day}
-					<span class="axis-cell" class:future={day.future}>{isAxisTick(day.date) ? dayLabel(day.date) : ''}</span>
-				{/each}
-			</div>
-		</section>
 	{/if}
 </div>
 
@@ -320,30 +304,43 @@
 		gap: 0.875rem;
 	}
 
-	/* ---- Month overview ---- */
-	.month-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		gap: 1rem;
-		flex-wrap: wrap;
-		padding: 0.25rem 0.25rem 0;
+	/* ---- Month overview band ---- */
+	.overview {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		background: var(--white);
+		border: 1px solid var(--gray-200);
+		border-radius: var(--radius-lg);
 	}
 
-	.month-label {
+	.ov-cell {
+		padding: 1rem 1.125rem;
+		min-width: 0;
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.ov-main {
+		grid-column: 1 / -1;
+		border-bottom: 1px solid var(--gray-100);
+	}
+
+	.ov-cell + .ov-cell:not(.ov-main) {
+		border-left: 1px solid var(--gray-100);
+	}
+
+	.ov-main + .ov-cell {
+		border-left: none;
+	}
+
+	.ov-k {
 		font-size: var(--text-sm);
-		color: var(--gray-500);
-		margin-bottom: 0.25rem;
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-600);
+		margin-bottom: 0.375rem;
 	}
 
-	.total-row {
-		display: flex;
-		align-items: baseline;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-	}
-
-	.total-value {
+	.ov-v {
 		font-size: 3rem;
 		font-weight: 750;
 		font-stretch: var(--figure-stretch);
@@ -353,85 +350,117 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	.total-unit {
-		font-size: 1.1rem;
+	.ov-v-sm {
+		font-size: 2rem;
+	}
+
+	.ov-v.tank-negative {
+		color: var(--error);
+	}
+
+	.ov-unit {
+		font-size: 0.45em;
 		font-weight: var(--font-weight-semibold);
 		color: var(--gray-400);
-		margin-left: 0.25rem;
+		margin-left: 0.2rem;
+	}
+
+	.ov-sub {
+		font-size: var(--text-sm);
+		color: var(--gray-500);
+		margin-top: 0.375rem;
+	}
+
+	.ov-tank:hover .ov-k {
+		color: var(--brand);
 	}
 
 	.mom {
 		font-size: var(--text-sm);
 		font-weight: 500;
+		margin-top: 0.5rem;
 	}
 
 	.mom.down {
-		color: var(--success);
+		color: var(--success-dark);
 	}
 
 	.mom.up {
 		color: var(--warning-dark);
 	}
 
-	.tank-box {
-		min-width: 200px;
-	}
-
-	.tank-title {
-		font-size: var(--text-sm);
-		color: var(--gray-500);
-		margin-bottom: 0.25rem;
-	}
-
-	.tank-level {
-		font-size: 1.75rem;
-		line-height: 1.1;
-		font-weight: 750;
-		font-stretch: var(--figure-stretch);
-		color: var(--gray-900);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.tank-level.tank-negative {
-		color: var(--error);
-	}
-
-	.tank-unit {
-		font-size: 1rem;
-		color: var(--gray-400);
-		margin-left: 0.15rem;
-	}
-
-	.tank-runway {
-		display: block;
-		font-size: var(--text-sm);
-		font-weight: 400;
-		font-stretch: 100%;
-		color: var(--gray-500);
-	}
-
 	.tank-track {
 		height: 6px;
 		background: var(--gray-100);
 		border-radius: 3px;
-		margin-top: 0.375rem;
+		margin-top: 0.625rem;
 		overflow: hidden;
 	}
 
 	.tank-fill {
 		height: 100%;
 		background: var(--brand);
-		border-radius: 3px;
 	}
 
 	.tank-fill.low {
 		background: var(--error);
 	}
 
-	.tank-meta {
-		font-size: var(--text-xs);
-		color: var(--gray-500);
-		margin-top: 0.375rem;
+	/* Wide: one row of three, the month total leading */
+	@media (min-width: 900px) {
+		.overview {
+			grid-template-columns: 1.6fr 1fr 1.2fr;
+		}
+
+		.ov-main {
+			grid-column: auto;
+			border-bottom: none;
+		}
+
+		.ov-main + .ov-cell {
+			border-left: 1px solid var(--gray-100);
+		}
+
+		.ov-cell {
+			padding: 1.25rem 1.5rem;
+		}
+	}
+
+	/* ---- Board ---- */
+	.board {
+		display: flex;
+		flex-direction: column;
+		gap: 0.875rem;
+	}
+
+	@media (min-width: 1100px) {
+		.board {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			grid-template-areas:
+				'daily daily attention'
+				'fleet fleet activity';
+			gap: 1rem;
+			align-items: start;
+		}
+
+		.p-daily {
+			grid-area: daily;
+		}
+
+		.p-attention {
+			grid-area: attention;
+			align-self: stretch;
+		}
+
+		.p-fleet {
+			grid-area: fleet;
+		}
+
+		.p-activity {
+			grid-area: activity;
+			align-self: stretch;
+		}
 	}
 
 	/* ---- Panels ---- */
@@ -442,6 +471,12 @@
 		padding: 1rem 1.125rem;
 	}
 
+	@media (min-width: 1100px) {
+		.panel {
+			padding: 1.25rem 1.5rem;
+		}
+	}
+
 	.panel-title {
 		font-size: 1rem;
 		font-weight: var(--font-weight-semibold);
@@ -450,44 +485,61 @@
 		letter-spacing: 0;
 	}
 
-	.two-col {
+	/* ---- Where fuel went: ranked bars ---- */
+	.act-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.act-row {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-		gap: 0.875rem;
+		grid-template-columns: 1fr auto 2.75rem;
+		align-items: baseline;
+		column-gap: 0.75rem;
+		row-gap: 0.3rem;
+		font-size: var(--text-sm);
+		font-variant-numeric: tabular-nums;
 	}
 
-	/* ---- Stacked activity bar ---- */
-	.stack-bar {
-		display: flex;
-		height: 22px;
-		border-radius: var(--radius-md);
+	.act-name {
+		color: var(--gray-800);
+		min-width: 0;
 		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
-	.stack-seg {
-		min-width: 4px;
-	}
-
-	.stack-legend {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.375rem 1rem;
-		margin-top: 0.625rem;
-		font-size: var(--text-xs);
+	.act-l {
 		color: var(--gray-600);
 	}
 
-	.legend-item {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.375rem;
+	.act-pct {
+		text-align: right;
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-900);
 	}
 
-	.legend-dot {
-		width: 10px;
-		height: 10px;
+	.act-bar {
+		grid-column: 1 / -1;
+		height: 6px;
+		background: var(--gray-100);
 		border-radius: 3px;
-		flex-shrink: 0;
+		overflow: hidden;
+	}
+
+	.act-bar span {
+		display: block;
+		height: 100%;
+		background: var(--brand);
+		border-radius: 3px;
+	}
+
+	.act-row.other .act-bar span {
+		background: var(--gray-400);
 	}
 
 	/* ---- Fleet table ---- */
@@ -696,6 +748,12 @@
 		height: 160px;
 	}
 
+	@media (min-width: 1100px) {
+		.daily-bars {
+			height: 210px;
+		}
+	}
+
 	/* Whole-column tap target: value label rides the bar top */
 	.daily-cell {
 		flex: 1;
@@ -832,17 +890,12 @@
 	}
 
 	@media (max-width: 768px) {
-		.month-head {
-			flex-direction: column;
-			gap: 0.875rem;
-		}
-
-		.tank-box {
-			width: 100%;
-		}
-
-		.total-value {
+		.ov-v {
 			font-size: 2.6rem;
+		}
+
+		.ov-v-sm {
+			font-size: 1.75rem;
 		}
 
 		.daily-bars {
