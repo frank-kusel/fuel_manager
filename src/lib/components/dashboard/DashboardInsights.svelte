@@ -56,6 +56,25 @@
 		return day === 1 || day % 5 === 0;
 	}
 
+	/**
+	 * The month's days so far, padded out to the full month. Without the padding
+	 * six days into October draws six fat bars across the whole panel; with it
+	 * the bars keep one width all month and the empty tail shows how far in we are.
+	 */
+	let dailySlots = $derived.by(() => {
+		const days = $insightsData?.daily ?? [];
+		if (days.length === 0) return [];
+		const last = days[days.length - 1].date;
+		const [y, m, dd] = last.split('-').map(Number);
+		const monthLen = new Date(y, m, 0).getDate();
+		const slots = days.map((x) => ({ ...x, future: false }));
+		for (let day = dd + 1; day <= monthLen; day++) {
+			const date = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+			slots.push({ date, litres: 0, future: true });
+		}
+		return slots;
+	});
+
 	let selectedDay = $state<string | null>(null);
 
 	function toggleDay(date: string) {
@@ -93,12 +112,12 @@
 		<!-- Month overview -->
 		<section class="month-head">
 			<div class="month-total">
-				<div class="month-label">{d.monthLabel} · {d.entryCount} entries</div>
+				<div class="month-label">Used in {d.monthLabel}, {d.entryCount} entries</div>
 				<div class="total-row">
 					<span class="total-value">{nf.format(Math.round(d.totalLitres))}<span class="total-unit">L</span></span>
 					{#if d.momPct !== null}
 						<span class="mom" class:up={d.momPct > 0} class:down={d.momPct <= 0}>
-							{d.momPct > 0 ? '▲' : '▼'} {Math.abs(d.momPct)}% vs same time last month
+							{d.momPct > 0 ? '▲' : '▼'} {Math.abs(d.momPct)}% on the same days last month
 						</span>
 					{/if}
 				</div>
@@ -106,12 +125,12 @@
 
 			{#if d.tank}
 				<div class="tank-box">
-					<div class="tank-title">{d.tank.name}</div>
+					<div class="tank-title">{d.tank.name} book balance</div>
 					{#if d.tank.derivedLevel !== null}
 						<div class="tank-level" class:tank-negative={d.tank.derivedLevel <= 0}>
-							{nf.format(Math.round(d.tank.derivedLevel))} L
+							{nf.format(Math.round(d.tank.derivedLevel))}<span class="tank-unit">L</span>
 							{#if d.tank.runwayDays !== null}
-								<span class="tank-runway">· ~{d.tank.runwayDays} days left</span>
+								<span class="tank-runway">about {d.tank.runwayDays} days left</span>
 							{/if}
 						</div>
 						{#if tankPct !== null}
@@ -164,7 +183,7 @@
 		<div class="two-col">
 			<!-- Fleet -->
 			<section class="panel">
-				<h2 class="panel-title">Top consumers · vs own average</h2>
+				<h2 class="panel-title">Top consumers <span class="title-note">against their own average</span></h2>
 				<table class="fleet-table">
 					<tbody>
 						{#each d.fleet.slice(0, 6) as row}
@@ -237,7 +256,14 @@
 					{#each d.attention as item}
 						<li class="attention-item {item.severity}">
 							<span class="attention-dot"></span>
-							<span>{item.text}</span>
+							{#if item.href}
+								<a class="attention-link" href={item.href}>
+									<span>{item.text}</span>
+									<svg class="attention-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+								</a>
+							{:else}
+								<span>{item.text}</span>
+							{/if}
 						</li>
 					{/each}
 				</ul>
@@ -247,13 +273,16 @@
 		<!-- Daily usage -->
 		<section class="panel">
 			<div class="daily-head">
-				<h2 class="panel-title daily-title">Daily usage · {d.monthLabel}</h2>
+				<h2 class="panel-title daily-title">Daily usage <span class="title-note">{d.monthLabel}</span></h2>
 				{#if selectedDayInfo}
 					<span class="daily-selected">{selectedDayInfo.label} — {nf1.format(selectedDayInfo.litres)} L</span>
 				{/if}
 			</div>
 			<div class="daily-bars">
-				{#each d.daily as day}
+				{#each dailySlots as day}
+					{#if day.future}
+						<span class="daily-cell future" aria-hidden="true"><span class="daily-bar"></span></span>
+					{:else}
 					<button
 						class="daily-cell"
 						class:selected={selectedDay === day.date}
@@ -272,11 +301,12 @@
 							style="height: {Math.max((day.litres / maxDaily) * 75, day.litres > 0 ? 3 : 1.5)}%"
 						></span>
 					</button>
+					{/if}
 				{/each}
 			</div>
 			<div class="daily-axis">
-				{#each d.daily as day}
-					<span class="axis-cell">{isAxisTick(day.date) ? dayLabel(day.date) : ''}</span>
+				{#each dailySlots as day}
+					<span class="axis-cell" class:future={day.future}>{isAxisTick(day.date) ? dayLabel(day.date) : ''}</span>
 				{/each}
 			</div>
 		</section>
@@ -314,8 +344,9 @@
 	}
 
 	.total-value {
-		font-size: 2.25rem;
-		font-weight: var(--font-weight-bold);
+		font-size: 3rem;
+		font-weight: 750;
+		font-stretch: var(--figure-stretch);
 		color: var(--gray-900);
 		letter-spacing: -0.02em;
 		line-height: 1;
@@ -353,8 +384,10 @@
 	}
 
 	.tank-level {
-		font-size: var(--text-lg);
-		font-weight: var(--font-weight-semibold);
+		font-size: 1.75rem;
+		line-height: 1.1;
+		font-weight: 750;
+		font-stretch: var(--figure-stretch);
 		color: var(--gray-900);
 		font-variant-numeric: tabular-nums;
 	}
@@ -363,9 +396,17 @@
 		color: var(--error);
 	}
 
+	.tank-unit {
+		font-size: 1rem;
+		color: var(--gray-400);
+		margin-left: 0.15rem;
+	}
+
 	.tank-runway {
+		display: block;
 		font-size: var(--text-sm);
 		font-weight: 400;
+		font-stretch: 100%;
 		color: var(--gray-500);
 	}
 
@@ -389,7 +430,7 @@
 
 	.tank-meta {
 		font-size: var(--text-xs);
-		color: var(--gray-400);
+		color: var(--gray-500);
 		margin-top: 0.375rem;
 	}
 
@@ -402,9 +443,9 @@
 	}
 
 	.panel-title {
-		font-size: var(--text-sm);
+		font-size: 1rem;
 		font-weight: var(--font-weight-semibold);
-		color: var(--gray-600);
+		color: var(--gray-900);
 		margin: 0 0 0.75rem;
 		letter-spacing: 0;
 	}
@@ -522,7 +563,7 @@
 
 	.empty-note {
 		font-size: var(--text-sm);
-		color: var(--gray-400);
+		color: var(--gray-500);
 		margin: 0;
 	}
 
@@ -574,6 +615,38 @@
 		font-size: var(--text-sm);
 		color: var(--gray-700);
 		line-height: 1.45;
+	}
+
+	.attention-link {
+		flex: 1;
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.75rem;
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.attention-link:hover {
+		color: var(--brand);
+	}
+
+	.attention-chev {
+		flex-shrink: 0;
+		width: 1rem;
+		height: 1rem;
+		margin-top: 0.15rem;
+		color: var(--gray-400);
+	}
+
+	.attention-link:hover .attention-chev {
+		color: var(--brand);
+	}
+
+	.title-note {
+		font-weight: 400;
+		color: var(--gray-500);
+		margin-left: 0.25rem;
 	}
 
 	.attention-dot {
@@ -671,6 +744,19 @@
 		background: var(--brand-hover);
 	}
 
+	.daily-cell.future {
+		cursor: default;
+	}
+
+	.daily-cell.future .daily-bar {
+		height: 1.5%;
+		background: var(--gray-100);
+	}
+
+	.axis-cell.future {
+		color: var(--gray-300);
+	}
+
 	.daily-cell.selected .daily-bar {
 		background: var(--brand);
 	}
@@ -756,7 +842,7 @@
 		}
 
 		.total-value {
-			font-size: 1.9rem;
+			font-size: 2.6rem;
 		}
 
 		.daily-bars {

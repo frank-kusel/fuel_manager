@@ -406,7 +406,7 @@
 				</button>
 			</div>
 			{#if gaugeWorking}
-				<div class="grid-2">
+				<div class="grid-2 pair">
 					<div class="form-group">
 						<label class="form-label" for="qe-odo-start">Start reading (km)</label>
 						<input
@@ -464,7 +464,7 @@
 					{/each}
 				</select>
 			</div>
-			<div class="grid-2">
+			<div class="grid-2 pair">
 				<div class="form-group">
 					<label class="form-label" for="qe-bowser-start">Bowser start (L)</label>
 					<input
@@ -520,7 +520,7 @@
 		<!-- 6. Date & time + submit -->
 		<section class="panel">
 			<h2 class="panel-title">Date &amp; time</h2>
-			<div class="grid-2">
+			<div class="grid-2 pair">
 				<div class="form-group">
 					<label class="form-label" for="qe-date">Date</label>
 					<input
@@ -616,11 +616,9 @@
 	}
 
 	.panel-title {
-		font-size: var(--text-sm);
+		font-size: 1rem;
 		font-weight: 600;
-		color: var(--gray-600);
-		text-transform: uppercase;
-		letter-spacing: 0.03em;
+		color: var(--gray-900);
 		margin: 0 0 0.875rem;
 	}
 
@@ -653,6 +651,12 @@
 	.form-group:last-child,
 	.grid-2 .form-group {
 		margin-bottom: 0;
+	}
+
+	/* Grid items default to min-width: auto, which lets a native date input
+	   push its column wider than half the panel. */
+	.grid-2 .form-group {
+		min-width: 0;
 	}
 
 	.grid-2 {
@@ -897,6 +901,21 @@
 		font-weight: 600;
 	}
 
+	/* Wide desktop: two columns of panels so the whole form — and its submit
+	   button — fits in roughly one screen instead of two. DOM order (and so tab
+	   order) still runs 1→6, reading left to right. */
+	@media (min-width: 1200px) {
+		.quick-page {
+			max-width: 1120px;
+		}
+
+		.panels {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			align-items: start;
+		}
+	}
+
 	/* Mobile */
 	@media (max-width: 768px) {
 		.quick-page {
@@ -905,6 +924,13 @@
 
 		.grid-2 {
 			grid-template-columns: 1fr;
+		}
+
+		/* Start/end readings and date/time are short values — keep each pair
+		   side by side so the form is a third shorter to scroll. */
+		.grid-2.pair {
+			grid-template-columns: 1fr 1fr;
+			gap: 0.625rem;
 		}
 
 		.panel {

@@ -226,8 +226,6 @@
 		border-radius: 12px;
 		font-size: 0.75rem;
 		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
 	}
 
 	/* Ultra-clean table container */
@@ -252,8 +250,6 @@
 		font-size: 0.6875rem;
 		font-weight: 500;
 		color: #9ca3af;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
 		line-height: 1;
 	}
 
@@ -408,8 +404,6 @@
 		font-size: 0.6875rem;
 		color: #9ca3af;
 		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
 		margin-bottom: 0.5rem;
 	}
 

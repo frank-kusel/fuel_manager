@@ -471,9 +471,9 @@
 	}
 
 	.panel-title {
-		font-size: var(--text-sm);
+		font-size: 1rem;
 		font-weight: var(--font-weight-semibold);
-		color: var(--gray-600);
+		color: var(--gray-900);
 		margin: 0 0 0.75rem;
 	}
 

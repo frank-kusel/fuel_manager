@@ -376,8 +376,6 @@
 		font-size: 0.625rem;
 		font-weight: 700;
 		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
 		padding: 0.4rem 0.5rem;
 		gap: 0.5rem;
 	}

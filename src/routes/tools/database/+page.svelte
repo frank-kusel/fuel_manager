@@ -204,7 +204,7 @@
 							</span>
 						</button>
 						{#if config.historyLink}
-							<a class="history-link" href={config.historyLink(row)}>History →</a>
+							<a class="history-link" href={config.historyLink(row)}>History</a>
 						{/if}
 					</li>
 				{/each}
@@ -255,6 +255,12 @@
 		gap: 0.5rem;
 		overflow-x: auto;
 		padding-bottom: 2px;
+		/* Swipeable row — the bar under it is noise on touch screens */
+		scrollbar-width: none;
+	}
+
+	.chips::-webkit-scrollbar {
+		display: none;
 	}
 
 	.chip {
@@ -449,7 +455,7 @@
 
 	.empty-note {
 		font-size: var(--text-sm);
-		color: var(--gray-400);
+		color: var(--gray-500);
 		margin: 0.75rem 0 0;
 	}
 

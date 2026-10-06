@@ -118,9 +118,9 @@
 	}
 
 	.panel-title {
-		font-size: var(--text-sm);
+		font-size: 1rem;
 		font-weight: var(--font-weight-semibold);
-		color: var(--gray-600);
+		color: var(--gray-900);
 		margin: 0 0 0.75rem;
 	}
 
@@ -138,15 +138,15 @@
 	}
 
 	.trend-k {
-		font-size: var(--text-xs);
-		color: var(--gray-500);
-		text-transform: uppercase;
-		letter-spacing: 0.03em;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-600);
 	}
 
 	.trend-v {
-		font-size: var(--text-2xl);
-		font-weight: var(--font-weight-bold);
+		font-size: 2rem;
+		font-weight: 750;
+		font-stretch: var(--figure-stretch);
 		color: var(--gray-900);
 		font-variant-numeric: tabular-nums;
 		line-height: 1.1;
@@ -240,6 +240,20 @@
 	.accepted {
 		text-align: center;
 		color: var(--gray-400);
+	}
+
+	/* At phone width the four figures plus a 60px bar overflow the card; let
+	   the bar shrink instead of making the whole table scroll sideways. */
+	@media (max-width: 480px) {
+		.history-table td,
+		.history-table th {
+			padding-right: 0.4rem;
+		}
+
+		.spark {
+			width: auto;
+			min-width: 24px;
+		}
 	}
 
 	.rebase-row td {

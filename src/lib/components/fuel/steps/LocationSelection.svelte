@@ -481,7 +481,6 @@
 		background: #f1f5f9;
 		border-radius: 4px;
 		color: #64748b;
-		text-transform: uppercase;
 		font-weight: 500;
 	}
 

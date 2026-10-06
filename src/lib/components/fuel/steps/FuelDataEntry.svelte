@@ -344,9 +344,7 @@
 		font-weight: 600;
 		color: #6b7280;
 		margin: 0;
-		text-transform: uppercase;
 		font-size: 0.75rem;
-		letter-spacing: 0.05em;
 	}
 
 	.calc-item {

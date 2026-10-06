@@ -399,6 +399,18 @@
 		return nf1.format(v);
 	}
 
+	/**
+	 * The DB's consumption column is litres ÷ odometer movement (×100 for km),
+	 * so for hour-meter vehicles it is really L/hr — label it that way.
+	 */
+	function rate(e: any): string {
+		const v = e.fuel_consumption_l_per_100km;
+		if (v === null || v === undefined) return '—';
+		const unit = e.vehicles?.odometer_unit || 'km';
+		const isHours = unit === 'hours' || unit === 'hr';
+		return `${nf1.format(v)} ${isHours ? 'L/hr' : 'L/100'}`;
+	}
+
 	/** Odometer movement in the vehicle's own unit (km or hr). */
 	function usage(e: any): string {
 		if (e.gauge_working === false || e.odometer_start === null || e.odometer_end === null)
@@ -735,7 +747,7 @@
 						<th class="num">Odo end</th>
 						<th class="num">Usage</th>
 						<th class="num">Litres</th>
-						<th class="num">L/100</th>
+						<th class="num" title="L/100 km for km vehicles, L/hr for hour-meter vehicles">Rate</th>
 						<th class="num">Bowser</th>
 						{#if reviewOn}<th>Issue</th>{/if}
 						<th></th>
@@ -903,7 +915,7 @@
 								{/if}
 							</td>
 
-							<td class="num cell-ro">{e.fuel_consumption_l_per_100km ?? '—'}</td>
+							<td class="num cell-ro">{rate(e)}</td>
 
 							<td class="num cell-ro cell-bowser" title="Bowser meter start → end (derived)">
 								{fmtNum(e.bowser_reading_start)} → {fmtNum(e.bowser_reading_end)}
@@ -966,6 +978,12 @@
 		gap: 0.5rem;
 		overflow-x: auto;
 		padding-bottom: 2px;
+		/* Swipeable row — the bar under it is noise on touch screens */
+		scrollbar-width: none;
+	}
+
+	.chips::-webkit-scrollbar {
+		display: none;
 	}
 
 	.chip {
@@ -1021,6 +1039,7 @@
 
 	.filter-row {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.75rem;
 	}
@@ -1051,6 +1070,19 @@
 		font-size: var(--text-sm);
 		color: var(--gray-500);
 		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	@media (max-width: 640px) {
+		.vehicle-filter {
+			flex: 1;
+			min-width: 0;
+			max-width: none;
+		}
+
+		.totals {
+			flex-basis: 100%;
+		}
 	}
 
 	/* ---- Review mode ---- */
@@ -1466,7 +1498,7 @@
 	/* ---- States ---- */
 	.empty-note {
 		font-size: var(--text-sm);
-		color: var(--gray-400);
+		color: var(--gray-500);
 		margin: 0;
 		padding: 1rem 1.125rem;
 	}

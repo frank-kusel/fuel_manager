@@ -364,8 +364,6 @@
 		font-size: 1rem;
 		font-weight: 600;
 		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
 		border: none;
 		text-align: center;
 		border-radius: 1rem;
@@ -375,8 +373,6 @@
 		font-weight: 600;
 		color: #6b7280;
 		font-size: 1rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
 		display: block;
 		text-align: center;
 		width: 100%;
@@ -489,8 +485,6 @@
 		font-size: 0.6875rem;
 		color: #9ca3af;
 		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
 		margin-bottom: 0.5rem;
 	}
 

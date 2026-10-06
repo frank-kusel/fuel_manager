@@ -130,15 +130,15 @@
 				<span class="sb-label">Log fuel entry</span>
 			</button>
 			<button class="sb-item" title="Dipstick reading" onclick={() => handleAction('dipstick')}>
-				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg>
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V6M8 10l4-4 4 4"/><path d="M5 20h14"/></svg>
 				<span class="sb-label">Dipstick reading</span>
 			</button>
 			<button class="sb-item" title="Tank delivery" onclick={() => handleAction('refill')}>
-				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="m3 15 6-6 3 3 6-6"/></svg>
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0l-4-4m4 4l4-4"/><path d="M5 20h14"/></svg>
 				<span class="sb-label">Tank delivery</span>
 			</button>
 			<button class="sb-item" title="Full entry workflow" onclick={() => handleAction('fuel')}>
-				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg>
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h11M10 12h11M10 18h11"/><path d="m3 6 1.5 1.5L7 5"/><path d="m3 12 1.5 1.5L7 11"/><path d="m3 18 1.5 1.5L7 17"/></svg>
 				<span class="sb-label">Full workflow</span>
 				{#if $hasDraft}<span class="sb-draft-dot" title="Draft in progress"></span>{/if}
 			</button>
@@ -256,7 +256,7 @@
 			class:active={pathname === '/dashboard'}
 		>
 			<svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20V16"/></svg>
-			<span class="nav-label">Dash</span>
+			<span class="nav-label">Dashboard</span>
 		</a>
 
 		<!-- Central Action Button -->
@@ -510,9 +510,11 @@
 
 	.nav-label {
 		font-weight: 500;
-		font-size: 0.7rem;
-		text-transform: uppercase;
-		letter-spacing: 0.025em;
+		font-size: 0.75rem;
+	}
+
+	.mobile-nav-btn.active .nav-label {
+		font-weight: 650;
 	}
 
 	/* Central Action Button */
@@ -797,11 +799,9 @@
 	}
 
 	.sb-group-label {
-		font-size: 0.625rem;
+		font-size: 0.75rem;
 		font-weight: var(--font-weight-semibold);
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--gray-400);
+		color: var(--gray-500);
 		padding: 0.25rem 0.625rem;
 		white-space: nowrap;
 		min-height: 1.2rem;

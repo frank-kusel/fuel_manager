@@ -42,6 +42,8 @@ export interface FleetRow {
 export interface AttentionItem {
 	severity: 'danger' | 'warning' | 'info';
 	text: string;
+	/** Where to go to act on it, when there is somewhere */
+	href?: string;
 }
 
 export interface TankInsight {
@@ -398,7 +400,8 @@ function createInsightsStore() {
 				if (row.deltaPct !== null && row.deltaPct >= OUTLIER_THRESHOLD_PCT && row.entryCount >= 3) {
 					attention.push({
 						severity: 'danger',
-						text: `${row.code} ${row.name} burning ${row.deltaPct}% above its average`
+						text: `${row.code} ${row.name} burning ${row.deltaPct}% above its average`,
+						href: `/tools/database/vehicles/${row.vehicleId}`
 					});
 				}
 			}
@@ -406,12 +409,14 @@ function createInsightsStore() {
 				if (tank.derivedLevel <= 0) {
 					attention.push({
 						severity: 'danger',
-						text: `Derived tank level is ${Math.round(tank.derivedLevel)} L — dip or refill records look out of date`
+						text: `Derived tank level is ${Math.round(tank.derivedLevel)} L — dip or refill records look out of date`,
+						href: '/tank'
 					});
 				} else if (tank.capacity && tank.derivedLevel / tank.capacity < 0.15) {
 					attention.push({
 						severity: 'warning',
-						text: `${tank.name} below 15% (${Math.round(tank.derivedLevel)} L) — plan a refill`
+						text: `${tank.name} below 15% (${Math.round(tank.derivedLevel)} L) — plan a refill`,
+						href: '/tank'
 					});
 				}
 			}
@@ -419,13 +424,15 @@ function createInsightsStore() {
 			if (isDipStale(ageDays)) {
 				attention.push({
 					severity: 'warning',
-					text: `Last dipstick reading is ${ageDays} days old — take a fresh dip`
+					text: `Last dipstick reading is ${ageDays} days old — take a fresh dip`,
+					href: '/tank'
 				});
 			}
 			if (brokenGaugeCount > 0) {
 				attention.push({
 					severity: 'warning',
-					text: `${brokenGaugeCount} ${brokenGaugeCount === 1 ? 'entry' : 'entries'} this month with a broken gauge`
+					text: `${brokenGaugeCount} ${brokenGaugeCount === 1 ? 'entry' : 'entries'} this month with a broken gauge`,
+					href: '/entries'
 				});
 			}
 			const futureEntries = futureRes.data || [];
@@ -435,7 +442,8 @@ function createInsightsStore() {
 					.join(', ');
 				attention.push({
 					severity: 'danger',
-					text: `${futureEntries.length} future-dated ${futureEntries.length === 1 ? 'entry' : 'entries'}${codes ? ` (${codes})` : ''} — check the entry dates`
+					text: `${futureEntries.length} future-dated ${futureEntries.length === 1 ? 'entry' : 'entries'}${codes ? ` (${codes})` : ''} — check the entry dates`,
+					href: '/entries'
 				});
 			}
 			if (attention.length === 0) {

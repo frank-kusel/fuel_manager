@@ -551,8 +551,6 @@
 		font-size: 0.75rem;
 		font-weight: 600;
 		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.025em;
 	}
 
 	.form-group input,
@@ -592,8 +590,6 @@
 		font-weight: 700;
 		color: rgba(255, 255, 255, 0.95);
 		margin-bottom: 0.5rem;
-		text-transform: uppercase;
-		letter-spacing: 0.075em;
 	}
 
 	.litres-input {
@@ -634,8 +630,6 @@
 	.bowser-calc .calc-label {
 		font-size: 0.75rem;
 		color: rgba(255, 255, 255, 0.8);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
 		font-weight: 500;
 	}
 

@@ -66,7 +66,9 @@
 						{outstanding}
 						{outstanding === 1 ? 'check' : 'checks'} outstanding
 					</strong>
-					{#if next}<span class="sub">{next.title}</span>{/if}
+					<!-- The detail, not the title: titles name the goal ("June closed"),
+					     which reads as already done next to an outstanding count. -->
+					{#if next}<span class="sub">{next.detail}</span>{/if}
 				{:else if overTolerance}
 					<strong>{monthLabel} closed over tolerance</strong>
 					<span class="sub">Review the leak check before claiming</span>
@@ -91,11 +93,11 @@
 
 		{#if next?.action}
 			<button class="cta" onclick={() => onact(next.action!.target)}>
-				{next.action.label} →
+				{next.action.label}
 			</button>
 		{:else if outstanding === 0 && !overTolerance}
 			<!-- Green still gets a verb: exports are the month's actual last step. -->
-			<button class="cta ghost" onclick={onexports}>Claim &amp; exports →</button>
+			<button class="cta ghost" onclick={onexports}>Claim and exports</button>
 		{/if}
 	</div>
 
@@ -115,7 +117,7 @@
 							</span>
 							{#if item.action}
 								<button class="row-act" onclick={() => onact(item.action!.target)}>
-									{item.action.label} →
+									{item.action.label}
 								</button>
 							{/if}
 						</div>
@@ -239,8 +241,6 @@
 
 	.group-label {
 		font-size: var(--text-xs);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
 		color: var(--gray-400);
 		margin: 0.5rem 0 0.25rem;
 	}
@@ -329,6 +329,12 @@
 		.cta {
 			padding: 0.5rem 0.6rem;
 			font-size: 0.72rem;
+		}
+
+		/* Next to the CTA there's room for ~20 characters — wrap rather than
+		   cut the one line that says what's wrong. */
+		.sub {
+			white-space: normal;
 		}
 
 		.chev {

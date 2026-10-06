@@ -282,8 +282,6 @@
 		color: var(--brand-hover);
 		font-size: 0.7rem;
 		font-weight: 700;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
 	}
 	h2 {
 		margin: 0;

@@ -394,9 +394,9 @@
 		{#each months as m (m.key)}
 			<button class="chip" class:on={m.key === selectedKey} onclick={() => selectMonth(m.key)}>
 				{m.shortLabel}
-				<span class="chip-badge" class:closed={closedMonthKeys.has(m.key)}>
-					{closedMonthKeys.has(m.key) ? '✓' : '·'}
-				</span>
+				{#if closedMonthKeys.has(m.key)}
+					<span class="chip-badge closed" title="Closed">✓</span>
+				{/if}
 			</button>
 		{/each}
 	</div>
@@ -614,10 +614,20 @@
 		<!-- Manage -->
 		<h2 class="section-heading">Manage</h2>
 		<div class="manage-links">
-			<a href="/entries" class="manage-link">All entries</a>
-			<a href="/tank" class="manage-link">Tank</a>
-			<a href="/tools/database" class="manage-link">Database management</a>
-			<a href="/menu" class="manage-link">System settings</a>
+			{#each [
+				{ href: '/entries', t: 'All entries', d: 'Spreadsheet view — fix any cell in place' },
+				{ href: '/tank', t: 'Tank', d: 'Book balance, dips and deliveries' },
+				{ href: '/tools/database', t: 'Database', d: 'Vehicles, drivers, activities, fields' },
+				{ href: '/menu', t: 'System settings', d: 'Thresholds and preferences' }
+			] as link (link.href)}
+				<a href={link.href} class="manage-link">
+					<span class="manage-text">
+						<span class="manage-t">{link.t}</span>
+						<span class="manage-d">{link.d}</span>
+					</span>
+					<svg class="manage-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+				</a>
+			{/each}
 		</div>
 	{/if}
 </div>
@@ -650,6 +660,12 @@
 		gap: 0.5rem;
 		overflow-x: auto;
 		padding-bottom: 2px;
+		/* Swipeable row — the bar under it is noise on touch screens */
+		scrollbar-width: none;
+	}
+
+	.chips::-webkit-scrollbar {
+		display: none;
 	}
 
 	.chip {
@@ -732,10 +748,9 @@
 	}
 
 	.setup-h {
-		font-size: var(--text-xs);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: var(--gray-400);
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-700);
 		margin: 1rem 0 0.5rem;
 	}
 
@@ -779,12 +794,10 @@
 	}
 
 	.section-heading {
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-500);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		margin: 0.5rem 0 -0.25rem;
+		font-size: 1.125rem;
+		font-weight: 700;
+		color: var(--gray-900);
+		margin: 0.75rem 0 -0.125rem;
 	}
 
 	/* Claim */
@@ -800,16 +813,15 @@
 	}
 
 	.stat-k {
-		font-size: var(--text-xs);
+		font-size: var(--text-sm);
 		font-weight: var(--font-weight-semibold);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--gray-500);
+		color: var(--gray-600);
 	}
 
 	.stat-v {
-		font-size: 1.9rem;
-		font-weight: var(--font-weight-bold);
+		font-size: 2.4rem;
+		font-weight: 750;
+		font-stretch: var(--figure-stretch);
 		color: var(--gray-900);
 		letter-spacing: -0.02em;
 		line-height: 1.15;
@@ -1044,12 +1056,49 @@
 	/* Manage links */
 	.manage-links {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		grid-template-columns: 1fr;
 		gap: 0.625rem;
 	}
 
+	@media (min-width: 640px) {
+		.manage-links {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	.manage-text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.manage-t {
+		color: var(--gray-900);
+		font-weight: var(--font-weight-semibold);
+	}
+
+	.manage-d {
+		font-size: var(--text-xs);
+		font-weight: 400;
+		color: var(--gray-500);
+	}
+
+	.manage-chev {
+		flex-shrink: 0;
+		width: 1rem;
+		height: 1rem;
+		color: var(--gray-400);
+	}
+
+	.manage-link:hover .manage-chev {
+		color: var(--brand);
+	}
+
 	.manage-link {
-		display: block;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
 		padding: 0.8rem 1rem;
 		background: var(--white);
 		border: 1px solid var(--gray-200);

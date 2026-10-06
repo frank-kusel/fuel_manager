@@ -8,7 +8,7 @@
 		insightsLoading
 	} from '$lib/stores/dashboard-insights';
 	import { onVisible } from '$lib/stores/freshness';
-	import { fmtDayMonth, fmtFull } from '$lib/utils/dates';
+	import { daysBetween, fmtDayMonth, fmtFull, todayIso } from '$lib/utils/dates';
 	import {
 		bandVariance,
 		dipAgeDays,
@@ -24,6 +24,8 @@
 		{ litres_added: number; delivery_date: string; supplier: string | null; invoice_number: string | null }[]
 	>([]);
 	let closes = $state<CloseRow[]>([]);
+	// Until the first fetch lands, an empty list means "not loaded", not "none".
+	let historyLoaded = $state(false);
 
 	const nf = new Intl.NumberFormat('en-ZA');
 	const nf1 = new Intl.NumberFormat('en-ZA', {
@@ -56,6 +58,12 @@
 		recentDips = dips.data || [];
 		recentRefills = refills.data || [];
 		closes = (history.data || []) as CloseRow[];
+		historyLoaded = true;
+	}
+
+	function ago(iso: string): string {
+		const d = daysBetween(iso, todayIso());
+		return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
 	}
 
 	onMount(() => {
@@ -79,6 +87,20 @@
 	});
 
 	let dipAge = $derived(dipAgeDays(tank?.lastDipDate ?? null));
+
+	/**
+	 * Dipstick graduations: a minor mark every 1/24 of capacity, a labelled
+	 * major mark every quarter. Fixed geometry, so the scale reads the same
+	 * whatever the tank size.
+	 */
+	let scaleTicks = $derived.by(() => {
+		if (!tank?.capacity) return [];
+		return Array.from({ length: 25 }, (_, i) => ({
+			pct: (i / 24) * 100,
+			major: i % 6 === 0,
+			litres: Math.round((tank!.capacity! * i) / 24)
+		}));
+	});
 
 	/**
 	 * The accuracy answer. The book is anchored to the last close, so a dip taken
@@ -111,24 +133,34 @@
 		<section class="panel hero" class:alert={tank.derivedLevel !== null && tank.derivedLevel <= 0}>
 			<div class="hero-top">
 				<div>
-					<div class="hero-label">{tank.name} · book balance</div>
+					<div class="hero-label">{tank.name} book balance</div>
 					<div class="hero-value" class:negative={tank.derivedLevel !== null && tank.derivedLevel <= 0}>
 						{tank.derivedLevel !== null ? nf.format(Math.round(tank.derivedLevel)) : '—'}<span class="hero-unit">L</span>
 					</div>
 					{#if tank.runwayDays !== null}
-						<div class="hero-sub">~{tank.runwayDays} days left at the recent burn rate</div>
+						<div class="hero-sub">About {tank.runwayDays} days left at the recent burn rate</div>
 					{/if}
 				</div>
-				{#if tank.capacity}
+				{#if tankPct !== null}
 					<div class="hero-cap">
-						<span>{tankPct !== null ? Math.round(tankPct) : '—'}%</span>
-						<small>of {nf.format(tank.capacity)} L</small>
+						<span>{Math.round(tankPct)}%</span>
+						<small>full</small>
 					</div>
 				{/if}
 			</div>
 			{#if tankPct !== null}
-				<div class="track">
-					<div class="fill" class:low={tankPct < 15} style="width: {tankPct}%"></div>
+				<!-- Dipstick: the wet length is the book balance -->
+				<div class="dipstick" role="img" aria-label="{Math.round(tankPct)}% of {nf.format(tank.capacity ?? 0)} litres">
+					<div class="stick">
+						<div class="wet" class:low={tankPct < 15} style="width: {tankPct}%"></div>
+					</div>
+					<div class="grads" aria-hidden="true">
+						{#each scaleTicks as t}
+							<span class="grad" class:major={t.major} style="left: {t.pct}%">
+								{#if t.major}<span class="grad-label">{nf.format(t.litres)}</span>{/if}
+							</span>
+						{/each}
+					</div>
 				</div>
 			{/if}
 			<table class="ledger">
@@ -171,7 +203,7 @@
 			<div class="trust-body">
 				{#if anchor?.kind === 'close'}
 					<div class="trust-t">
-						Anchored to the {fmtFull(anchor.date)} close · {nf.format(Math.round(anchor.litres))} L
+						Anchored to the {fmtFull(anchor.date)} close of {nf.format(Math.round(anchor.litres))}&nbsp;L
 					</div>
 				{:else if anchor}
 					<div class="trust-t">
@@ -201,7 +233,7 @@
 
 				{#if trend.latestGapLitres !== null && trend.months > 1}
 					{@const driftText =
-						trend.driftLitres !== null ? ` · drift ${signed(trend.driftLitres)} L` : ''}
+						trend.driftLitres !== null ? `, drift ${signed(trend.driftLitres)} L` : ''}
 					<div class="trust-trend">
 						<span>
 							Standing gap {signed(trend.latestGapLitres)} L across {trend.months} closes{driftText}
@@ -213,7 +245,7 @@
 								>approx.</span
 							>
 						{/if}
-						<a href="/audit">Leak trend →</a>
+						<a href="/audit">See the leak trend</a>
 					</div>
 				{/if}
 			</div>
@@ -235,14 +267,19 @@
 		<div class="two-col">
 			<section class="panel">
 				<h2 class="panel-title">Recent dips</h2>
-				{#if recentDips.length === 0}
+				{#if !historyLoaded}
+					<div class="hist-skeleton" aria-hidden="true"><span></span><span></span><span></span></div>
+				{:else if recentDips.length === 0}
 					<p class="empty-note">No dipstick readings yet.</p>
 				{:else}
 					<table class="hist-table">
 						<tbody>
 							{#each recentDips as dip}
 								<tr>
-									<td class="hist-date">{dip.reading_date}</td>
+									<td class="hist-date">
+										{fmtFull(dip.reading_date)}
+										<span class="hist-sub">{ago(dip.reading_date)}</span>
+									</td>
 									<td class="hist-val">{nf.format(Math.round(dip.reading_value))} L</td>
 								</tr>
 							{/each}
@@ -253,7 +290,9 @@
 
 			<section class="panel">
 				<h2 class="panel-title">Recent deliveries</h2>
-				{#if recentRefills.length === 0}
+				{#if !historyLoaded}
+					<div class="hist-skeleton" aria-hidden="true"><span></span><span></span><span></span></div>
+				{:else if recentRefills.length === 0}
 					<p class="empty-note">No deliveries recorded yet.</p>
 				{:else}
 					<table class="hist-table">
@@ -261,8 +300,8 @@
 							{#each recentRefills as r}
 								<tr>
 									<td class="hist-date">
-										{r.delivery_date}
-										<span class="hist-sub">{r.supplier || '—'}{r.invoice_number ? ` · ${r.invoice_number}` : ' · ⚠ no invoice no.'}</span>
+										{fmtFull(r.delivery_date)}
+										<span class="hist-sub">{r.supplier?.trim() || 'No supplier'}, {r.invoice_number ? `inv. ${r.invoice_number}` : 'no invoice number'}</span>
 									</td>
 									<td class="hist-val">+{nf.format(Math.round(r.litres_added))} L</td>
 								</tr>
@@ -310,9 +349,9 @@
 	}
 
 	.panel-title {
-		font-size: var(--text-sm);
+		font-size: 1rem;
 		font-weight: var(--font-weight-semibold);
-		color: var(--gray-600);
+		color: var(--gray-900);
 		margin: 0 0 0.75rem;
 	}
 
@@ -335,10 +374,12 @@
 	}
 
 	.hero-value {
-		font-size: 2.5rem;
-		font-weight: var(--font-weight-bold);
+		font-size: 3.25rem;
+		font-weight: 750;
+		font-stretch: var(--figure-stretch);
 		color: var(--gray-900);
-		line-height: 1.1;
+		line-height: 1;
+		margin-top: 0.25rem;
 		letter-spacing: -0.02em;
 		font-variant-numeric: tabular-nums;
 	}
@@ -366,34 +407,93 @@
 	}
 
 	.hero-cap span {
-		font-size: var(--text-xl);
-		font-weight: var(--font-weight-bold);
-		color: var(--brand-hover);
+		display: block;
+		font-size: 1.75rem;
+		line-height: 1;
+		font-weight: 750;
+		font-stretch: var(--figure-stretch);
+		color: var(--brand);
 	}
 
 	.hero-cap small {
 		display: block;
-		font-size: var(--text-xs);
-		color: var(--gray-400);
+		font-size: var(--text-sm);
+		color: var(--gray-500);
 	}
 
-	.track {
-		height: 10px;
+	/* ---- Dipstick ---- */
+	.dipstick {
+		margin: 1.25rem 0 0.25rem;
+		padding-bottom: 1.4rem; /* room for the graduation labels */
+		position: relative;
+	}
+
+	.stick {
+		height: 14px;
 		background: var(--gray-100);
-		border-radius: 5px;
-		margin-top: 0.875rem;
+		border: 1px solid var(--gray-300);
+		border-radius: 3px;
 		overflow: hidden;
 	}
 
-	.fill {
+	.wet {
 		height: 100%;
 		background: var(--brand);
-		border-radius: 5px;
 		transition: width 0.5s ease;
 	}
 
-	.fill.low {
+	.wet.low {
 		background: var(--error);
+	}
+
+	.grads {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 14px;
+		height: 1.4rem;
+	}
+
+	.grad {
+		position: absolute;
+		top: 0;
+		width: 1px;
+		height: 5px;
+		background: var(--gray-400);
+		transform: translateX(-0.5px);
+	}
+
+	.grad.major {
+		height: 9px;
+		background: var(--gray-700);
+	}
+
+	.grad-label {
+		position: absolute;
+		top: 10px;
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 0.6875rem;
+		font-stretch: var(--figure-stretch);
+		color: var(--gray-500);
+		white-space: nowrap;
+	}
+
+	.grad:first-child .grad-label {
+		left: 0;
+		transform: none;
+	}
+
+	.grad:last-child .grad-label {
+		left: auto;
+		right: 0;
+		transform: none;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.wet {
+			transition: none;
+		}
 	}
 
 	/* Derivation ledger */
@@ -582,7 +682,7 @@
 	.hist-sub {
 		display: block;
 		font-size: var(--text-xs);
-		color: var(--gray-400);
+		color: var(--gray-500);
 	}
 
 	.hist-val {
@@ -592,9 +692,23 @@
 		white-space: nowrap;
 	}
 
+	.hist-skeleton {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+
+	.hist-skeleton span {
+		height: 1.6rem;
+		border-radius: var(--radius-md);
+		background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%);
+		background-size: 200% 100%;
+		animation: shimmer 1.5s infinite;
+	}
+
 	.empty-note {
 		font-size: var(--text-sm);
-		color: var(--gray-400);
+		color: var(--gray-500);
 		margin: 0;
 	}
 
@@ -620,7 +734,14 @@
 		}
 
 		.hero-value {
-			font-size: 2rem;
+			font-size: 2.75rem;
+		}
+
+		/* Two buttons side by side at 375px: keep each label on one line */
+		.action-btn {
+			padding: 0.75rem 0.5rem;
+			font-size: 0.9375rem;
+			white-space: nowrap;
 		}
 	}
 </style>
