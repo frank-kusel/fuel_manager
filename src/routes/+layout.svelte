@@ -164,7 +164,7 @@
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M5 13h14"/><path d="M9 7h6"/></svg>
 				<span class="sb-label">Tank</span>
 			</a>
-			<a href="/audit" class="sb-item" title="Audit"class:active={pathname.startsWith('/audit') || pathname.startsWith('/reports')}>
+			<a href="/audit" class="sb-item" title="Audit"class:active={pathname.startsWith('/audit')}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><path d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z"/></svg>
 				<span class="sb-label">Audit</span>
 			</a>
@@ -175,10 +175,6 @@
 			<a href="/tools/database" class="sb-item" title="Database" class:active={pathname.startsWith('/tools/database')}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
 				<span class="sb-label">Database</span>
-			</a>
-			<a href="/menu" class="sb-item" title="Menu" class:active={pathname.startsWith('/menu')}>
-				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
-				<span class="sb-label">Menu</span>
 			</a>
 		</div>
 
@@ -241,7 +237,7 @@
 			<a
 				href="/audit"
 				class="nav-btn"
-				class:active={pathname.startsWith('/audit') || pathname.startsWith('/reports') || pathname.startsWith('/menu') || pathname.startsWith('/tools')}
+				class:active={pathname.startsWith('/audit') || pathname.startsWith('/tools')}
 			>
 				Audit
 			</a>
@@ -294,7 +290,7 @@
 		<a
 			href="/audit"
 			class="mobile-nav-btn"
-			class:active={pathname.startsWith('/audit') || pathname.startsWith('/reports') || pathname.startsWith('/menu') || pathname.startsWith('/tools')}
+			class:active={pathname.startsWith('/audit') || pathname.startsWith('/tools')}
 		>
 			<svg class="nav-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><path d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z"/></svg>
 			<span class="nav-label">Audit</span>

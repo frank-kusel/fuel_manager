@@ -9,6 +9,7 @@
 	import DipstickModal from '$lib/components/modals/DipstickModal.svelte';
 	import TankRefillModal from '$lib/components/modals/TankRefillModal.svelte';
 	import TankGauge from '$lib/components/charts/TankGauge.svelte';
+	import DatabaseLink from '$lib/components/ui/DatabaseLink.svelte';
 	import HistoryChart from '$lib/components/charts/HistoryChart.svelte';
 	import { tankStore, tankData, tankError } from '$lib/stores/tank';
 	import { claimSettings } from '$lib/stores/claim-settings';
@@ -50,32 +51,35 @@
 <div class="ui-page">
 	<div class="ui-head">
 		<h1>Tank</h1>
-		<!-- Tablet and desktop only: on phones the + button already records both. -->
-		<div class="ui-actions head-actions">
-			<button class="ui-btn primary" onclick={() => (showDipModal = true)}>
-				<svg
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"><path d="M12 20V6M8 10l4-4 4 4M5 20h14" /></svg
-				>
-				Record dip
-			</button>
-			<button class="ui-btn" onclick={() => (showRefillModal = true)}>
-				<svg
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"><path d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14" /></svg
-				>
-				Record delivery
-			</button>
+		<div class="head-tools">
+			<!-- Tablet and desktop only: on phones the + button already records both. -->
+			<div class="ui-actions head-actions">
+				<button class="ui-btn primary" onclick={() => (showDipModal = true)}>
+					<svg
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"><path d="M12 20V6M8 10l4-4 4 4M5 20h14" /></svg
+					>
+					Record dip
+				</button>
+				<button class="ui-btn" onclick={() => (showRefillModal = true)}>
+					<svg
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"><path d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14" /></svg
+					>
+					Record delivery
+				</button>
+			</div>
+			<DatabaseLink />
 		</div>
 	</div>
 
@@ -218,6 +222,11 @@
 <TankRefillModal bind:show={showRefillModal} onClose={() => (showRefillModal = false)} />
 
 <style>
+	.head-tools {
+		display: flex;
+		gap: 0.5rem;
+	}
+
 	/* Phones record dips and deliveries from the + button in the bottom nav */
 	.head-actions {
 		display: none;

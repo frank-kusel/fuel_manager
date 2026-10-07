@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DashboardInsights from '$lib/components/dashboard/DashboardInsights.svelte';
+	import DatabaseLink from '$lib/components/ui/DatabaseLink.svelte';
 </script>
 
 <svelte:head>
@@ -13,6 +14,7 @@
 <div class="ui-page">
 	<div class="ui-head">
 		<h1>Dashboard</h1>
+		<DatabaseLink />
 	</div>
 
 	<DashboardInsights />

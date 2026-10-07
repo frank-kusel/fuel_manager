@@ -10,6 +10,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import Step from '$lib/components/audit/Step.svelte';
+	import DatabaseLink from '$lib/components/ui/DatabaseLink.svelte';
 	import CloseStep from '$lib/components/audit/CloseStep.svelte';
 	import ClaimStep from '$lib/components/audit/ClaimStep.svelte';
 	import MonthHistory from '$lib/components/audit/MonthHistory.svelte';
@@ -179,7 +180,9 @@
 	async function loadHistory() {
 		try {
 			const { default: supabaseService } = await import('$lib/services/supabase');
-			const lastSeason = financialYearStart(new Date(new Date().getFullYear() - 1, new Date().getMonth(), 1));
+			const lastSeason = financialYearStart(
+				new Date(new Date().getFullYear() - 1, new Date().getMonth(), 1)
+			);
 			const start = isoLocal(lastSeason);
 			const end = isoLocal(new Date());
 			const [entriesRes, adjRes] = await Promise.all([
@@ -310,22 +313,7 @@
 	<div class="ui-head">
 		<h1>Audit</h1>
 		<div class="head-tools">
-			<!-- Phones and tablets: the sidebar's Database, Vehicle history and
-		     Settings live on /menu, reached from here. -->
-			<a
-				class="ui-btn icon more"
-				href="/menu"
-				aria-label="More: database, vehicle history, settings"
-				title="More"
-			>
-				<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
-					><circle cx="5" cy="12" r="1.75" /><circle cx="12" cy="12" r="1.75" /><circle
-						cx="19"
-						cy="12"
-						r="1.75"
-					/></svg
-				>
-			</a>
+			<DatabaseLink />
 			<button
 				class="ui-btn icon"
 				onclick={() => (showSettings = true)}
@@ -498,12 +486,6 @@
 		gap: 0.375rem;
 	}
 
-	@media (min-width: 1024px) {
-		.more {
-			display: none;
-		}
-	}
-
 	/* ---- Months ---- */
 	.months {
 		display: flex;
@@ -665,7 +647,6 @@
 		gap: 0.5rem;
 		min-width: 0;
 	}
-
 
 	.export-warn {
 		margin: 0 0 0.75rem;
