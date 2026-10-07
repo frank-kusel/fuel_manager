@@ -12,16 +12,16 @@
 	import Step from '$lib/components/audit/Step.svelte';
 	import CloseStep from '$lib/components/audit/CloseStep.svelte';
 	import ClaimStep from '$lib/components/audit/ClaimStep.svelte';
-	import LeakTrend from '$lib/components/audit/LeakTrend.svelte';
+	import MonthHistory from '$lib/components/audit/MonthHistory.svelte';
 	import DataExport from '$lib/components/audit/DataExport.svelte';
 	import AppSettingsPanel from '$lib/components/settings/AppSettingsPanel.svelte';
 	import DipstickModal from '$lib/components/modals/DipstickModal.svelte';
 	import type { ClassifierVehicle } from '$lib/components/audit/ClassifierAdjustment.svelte';
 	import { claimSettings } from '$lib/stores/claim-settings';
 	import { toast } from '$lib/stores/toast';
-	import { fmtDayMonth, recentMonths, type MonthOption } from '$lib/utils/dates';
+	import { financialYearStart, isoLocal, recentMonths, type MonthOption } from '$lib/utils/dates';
 	import { formatRand, formatSigned, formatWholeLitres } from '$lib/utils/formatting';
-	import { summariseClaim } from '$lib/utils/claim-totals';
+	import { monthlyClaims, summariseClaim, type MonthClaim } from '$lib/utils/claim-totals';
 	import {
 		buildReadiness,
 		buildSteps,
@@ -30,7 +30,7 @@
 		type StepId,
 		type StepStatus
 	} from '$lib/utils/audit-readiness';
-	import { dipAgeDays, type CloseRow, type MonthCloseData } from '$lib/utils/tank-balance';
+	import type { CloseRow, MonthCloseData } from '$lib/utils/tank-balance';
 	import type { Activity, DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
 
 	interface AuditEntry {
@@ -41,7 +41,8 @@
 		method: DieselClaimMethod;
 	}
 
-	const months: MonthOption[] = recentMonths(6);
+	const months: MonthOption[] = recentMonths(12);
+	const monthKeys = new Set(months.map((m) => m.key));
 	let selectedKey = $state(months[1].key); // last month: the one you are closing
 	let selected = $derived(months.find((m) => m.key === selectedKey) ?? months[1]);
 
@@ -63,6 +64,7 @@
 
 	let showSettings = $state(false);
 	let showDipModal = $state(false);
+	let history = $state<MonthClaim[] | null>(null);
 	let openSteps = $state(new Set<StepId>());
 
 	function one<T>(relation: T | T[] | null | undefined): T | null {
@@ -159,6 +161,7 @@
 			loadedKey = month.key;
 			// Open where the work is — once per month, never on a refresh.
 			if (firstLoadOfMonth) openSteps = new Set([startingStep(firstLoadOfPage)]);
+			loadHistory();
 		} catch (err) {
 			if (seq !== loadSeq) return;
 			const message = err instanceof Error ? err.message : 'Failed to load the month';
@@ -166,6 +169,29 @@
 			// loaded gets the full-page error.
 			if (loadedKey === month.key) toast.error(`Couldn't refresh: ${message}`);
 			else error = message;
+		}
+	}
+
+	/**
+	 * Every month since the start of last season, for the history table.
+	 * Background: the month on screen never waits for it.
+	 */
+	async function loadHistory() {
+		try {
+			const { default: supabaseService } = await import('$lib/services/supabase');
+			const lastSeason = financialYearStart(new Date(new Date().getFullYear() - 1, new Date().getMonth(), 1));
+			const start = isoLocal(lastSeason);
+			const end = isoLocal(new Date());
+			const [entriesRes, adjRes] = await Promise.all([
+				supabaseService.getClaimEntries(start, end),
+				supabaseService.getVehicleMonthlyClaimAdjustments(start, `${end.slice(0, 7)}-01`)
+			]);
+			if (entriesRes.error) throw new Error(entriesRes.error);
+			if (adjRes.error) throw new Error(adjRes.error);
+			history = monthlyClaims(entriesRes.data || [], adjRes.data || []);
+		} catch (err) {
+			toast.error(`History not loaded: ${err instanceof Error ? err.message : err}`);
+			history = [];
 		}
 	}
 
@@ -200,7 +226,6 @@
 	);
 	let ledger = $derived(closeData?.ledger ?? null);
 	let monthDip = $derived(closeData?.closingDip ?? null);
-	let dipAge = $derived(dipAgeDays(monthDip?.reading_date ?? null));
 
 	let items = $derived(
 		buildReadiness({
@@ -245,13 +270,6 @@
 		return issues.length > 1 ? `${issues[0]} · +${issues.length - 1} more` : issues[0];
 	}
 
-	let dipSummary = $derived.by(() => {
-		if (monthDip?.reading_value !== null && monthDip?.reading_value !== undefined)
-			return `${formatWholeLitres(monthDip.reading_value)} L · ${fmtDayMonth(monthDip.reading_date)}`;
-		if (selectedClose?.measured_level !== null && selectedClose?.measured_level !== undefined)
-			return `${formatWholeLitres(selectedClose.measured_level)} L`;
-		return issueLine('dip') ?? '';
-	});
 	let closeSummary = $derived.by(() => {
 		if (selectedClose) {
 			const hasGap =
@@ -374,7 +392,7 @@
 					<p class="ui-label">Refund est.</p>
 					<p class="ui-figure good">{formatRand(refundRands)}</p>
 				</div>
-				<div class="progress" role="img" aria-label="{3 - openStepCount} of 3 steps done">
+				<div class="progress" role="img" aria-label="{2 - openStepCount} of 2 steps done">
 					{#each steps as s (s.id)}<i class={s.state}></i>{/each}
 				</div>
 			</section>
@@ -382,44 +400,6 @@
 			<div class="steps">
 				<Step
 					n={1}
-					id="dip"
-					title="Dip"
-					state={stepOf.dip.state}
-					summary={dipSummary}
-					open={openSteps.has('dip')}
-					ontoggle={() => toggle('dip')}
-				>
-					<div class="dip-body">
-						{#if monthDip?.reading_value !== null && monthDip?.reading_value !== undefined}
-							<div>
-								<p class="ui-label">Last dip in {selected.label}</p>
-								<p class="ui-figure dip-fig">
-									{formatWholeLitres(monthDip.reading_value)}<small>L</small>
-								</p>
-								<p class="ui-muted">
-									{fmtDayMonth(monthDip.reading_date)}{dipAge !== null ? ` · ${dipAge} d ago` : ''}
-								</p>
-							</div>
-							<button class="ui-btn" onclick={() => (showDipModal = true)}>Record another</button>
-						{:else}
-							{#if ledger}
-								<div>
-									<p class="ui-label">Book expects</p>
-									<p class="ui-figure dip-fig">
-										{formatWholeLitres(ledger.bookAtDip)}<small>L</small>
-									</p>
-									<p class="ui-muted">at {fmtDayMonth(selected.monthEnd)}, before the dip</p>
-								</div>
-							{/if}
-							<button class="ui-btn primary" onclick={() => (showDipModal = true)}
-								>Record dip</button
-							>
-						{/if}
-					</div>
-				</Step>
-
-				<Step
-					n={2}
 					id="close"
 					title="Close"
 					state={stepOf.close.state}
@@ -432,11 +412,12 @@
 						data={closeData}
 						toleranceL={$claimSettings.dipToleranceL}
 						onrefresh={load}
+						onrecorddip={() => (showDipModal = true)}
 					/>
 				</Step>
 
 				<Step
-					n={3}
+					n={2}
 					id="claim"
 					title="Claim"
 					state={stepOf.claim.state}
@@ -458,7 +439,7 @@
 				</Step>
 
 				<Step
-					n={4}
+					n={3}
 					id="export"
 					title="Export"
 					state={stepOf.export.state}
@@ -482,7 +463,15 @@
 			</div>
 
 			<div class="trend">
-				<LeakTrend rows={closes} toleranceL={$claimSettings.dipToleranceL} />
+				<MonthHistory
+					months={history}
+					{closes}
+					rateCents={$claimSettings.rateCents}
+					toleranceL={$claimSettings.dipToleranceL}
+					{selectedKey}
+					selectable={monthKeys}
+					onselect={selectMonth}
+				/>
 			</div>
 		</div>
 	{/if}
@@ -583,9 +572,9 @@
 		gap: 0.875rem;
 	}
 
-	@media (min-width: 1024px) {
+	@media (min-width: 1280px) {
 		.layout {
-			grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 			grid-template-areas:
 				'kpis kpis'
 				'steps trend';
@@ -602,8 +591,6 @@
 
 		.trend {
 			grid-area: trend;
-			position: sticky;
-			top: 1rem;
 		}
 	}
 
@@ -647,7 +634,7 @@
 	.progress {
 		grid-column: 1 / -1;
 		display: grid;
-		grid-template-columns: repeat(4, 1fr);
+		grid-template-columns: repeat(3, 1fr);
 		gap: 1px;
 		background: var(--white);
 	}
@@ -679,21 +666,6 @@
 		min-width: 0;
 	}
 
-	.dip-body {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-
-	.dip-body p {
-		margin: 0;
-	}
-
-	.dip-fig {
-		font-size: 1.75rem;
-		margin: 0.25rem 0 !important;
-	}
 
 	.export-warn {
 		margin: 0 0 0.75rem;

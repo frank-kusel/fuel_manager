@@ -1,5 +1,5 @@
 /**
- * Month-end readiness, as four steps: Dip → Close → Claim → Export.
+ * Month-end readiness, as three steps: Close (with its dip) → Claim → Export.
  *
  * Each check belongs to the step where you fix it, and a step's state is the
  * worst of its checks. That is what lets the Audit page be one ordered list
@@ -20,9 +20,9 @@
 
 import type { CloseRow, DipRow } from './tank-balance';
 
-export type StepId = 'dip' | 'close' | 'claim' | 'export';
+export type StepId = 'close' | 'claim' | 'export';
 
-export const STEP_ORDER: StepId[] = ['dip', 'close', 'claim', 'export'];
+export const STEP_ORDER: StepId[] = ['close', 'claim', 'export'];
 
 export type ReadinessId =
 	| 'dip'
@@ -86,14 +86,14 @@ export function buildReadiness(input: ReadinessInput): ReadinessItem[] {
 		dipLitres !== null
 			? {
 					id: 'dip',
-					step: 'dip',
+					step: 'close',
 					state: 'ok',
 					title: 'Dip taken',
 					detail: `${rounded(dipLitres)} L${dipDate ? ` on ${dipDate}` : ''}`
 				}
 			: {
 					id: 'dip',
-					step: 'dip',
+					step: 'close',
 					state: 'blocker',
 					title: 'Dip taken',
 					detail: `No dip in ${monthLabel}`

@@ -133,3 +133,42 @@ export function summariseClaim(
 		byVehicle
 	};
 }
+
+export interface MonthClaim {
+	/** YYYY-MM */
+	month: string;
+	totalLitres: number;
+	claimableLitres: number;
+	/** Claimable-activity litres held back for a missing classifier result. */
+	excludedLitres: number;
+	missingAdjustments: number;
+}
+
+/** The claim month by month, newest first — one summariseClaim per month. */
+export function monthlyClaims(
+	entries: ClaimEntry[],
+	adjustments: ClaimAdjustment[] = []
+): MonthClaim[] {
+	const byMonth = new Map<string, ClaimEntry[]>();
+	for (const entry of entries) {
+		const month = entry.date.slice(0, 7);
+		const list = byMonth.get(month);
+		if (list) list.push(entry);
+		else byMonth.set(month, [entry]);
+	}
+	return [...byMonth.entries()]
+		.sort((a, b) => (a[0] < b[0] ? 1 : -1))
+		.map(([month, list]) => {
+			const summary = summariseClaim(
+				list,
+				adjustments.filter((a) => a.claim_month.startsWith(month))
+			);
+			return {
+				month,
+				totalLitres: summary.totalLitres,
+				claimableLitres: summary.claimableLitres,
+				excludedLitres: summary.excludedLitres,
+				missingAdjustments: summary.missingAdjustments
+			};
+		});
+}

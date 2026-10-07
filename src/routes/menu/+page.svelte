@@ -5,12 +5,6 @@
 
 	const menuItems = [
 		{
-			title: 'Month-end close',
-			description: 'Close the tank against a physical dip, review the leak trend and the claim',
-			href: '/audit',
-			icon: 'scale'
-		},
-		{
 			title: 'Database Management',
 			description: 'Manage vehicles, drivers, bowsers, activities, fields, and zones',
 			href: '/tools/database',

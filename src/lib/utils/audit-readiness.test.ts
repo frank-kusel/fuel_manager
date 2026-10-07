@@ -118,16 +118,17 @@ describe('buildSteps and currentStep', () => {
 	it('is done through Claim and ready to export when everything is clear', () => {
 		const steps = buildSteps(buildReadiness(ready()));
 
-		expect(stepStates(ready())).toEqual({ dip: 'done', close: 'done', claim: 'done', export: 'ready' });
+		expect(stepStates(ready())).toEqual({ close: 'done', claim: 'done', export: 'ready' });
 		expect(currentStep(steps)).toBe('export');
 	});
 
-	it('starts at the dip on a fresh month', () => {
+	it('starts at the close on a fresh month, with the dip as its first issue', () => {
 		const input = ready({ monthDip: null, selectedClose: null, regNo: '' });
 		const steps = buildSteps(buildReadiness(input));
 
-		expect(stepStates(input)).toEqual({ dip: 'todo', close: 'todo', claim: 'todo', export: 'todo' });
-		expect(currentStep(steps)).toBe('dip');
+		expect(stepStates(input)).toEqual({ close: 'todo', claim: 'todo', export: 'todo' });
+		expect(currentStep(steps)).toBe('close');
+		expect(steps[0].issues[0]).toBe('No dip in June 2026');
 	});
 
 	it('moves on past a close that is over tolerance — it is closed, with a caveat', () => {
@@ -155,9 +156,9 @@ describe('firstOutstanding', () => {
 	});
 
 	it('follows step order when several checks fail', () => {
-		expect(firstOutstanding(buildReadiness(ready({ selectedClose: null, regNo: '' })))?.id).toBe(
-			'close'
-		);
+		expect(
+			firstOutstanding(buildReadiness(ready({ monthDip: null, selectedClose: null, regNo: '' })))?.id
+		).toBe('dip');
 	});
 
 	it('is null when everything is clear', () => {

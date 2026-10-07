@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summariseClaim, type ClaimAdjustment, type ClaimEntry } from './claim-totals';
+import { monthlyClaims, summariseClaim, type ClaimAdjustment, type ClaimEntry } from './claim-totals';
 
 function entry(overrides: Partial<ClaimEntry> = {}): ClaimEntry {
 	return {
@@ -77,5 +77,27 @@ describe('summariseClaim', () => {
 
 		expect(summary.claimableLitres).toBeCloseTo(150); // 50 + 100 + 0
 		expect(summary.byVehicle.get('actros')!.missingMonths).toEqual(['2026-08']);
+	});
+});
+
+describe('monthlyClaims', () => {
+	it('summarises each month on its own, newest first', () => {
+		const months = monthlyClaims(
+			[
+				entry({ date: '2026-06-10', litres: 100 }),
+				entry({ date: '2026-07-10', litres: 50, eligible: false }),
+				entry({ vehicleId: 'actros', method: 'monthly_classifier', date: '2026-07-11', litres: 200 })
+			],
+			[adjustment('2026-06', 100, 100)]
+		);
+
+		expect(months.map((m) => m.month)).toEqual(['2026-07', '2026-06']);
+		expect(months[0]).toMatchObject({
+			totalLitres: 250,
+			claimableLitres: 0,
+			excludedLitres: 200,
+			missingAdjustments: 1
+		});
+		expect(months[1]).toMatchObject({ totalLitres: 100, claimableLitres: 100 });
 	});
 });

@@ -25,9 +25,11 @@
 		toleranceL: number;
 		/** Reload the page's data after a close. */
 		onrefresh: () => Promise<void>;
+		/** Open the dip form, dated to this month's end. */
+		onrecorddip: () => void;
 	}
 
-	let { month, data, toleranceL, onrefresh }: Props = $props();
+	let { month, data, toleranceL, onrefresh, onrecorddip }: Props = $props();
 
 	let note = $state('');
 	let rebaseline = $state(false);
@@ -131,10 +133,11 @@
 {:else if !ledger.dip}
 	<div class="waiting">
 		<p>
-			<span class="ui-label">Book so far</span>
+			<span class="ui-label">Book expects</span>
 			<span class="ui-figure so-far">{formatWholeLitres(ledger.bookAtDip)}<small>L</small></span>
+			<span class="ui-muted">at {fmtDayMonth(month.monthEnd)} · from the {fmtDayMonth(ledger.opening.date)} {ledger.opening.source}</span>
 		</p>
-		<p class="ui-muted">Opening {formatWholeLitres(ledger.opening.value)} · {fmtDayMonth(ledger.opening.date)} {ledger.opening.source}</p>
+		<button class="ui-btn primary" onclick={onrecorddip}>Record dip</button>
 	</div>
 {:else}
 	<div class="gap-row">
@@ -166,7 +169,10 @@
 			<dd>{formatWholeLitres(ledger.bookAtDip)}</dd>
 		</div>
 		<div>
-			<dt>Dip <small>{fmtDayMonth(ledger.dip.date)}</small></dt>
+			<dt>
+				Dip <small>{fmtDayMonth(ledger.dip.date)}</small>
+				<button class="redip" onclick={onrecorddip}>re-dip</button>
+			</dt>
 			<dd>{formatWholeLitres(ledger.dip.litres)}</dd>
 		</div>
 		{#if ledger.deliveriesAfterDip > 0 || ledger.dispensedAfterDip > 0}
@@ -257,6 +263,17 @@
 	.waiting p:first-child {
 		display: grid;
 		gap: 0.25rem;
+	}
+
+	.redip {
+		margin-left: 0.375rem;
+		padding: 0;
+		border: 0;
+		background: none;
+		font: inherit;
+		font-size: var(--text-xs);
+		color: var(--brand);
+		cursor: pointer;
 	}
 
 	.so-far {
