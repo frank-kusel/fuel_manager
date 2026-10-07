@@ -21,7 +21,7 @@ import type {
 	VehicleMonthlyClaimAdjustmentInput,
 	ApiResponse
 } from '$lib/types';
-import { todayIso } from '$lib/utils/dates';
+import { isoDayBefore, todayIso } from '$lib/utils/dates';
 import {
 	BURN_WINDOW_DAYS,
 	buildMonthLedger,
@@ -1136,9 +1136,9 @@ class SupabaseService {
 		const client = this.ensureInitialized();
 
 		try {
-			const [y, m] = monthStart.split('-').map(Number);
-			const prevEndDate = new Date(y, m - 1, 0); // last day of previous month
-			const prevEnd = prevEndDate.toLocaleDateString('en-CA');
+			// Opens from the day before the period: the previous month end for a
+			// whole month, and still correct for a custom period (the claim PDF).
+			const prevEnd = isoDayBefore(monthStart);
 
 			const [closingRes, existingRes, prevCloseRes, meterRes] = await Promise.all([
 				client

@@ -48,6 +48,13 @@ export function monthKey(year: number, month: number): string {
 	return `${year}-${String(month).padStart(2, '0')}`;
 }
 
+/** The calendar day before `iso`, e.g. the opening date for a period. */
+export function isoDayBefore(iso: string): string {
+	const d = new Date(`${iso}T12:00:00`);
+	d.setDate(d.getDate() - 1);
+	return isoLocal(d);
+}
+
 /** Whole days from `isoA` to `isoB`, positive when B is later. */
 export function daysBetween(isoA: string, isoB: string): number {
 	const a = new Date(`${isoA}T12:00:00`).getTime();

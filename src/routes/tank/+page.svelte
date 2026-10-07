@@ -3,6 +3,7 @@
 	import DipstickModal from '$lib/components/modals/DipstickModal.svelte';
 	import TankRefillModal from '$lib/components/modals/TankRefillModal.svelte';
 	import { tankStore, tankData, tankLoading } from '$lib/stores/tank';
+	import { claimSettings } from '$lib/stores/claim-settings';
 	import { onVisible } from '$lib/stores/freshness';
 	import { daysBetween, fmtDayMonth, fmtFull, todayIso } from '$lib/utils/dates';
 	import {
@@ -79,7 +80,7 @@
 	let dipBand = $derived.by(() => {
 		const check = tank?.dipCheck;
 		if (!check) return null;
-		return bandVariance(check.gapLitres, check.dipLitres);
+		return bandVariance(check.gapLitres, check.dipLitres, $claimSettings.dipToleranceL);
 	});
 
 	let trend = $derived(varianceTrend(closes));

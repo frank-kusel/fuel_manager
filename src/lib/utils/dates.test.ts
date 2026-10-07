@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { daysBetween, isoLocal, monthKey, monthRange, recentMonths, todayIso } from './dates';
+import {
+	daysBetween,
+	isoDayBefore,
+	isoLocal,
+	monthKey,
+	monthRange,
+	recentMonths,
+	todayIso
+} from './dates';
 
 afterEach(() => {
 	vi.useRealTimers();
@@ -74,5 +82,14 @@ describe('monthKey', () => {
 	it('zero-pads single-digit months', () => {
 		expect(monthKey(2026, 7)).toBe('2026-07');
 		expect(monthKey(2026, 12)).toBe('2026-12');
+	});
+});
+
+describe('isoDayBefore', () => {
+	it('crosses month and year boundaries', () => {
+		expect(isoDayBefore('2026-07-01')).toBe('2026-06-30');
+		expect(isoDayBefore('2026-03-01')).toBe('2026-02-28');
+		expect(isoDayBefore('2026-01-01')).toBe('2025-12-31');
+		expect(isoDayBefore('2026-07-15')).toBe('2026-07-14');
 	});
 });

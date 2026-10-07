@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/Button.svelte';
+	import { claimSettings } from '$lib/stores/claim-settings';
 
 	// Initialize date range with current month immediately.
 	// Format in LOCAL time — toISOString() is UTC and shifts the date back a
@@ -178,7 +179,7 @@
 				range.start,
 				range.end,
 				supabaseService,
-				'KCT Farming (Pty) Ltd'
+				{ companyName: 'KCT Farming (Pty) Ltd', toleranceL: $claimSettings.dipToleranceL }
 			);
 
 			if (result.success) {

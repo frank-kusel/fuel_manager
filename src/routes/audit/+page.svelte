@@ -21,6 +21,7 @@
 	import { summariseClaim } from '$lib/utils/claim-totals';
 	import { formatLitres, formatNumber } from '$lib/utils/formatting';
 	import { toast } from '$lib/stores/toast';
+	import { claimSettings, DEFAULT_CLAIM_SETTINGS } from '$lib/stores/claim-settings';
 	import type { Activity, DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
 
 	const SETTINGS_KEY = 'farmtrack_audit_settings_v1';
@@ -99,12 +100,14 @@
 		}
 	}
 
+	// Rate, registration and tolerance go through the shared store so the
+	// Tank page and the claim PDF band gaps with the same tolerance.
 	function saveSettings() {
-		try {
-			localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-		} catch {
-			/* private mode etc. */
-		}
+		claimSettings.save({
+			rateCents: Number(settings.rateCents) || DEFAULT_CLAIM_SETTINGS.rateCents,
+			regNo: settings.regNo,
+			dipToleranceL: Number(settings.dipToleranceL) > 0 ? Number(settings.dipToleranceL) : DEFAULT_DIP_TOLERANCE_L
+		});
 	}
 
 	// Whole calendar month, from local-calendar helpers. The old version built
@@ -446,12 +449,12 @@
 			<div id="month-close">
 				<MonthCloseSection
 					month={selected}
-					toleranceL={settings.dipToleranceL}
+					toleranceL={$claimSettings.dipToleranceL}
 					onclosed={load}
 				/>
 			</div>
 
-			<CloseHistory rows={closes} toleranceL={settings.dipToleranceL} />
+			<CloseHistory rows={closes} toleranceL={$claimSettings.dipToleranceL} />
 		</div>
 
 		{#if claimMounted}
