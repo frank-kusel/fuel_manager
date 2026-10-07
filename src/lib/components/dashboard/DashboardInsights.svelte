@@ -10,7 +10,7 @@
 	import { tankStore, tankData } from '$lib/stores/tank';
 	import { tankAttention } from '$lib/utils/tank-balance';
 	import { formatWholeLitres } from '$lib/utils/formatting';
-	import PaceChart from '$lib/components/charts/PaceChart.svelte';
+	import SeasonChart from '$lib/components/charts/SeasonChart.svelte';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
@@ -45,6 +45,11 @@
 	);
 
 	let tank = $derived($tankData?.insight ?? null);
+	let seasonPct = $derived.by(() => {
+		const season = $insightsData?.season;
+		if (!season || season.previousToDate <= 0) return null;
+		return Math.round(((season.toDate - season.previousToDate) / season.previousToDate) * 100);
+	});
 	let avgPerDay = $derived(
 		$insightsData && $insightsData.daily.length > 0
 			? $insightsData.totalLitres / $insightsData.daily.length
@@ -128,25 +133,42 @@
 	{:else if $insightsData}
 		{@const d = $insightsData}
 
-		<!-- The month: how much, how fast, against last month -->
+		<!-- This month and the season so far, against last year -->
 		<section class="overview">
 			<div class="ov-figures">
-				<p class="ui-label">Used in {d.monthLabel}</p>
-				<p class="ui-figure ov-v">{formatWholeLitres(d.totalLitres)}<small>L</small></p>
-				{#if d.momPct !== null}
-					<span class="ui-pill {d.momPct > 10 ? 'warn' : d.momPct < 0 ? 'good' : 'plain'}">
-						{d.momPct > 0 ? '▲' : '▼'} {Math.abs(d.momPct)}% vs same days last month
-					</span>
-				{/if}
+				<div class="ov-pair">
+					<div>
+						<p class="ui-label">{d.monthLabel}</p>
+						<p class="ui-figure ov-v">{formatWholeLitres(d.totalLitres)}<small>L</small></p>
+						{#if d.momPct !== null}
+							<span class="ui-pill {d.momPct > 10 ? 'warn' : d.momPct < 0 ? 'good' : 'plain'}" title="Against the same days last month">
+								{d.momPct > 0 ? '▲' : '▼'} {Math.abs(d.momPct)}% vs last month
+							</span>
+						{/if}
+					</div>
+					{#if d.season}
+						<div>
+							<p class="ui-label">Season {d.season.label}</p>
+							<p class="ui-figure ov-v">{formatWholeLitres(d.season.toDate)}<small>L</small></p>
+							{#if seasonPct !== null}
+								<span class="ui-pill {seasonPct > 10 ? 'warn' : seasonPct < 0 ? 'good' : 'plain'}" title="Against last season to the same day">
+									{seasonPct > 0 ? '▲' : '▼'} {Math.abs(seasonPct)}% vs last season
+								</span>
+							{/if}
+						</div>
+					{/if}
+				</div>
 				<dl class="ov-stats">
 					<div><dt>Entries</dt><dd>{formatWholeLitres(d.entryCount)}</dd></div>
 					<div><dt>Vehicles</dt><dd>{d.fleet.length}</dd></div>
 					<div><dt>Per day</dt><dd>{formatWholeLitres(avgPerDay)}</dd></div>
 				</dl>
 			</div>
-			<div class="ov-pace">
-				<PaceChart current={d.daily} previous={d.prevDaily ?? []} />
-			</div>
+			{#if d.season}
+				<div class="ov-pace">
+					<SeasonChart months={d.season.months} />
+				</div>
+			{/if}
 		</section>
 
 		<!--
@@ -330,8 +352,14 @@
 		margin: 0;
 	}
 
+	.ov-pair {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1rem;
+	}
+
 	.ov-v {
-		font-size: clamp(2.5rem, 7vw, 3.25rem);
+		font-size: clamp(1.875rem, 5vw, 2.5rem);
 		margin: 0.375rem 0 0.5rem !important;
 	}
 

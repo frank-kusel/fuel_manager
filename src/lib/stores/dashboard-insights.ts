@@ -1,4 +1,5 @@
 import { writable, derived } from 'svelte/store';
+import { financialYearStart, fyLabel, isoLocal } from '$lib/utils/dates';
 
 /**
  * Dashboard insights store — month-scoped operational view.
@@ -41,6 +42,65 @@ export interface DailyPoint {
 	litres: number;
 }
 
+export interface SeasonMonth {
+	/** YYYY-MM of this season's month */
+	key: string;
+	label: string;
+	/** Litres this season; null for months not reached yet. */
+	current: number | null;
+	/** The same month last season. */
+	previous: number;
+}
+
+export interface SeasonSummary {
+	/** "2026/27" */
+	label: string;
+	months: SeasonMonth[];
+	/** This season so far. */
+	toDate: number;
+	/** Last season over the same span of days. */
+	previousToDate: number;
+	/** All of last season. */
+	previousTotal: number;
+}
+
+/** The season (financial year from 1 March) month by month against last season. */
+export function buildSeason(rows: { entry_date: string; litres_dispensed: number | null }[], now: Date): SeasonSummary {
+	const start = financialYearStart(now);
+	const prevStart = new Date(start.getFullYear() - 1, 2, 1);
+	const today = isoLocal(now);
+	const sameDayLastYear = isoLocal(new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()));
+	const byMonth = new Map<string, number>();
+	let toDate = 0;
+	let previousToDate = 0;
+	let previousTotal = 0;
+	const startIso = isoLocal(start);
+	const prevStartIso = isoLocal(prevStart);
+	for (const r of rows) {
+		const litres = r.litres_dispensed || 0;
+		const month = r.entry_date.slice(0, 7);
+		byMonth.set(month, (byMonth.get(month) || 0) + litres);
+		if (r.entry_date >= startIso && r.entry_date <= today) toDate += litres;
+		if (r.entry_date >= prevStartIso && r.entry_date < startIso) {
+			previousTotal += litres;
+			if (r.entry_date <= sameDayLastYear) previousToDate += litres;
+		}
+	}
+	const thisMonth = today.slice(0, 7);
+	const months: SeasonMonth[] = Array.from({ length: 12 }, (_, i) => {
+		const d = new Date(start.getFullYear(), 2 + i, 1);
+		const prev = new Date(start.getFullYear() - 1, 2 + i, 1);
+		const key = isoLocal(d).slice(0, 7);
+		return {
+			key,
+			label: d.toLocaleDateString('en-ZA', { month: 'short' }),
+			current: key <= thisMonth ? (byMonth.get(key) ?? 0) : null,
+			previous: byMonth.get(isoLocal(prev).slice(0, 7)) ?? 0
+		};
+	});
+	return { label: fyLabel(start), months, toDate, previousToDate, previousTotal };
+}
+
 export interface DashboardInsights {
 	monthLabel: string;
 	monthStart: string;
@@ -54,8 +114,7 @@ export interface DashboardInsights {
 	/** Fleet and logbook items only — tank items come from the tank store. */
 	attention: AttentionItem[];
 	daily: DailyPoint[];
-	/** Every day of the previous month, for the pace chart. */
-	prevDaily: DailyPoint[];
+	season: SeasonSummary;
 	brokenGaugeCount: number;
 }
 
@@ -69,7 +128,7 @@ interface InsightsState {
 }
 
 const CACHE_MS = 5 * 60 * 1000;
-const STORAGE_KEY = 'farmtrack_insights_cache_v4';
+const STORAGE_KEY = 'farmtrack_insights_cache_v5';
 
 // Hydrate from localStorage so a cold app-open paints the dashboard (and the
 // month figures) instantly; fresh data replaces it silently.
@@ -180,7 +239,8 @@ function createInsightsStore() {
 			const monthStartIso = isoDate(win.start);
 			const windowEnd = win.end;
 
-			const [prevRes, vehiclesRes, futureRes] = await Promise.all([
+			const seasonFrom = isoLocal(new Date(financialYearStart(now).getFullYear() - 1, 2, 1));
+			const [prevRes, vehiclesRes, futureRes, seasonRes] = await Promise.all([
 				client
 					.from('fuel_entries')
 					.select('entry_date, litres_dispensed')
@@ -195,11 +255,14 @@ function createInsightsStore() {
 					.from('fuel_entries')
 					.select('id, entry_date, vehicles(code)')
 					.is('deleted_at', null)
-					.gt('entry_date', isoDate(now))
+					.gt('entry_date', isoDate(now)),
+				supabaseService.getDispensedSince(seasonFrom, isoDate(now))
 			]);
 
 			const firstError = prevRes.error || vehiclesRes.error;
 			if (firstError) throw new Error(firstError.message);
+			if (seasonRes.error) throw new Error(seasonRes.error);
+			const season = buildSeason(seasonRes.data || [], now);
 
 			const entries = entriesRes.data || [];
 			const prevEntries = prevRes.data || [];
@@ -297,17 +360,6 @@ function createInsightsStore() {
 				daily.push({ date: key, litres: dailyTotals.get(key) || 0 });
 			}
 
-			// The whole previous month, day by day, for the pace comparison
-			const prevTotals = new Map<string, number>();
-			for (const e of prevEntries) {
-				prevTotals.set(e.entry_date, (prevTotals.get(e.entry_date) || 0) + (e.litres_dispensed || 0));
-			}
-			const prevDaily: DailyPoint[] = [];
-			for (let d = new Date(win.prevStart); d <= win.prevMonthEnd; d.setDate(d.getDate() + 1)) {
-				const key = isoDate(d);
-				prevDaily.push({ date: key, litres: prevTotals.get(key) || 0 });
-			}
-
 			// ---- Attention items ----
 			const attention: AttentionItem[] = [];
 			const brokenGaugeCount = entries.filter((e) => e.gauge_working === false).length;
@@ -353,7 +405,7 @@ function createInsightsStore() {
 				fleet,
 				attention,
 				daily,
-				prevDaily,
+				season,
 				brokenGaugeCount
 			};
 			const now2 = Date.now();
