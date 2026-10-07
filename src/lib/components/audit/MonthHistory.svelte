@@ -65,7 +65,7 @@
 	let trend = $derived(varianceTrend([...closes].sort((a, b) => (a.reconciliation_date < b.reconciliation_date ? 1 : -1))));
 </script>
 
-<section class="ui-panel" id="history">
+<section class="ui-panel history" id="history">
 	<div class="ui-panel-head">
 		<p class="ui-label">History</p>
 		{#if trend.driftLitres !== null}
@@ -181,6 +181,7 @@
 		margin: 0 -0.25rem;
 	}
 
+
 	table {
 		width: 100%;
 		border-collapse: collapse;
@@ -294,5 +295,56 @@
 	.open {
 		font-size: var(--text-xs);
 		margin: 0 auto;
+	}
+
+	/* Phones: no card — the table runs edge to edge on the page background,
+	   like the Tank chart. The side margins cancel the page gutter (main
+	   0.5rem + ui-page 0.25rem); the first and last columns keep it as
+	   padding so the figures still line up with the rest of the page. */
+	@media (max-width: 639px) {
+		.history {
+			margin: 0 -0.75rem;
+			padding: 0.5rem 0 0;
+			background: none;
+			border: 0;
+			border-radius: 0;
+		}
+
+		.history .ui-panel-head,
+		.history .season {
+			padding-left: 0.75rem;
+			padding-right: 0.75rem;
+		}
+
+		.table-wrap {
+			margin: 0;
+		}
+
+		th:first-child,
+		td:first-child {
+			padding-left: 0.75rem;
+		}
+
+		th:last-child,
+		td:last-child {
+			padding-right: 0.75rem;
+		}
+
+		/* Fit every column on a phone: the share is the least needed figure. */
+		.share {
+			display: none;
+		}
+
+		.gap-h {
+			min-width: 0;
+		}
+
+		.bar {
+			min-width: 2rem;
+		}
+
+		.gap-v {
+			width: 2.75rem;
+		}
 	}
 </style>
