@@ -10,10 +10,11 @@
 	 * band — inside the band is dipstick noise; a run of lollipops leaning one
 	 * way is a leak (or a recording error).
 	 *
-	 * There is no value axis. A scrub line, always on screen, picks a day and
-	 * the readout above the chart gives its figures; it starts on today, stays
-	 * where it is left, and is dragged with a finger or the mouse. The chosen
-	 * span (3M / 6M / All) fits the width, ending today.
+	 * There is no value axis. A scrub line, always on screen, picks a day: the
+	 * date and book ride on a label at its top, and the day's in / out / dip /
+	 * gap sit in fixed slots above the chart, so nothing jumps as it moves. It
+	 * starts on today, stays where it is left, and is dragged with a finger or
+	 * the mouse. The chosen span (3M / 6M / All) fits the width, ending today.
 	 */
 	import { fmtDayMonth, fmtFull } from '$lib/utils/dates';
 	import { formatSigned, formatWholeLitres } from '$lib/utils/formatting';
@@ -40,10 +41,11 @@
 
 	// ---- Geometry: two tracks, one timeline, no axis column ----
 	const PAD_X = 10;
-	const MAIN = { top: 30, bottom: 184 };
-	const GAP = { top: 200, bottom: 256 };
-	const MONTHS_Y = 278;
-	const HEIGHT = 290;
+	const LABEL_H = 20; // the scrub label rides in a band above the plot
+	const MAIN = { top: 48, bottom: 200 };
+	const GAP = { top: 216, bottom: 272 };
+	const MONTHS_Y = 294;
+	const HEIGHT = 306;
 	const gapMid = (GAP.top + GAP.bottom) / 2;
 	const uid = Math.random().toString(36).slice(2, 8);
 
@@ -200,29 +202,31 @@
 		{/each}
 	</div>
 
-	<!-- Readout: the scrub line's day -->
-	<div class="readout" aria-live="polite">
+	<!-- The day's details, each in a fixed slot: nothing moves as the line does -->
+	<div class="slots" aria-live="polite">
 		{#if shown}
-			<div class="r-main">
-				<span class="r-date">{isToday ? 'Today' : fmtDayMonth(shown.date)}</span>
-				<span class="r-book">{formatWholeLitres(shown.litres)}<small>L</small></span>
-				{#if !isToday}
-					<button class="chip today" onclick={() => (picked = null)}>Today</button>
-				{/if}
+			{@const dip = shownDip ?? (isToday ? latestDip : undefined)}
+			<div class="slot">
+				<span class="s-k">In</span>
+				<span class="s-v" class:in={shown.delivered > 0}
+					>{shown.delivered > 0 ? `+${formatWholeLitres(shown.delivered)}` : '—'}</span
+				>
 			</div>
-			<div class="r-chips">
-				{#if shown.delivered > 0}<span class="chip in">+{formatWholeLitres(shown.delivered)} in</span>{/if}
-				{#if shown.dispensed > 0 && !isToday}<span class="chip">−{formatWholeLitres(shown.dispensed)} out</span>{/if}
-				{#if shownDip}
-					<span class="chip {shownDip.band ? TONE[shownDip.band.key] : ''}">
-						dip {formatWholeLitres(shownDip.dipLitres)} · gap {formatSigned(shownDip.gapLitres)}
-					</span>
-				{:else if isToday && latestDip}
-					<span class="chip {latestDip.band ? TONE[latestDip.band.key] : ''}">
-						last gap {formatSigned(latestDip.gapLitres)} · {fmtDayMonth(latestDip.date)}
-					</span>
-				{/if}
+			<div class="slot">
+				<span class="s-k">Out</span>
+				<span class="s-v">{shown.dispensed > 0 ? `−${formatWholeLitres(shown.dispensed)}` : '—'}</span>
 			</div>
+			<div class="slot">
+				<span class="s-k">{dip && !shownDip ? `Last dip ${fmtDayMonth(dip.date)}` : 'Dip'}</span>
+				<span class="s-v">{dip ? formatWholeLitres(dip.dipLitres) : '—'}</span>
+			</div>
+			<div class="slot">
+				<span class="s-k">Gap</span>
+				<span class="s-v {dip?.band ? TONE[dip.band.key] : ''}">{dip ? formatSigned(dip.gapLitres) : '—'}</span>
+			</div>
+			<button class="to-today" class:hidden={isToday} onclick={() => (picked = null)} tabindex={isToday ? -1 : 0}
+				>Today</button
+			>
 		{/if}
 	</div>
 
@@ -339,11 +343,18 @@
 			<!-- ===== Scrub line: always there, dragged to any day ===== -->
 			{#if shown}
 				{@const sx = xAt(at)}
-				<line class="scrub" x1={sx} x2={sx} y1={MAIN.top - 10} y2={GAP.bottom + 2} />
+				<line class="scrub" x1={sx} x2={sx} y1={2 + LABEL_H} y2={GAP.bottom + 2} />
 				<circle class="focus" cx={sx} cy={yAt(shown.litres)} r="4.5" />
 				{#if shownDip}
 					<circle class="focus-gap" cx={sx} cy={gAt(shownDip.gapLitres)} r="5" />
 				{/if}
+				{@const text = `${isToday ? 'Today' : fmtDayMonth(shown.date)} · ${formatWholeLitres(shown.litres)} L`}
+				{@const lw = text.length * 6.1 + 18}
+				{@const lx = Math.min(Math.max(sx - lw / 2, 2), viewW - lw - 2)}
+				<g class="tag">
+					<rect x={lx} y="2" width={lw} height={LABEL_H} rx={LABEL_H / 2} />
+					<text x={lx + lw / 2} y={2 + LABEL_H / 2 + 4}>{text}</text>
+				</g>
 				<g
 					class="handle"
 					class:active={dragging}
@@ -391,114 +402,71 @@
 		box-shadow: var(--shadow-sm);
 	}
 
-	/* ---- Readout ----
-	   A fixed height whatever the day holds, so the chart under it never
-	   jumps as the scrub line crosses a dip or a delivery. Phones: two rows
-	   (day and litres, then the tags); wider: one row. The tags never wrap. */
-	.readout {
+	/* ---- Slots: fixed positions, fixed height ---- */
+	.slots {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: 1.75rem 1.5rem;
+		grid-template-columns: repeat(4, minmax(0, 1fr)) 3.75rem;
 		align-items: center;
-		height: 3.5rem;
+		column-gap: 0.5rem;
+		height: 2.75rem;
+		margin-bottom: 0.25rem;
 		font-variant-numeric: tabular-nums;
 	}
 
-	@media (min-width: 640px) {
-		.readout {
-			grid-template-columns: auto minmax(0, 1fr);
-			grid-template-rows: 2.25rem;
-			height: 2.25rem;
-			column-gap: 0.75rem;
-		}
-
-		.r-chips {
-			justify-content: flex-end;
-		}
-	}
-
-	.r-main {
-		display: flex;
-		align-items: baseline;
-		gap: 0.625rem;
-	}
-
-	.r-main .today {
-		margin-left: auto;
-		align-self: center;
-	}
-
-	@media (min-width: 640px) {
-		.r-main .today {
-			margin-left: 0.25rem;
-		}
-	}
-
-	.r-date {
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-500);
-		min-width: 3.25rem;
-	}
-
-	.r-book {
-		font-size: 1.5rem;
-		font-weight: 800;
-		font-stretch: var(--figure-stretch);
-		letter-spacing: -0.02em;
-		color: var(--gray-900);
-		line-height: 1;
-	}
-
-	.r-book small {
-		font-size: 0.55em;
-		color: var(--gray-400);
-		margin-left: 0.15em;
-	}
-
-	.r-chips {
-		display: flex;
-		flex-wrap: nowrap;
-		gap: 0.25rem;
+	.slot {
+		display: grid;
 		min-width: 0;
-		overflow: hidden;
 	}
 
-	.chip {
-		font-size: var(--text-xs);
+	.s-k {
+		font-size: 0.625rem;
 		font-weight: var(--font-weight-semibold);
-		padding: 0.125rem 0.5rem;
-		border-radius: var(--radius-full);
-		background: var(--gray-100);
-		color: var(--gray-600);
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--gray-400);
 		white-space: nowrap;
-		flex: none;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.chip.in,
-	.chip.good {
-		background: #ecf6ef;
+	.s-v {
+		font-size: 0.9375rem;
+		font-weight: 700;
+		font-stretch: var(--figure-stretch);
+		color: var(--gray-800);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.s-v.in,
+	.s-v.good {
 		color: #1f6b3a;
 	}
 
-	.chip.warn {
-		background: #fdf3e2;
-		color: #8a4b08;
+	.s-v.warn {
+		color: #b45309;
 	}
 
-	.chip.bad {
-		background: #fbeaea;
-		color: #9b1c1c;
+	.s-v.bad {
+		color: var(--error);
 	}
 
-	.chip.today {
+	.to-today {
+		justify-self: end;
+		padding: 0.25rem 0.625rem;
 		border: 0;
+		border-radius: var(--radius-full);
+		background: var(--gray-900);
+		color: var(--white);
 		font: inherit;
 		font-size: var(--text-xs);
 		font-weight: var(--font-weight-semibold);
-		background: var(--gray-900);
-		color: var(--white);
 		cursor: pointer;
+	}
+
+	.to-today.hidden {
+		visibility: hidden;
 	}
 
 	/* ---- Plot ---- */
@@ -676,6 +644,18 @@
 		fill: none;
 		stroke: var(--gray-900);
 		stroke-width: 1.5;
+	}
+
+	.tag rect {
+		fill: var(--gray-900);
+	}
+
+	.tag text {
+		font-size: 11px;
+		font-weight: 700;
+		fill: var(--white);
+		text-anchor: middle;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.handle rect {

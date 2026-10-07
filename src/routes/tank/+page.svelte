@@ -355,7 +355,7 @@
 
 	.chart-panel .ui-panel-head,
 	.chart-panel .legend,
-	.chart-panel :global(.readout) {
+	.chart-panel :global(.slots) {
 		padding-left: var(--inset);
 		padding-right: var(--inset);
 	}
