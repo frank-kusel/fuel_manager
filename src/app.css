@@ -386,3 +386,283 @@ h3 {
 		font-size: 16px;
 	}
 }
+/* =========================================================================
+   SHARED SURFACES — the visual system for the Tank, Audit and Dashboard
+   pages. Numbers and shapes carry the meaning; text is a label, not a
+   paragraph. One radius, hairline borders, colour only on the thing that has
+   the status.
+   ========================================================================= */
+
+.ui-page {
+	max-width: 1080px;
+	margin: 0 auto;
+	padding: 0 0.25rem 1.5rem;
+	display: grid;
+	gap: 0.875rem;
+}
+
+.ui-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	min-height: 2.5rem;
+}
+
+.ui-head h1 {
+	margin: 0;
+}
+
+.ui-panel {
+	background: var(--white);
+	border: 1px solid var(--gray-200);
+	border-radius: var(--radius-lg);
+	padding: 1rem 1.125rem;
+	min-width: 0;
+}
+
+.ui-panel-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 0.75rem;
+}
+
+/* Small caps label above a figure or a section */
+.ui-label {
+	font-size: 0.6875rem;
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--gray-500);
+	margin: 0;
+}
+
+.ui-figure {
+	font-stretch: var(--figure-stretch);
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.02em;
+	line-height: 1;
+	color: var(--gray-900);
+}
+
+.ui-figure small {
+	font-size: 0.45em;
+	font-weight: var(--font-weight-semibold);
+	color: var(--gray-400);
+	margin-left: 0.15em;
+	letter-spacing: 0;
+}
+
+.ui-muted {
+	color: var(--gray-500);
+}
+
+/* Status pill: a dot and a few words */
+.ui-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	padding: 0.25rem 0.625rem;
+	border-radius: var(--radius-full);
+	background: var(--gray-100);
+	color: var(--gray-700);
+	font-size: var(--text-xs);
+	font-weight: var(--font-weight-semibold);
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	text-decoration: none;
+}
+
+.ui-pill::before {
+	content: '';
+	width: 0.4375rem;
+	height: 0.4375rem;
+	border-radius: 50%;
+	background: var(--gray-400);
+	flex: none;
+}
+
+.ui-pill.good {
+	background: #ecf6ef;
+	color: #1f6b3a;
+}
+.ui-pill.good::before {
+	background: var(--success);
+}
+.ui-pill.warn {
+	background: #fdf3e2;
+	color: #8a4b08;
+}
+.ui-pill.warn::before {
+	background: var(--warning);
+}
+.ui-pill.bad {
+	background: #fbeaea;
+	color: #9b1c1c;
+}
+.ui-pill.bad::before {
+	background: var(--error);
+}
+.ui-pill.plain::before {
+	display: none;
+}
+a.ui-pill:hover {
+	filter: brightness(0.97);
+}
+
+/* Compact list rows: date · label · value */
+.ui-rows {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.ui-rows li {
+	display: grid;
+	grid-template-columns: 4.25rem 1fr auto;
+	align-items: baseline;
+	gap: 0.75rem;
+	padding: 0.5rem 0;
+	border-top: 1px solid var(--gray-100);
+	font-size: var(--text-sm);
+}
+
+.ui-rows li:first-child {
+	border-top: 0;
+}
+
+.ui-rows .when {
+	color: var(--gray-500);
+	font-variant-numeric: tabular-nums;
+}
+
+.ui-rows .what {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ui-rows .what small {
+	color: var(--gray-400);
+	margin-left: 0.375rem;
+}
+
+.ui-rows .val {
+	font-weight: var(--font-weight-semibold);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+.ui-rows .val.in {
+	color: #1f6b3a;
+}
+
+/* Buttons for page-level actions */
+.ui-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	padding: 0.5625rem 0.875rem;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--gray-300);
+	background: var(--white);
+	color: var(--gray-800);
+	font: inherit;
+	font-size: var(--text-sm);
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.ui-btn:hover {
+	background: var(--gray-50);
+}
+
+.ui-btn.primary {
+	background: var(--brand);
+	border-color: var(--brand);
+	color: var(--white);
+}
+
+.ui-btn.primary:hover {
+	background: var(--brand-hover);
+}
+
+.ui-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.ui-btn svg {
+	width: 1rem;
+	height: 1rem;
+}
+
+/* Primary actions: inline on desktop, a sticky bar above the bottom nav on
+   phones so they are always one thumb away. */
+.ui-actions {
+	display: flex;
+	gap: 0.5rem;
+}
+
+@media (max-width: 767px) {
+	.ui-actions.sticky {
+		position: sticky;
+		bottom: 4.5rem;
+		z-index: 50;
+		padding: 0.5rem;
+		margin: 0 -0.25rem;
+		background: rgba(245, 245, 244, 0.92);
+		backdrop-filter: blur(8px);
+		border-radius: var(--radius-lg);
+	}
+
+	.ui-actions.sticky .ui-btn {
+		flex: 1;
+		padding: 0.75rem;
+	}
+}
+
+.ui-skeleton {
+	border-radius: var(--radius-lg);
+	background: linear-gradient(90deg, var(--gray-100), var(--gray-50), var(--gray-100));
+	background-size: 200% 100%;
+	animation: ui-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes ui-shimmer {
+	from {
+		background-position: 200% 0;
+	}
+	to {
+		background-position: -200% 0;
+	}
+}
+
+/* Progressive disclosure: tables and detail behind a one-line toggle */
+.ui-details > summary {
+	cursor: pointer;
+	list-style: none;
+	font-size: var(--text-xs);
+	font-weight: var(--font-weight-semibold);
+	color: var(--gray-500);
+	padding: 0.375rem 0;
+}
+
+.ui-details > summary::-webkit-details-marker {
+	display: none;
+}
+
+.ui-details > summary::after {
+	content: ' ›';
+}
+
+.ui-details[open] > summary::after {
+	content: ' ‹';
+}

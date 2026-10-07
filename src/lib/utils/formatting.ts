@@ -25,6 +25,26 @@ export function formatLitres(value: number | null | undefined): string {
 	return formatNumber(value, 1);
 }
 
+/** Whole litres for summaries and tiles, e.g. "10 613". Entry-level figures keep formatLitres. */
+export function formatWholeLitres(value: number | null | undefined): string {
+	return formatNumber(value === null || value === undefined ? value : Math.round(value), 0);
+}
+
+/** A signed difference, e.g. "+597" or "−321" (true minus sign). */
+export function formatSigned(value: number | null | undefined, decimals: number = 0): string {
+	if (value === null || value === undefined || isNaN(value)) return '—';
+	const rounded = Number(value.toFixed(decimals));
+	const body = formatNumber(Math.abs(rounded), decimals);
+	if (rounded > 0) return `+${body}`;
+	if (rounded < 0) return `−${body}`;
+	return body;
+}
+
+/** Whole rand, e.g. "R 20 757". */
+export function formatRand(value: number | null | undefined): string {
+	return `R ${formatNumber(value, 0)}`;
+}
+
 /** Field area in hectares, e.g. "12,5 ha" */
 export function formatArea(area: number | null | undefined): string {
 	if (area === null || area === undefined) return '';

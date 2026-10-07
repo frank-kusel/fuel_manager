@@ -191,6 +191,16 @@ export function computeVariance(
  * percentage threshold. At 15 kL the percentage dominates; at 2 kL the tolerance
  * does, which is what stops low-stock months from flagging on instrument noise.
  */
+export function bandLimits(
+	measured: number,
+	toleranceL: number = DEFAULT_DIP_TOLERANCE_L
+): { good: number; acceptable: number } {
+	return {
+		good: Math.max(toleranceL, (VARIANCE_PCT.good / 100) * Math.abs(measured)),
+		acceptable: Math.max(2 * toleranceL, (VARIANCE_PCT.acceptable / 100) * Math.abs(measured))
+	};
+}
+
 export function bandVariance(
 	litres: number | null,
 	measured: number,
@@ -198,8 +208,7 @@ export function bandVariance(
 ): VarianceBand | null {
 	if (litres === null) return null;
 	const magnitude = Math.abs(litres);
-	const goodLimit = Math.max(toleranceL, (VARIANCE_PCT.good / 100) * Math.abs(measured));
-	const acceptableLimit = Math.max(2 * toleranceL, (VARIANCE_PCT.acceptable / 100) * Math.abs(measured));
+	const { good: goodLimit, acceptable: acceptableLimit } = bandLimits(measured, toleranceL);
 
 	if (magnitude <= goodLimit) return { key: 'good', label: 'Good' };
 	if (magnitude <= acceptableLimit) return { key: 'acceptable', label: 'Acceptable' };
