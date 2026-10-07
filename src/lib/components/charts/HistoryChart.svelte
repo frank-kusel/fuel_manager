@@ -206,10 +206,13 @@
 			<div class="r-main">
 				<span class="r-date">{isToday ? 'Today' : fmtDayMonth(shown.date)}</span>
 				<span class="r-book">{formatWholeLitres(shown.litres)}<small>L</small></span>
+				{#if !isToday}
+					<button class="chip today" onclick={() => (picked = null)}>Today</button>
+				{/if}
 			</div>
 			<div class="r-chips">
-				{#if shown.delivered > 0}<span class="chip in">+{formatWholeLitres(shown.delivered)} delivered</span>{/if}
-				{#if shown.dispensed > 0 && !isToday}<span class="chip">−{formatWholeLitres(shown.dispensed)} used</span>{/if}
+				{#if shown.delivered > 0}<span class="chip in">+{formatWholeLitres(shown.delivered)} in</span>{/if}
+				{#if shown.dispensed > 0 && !isToday}<span class="chip">−{formatWholeLitres(shown.dispensed)} out</span>{/if}
 				{#if shownDip}
 					<span class="chip {shownDip.band ? TONE[shownDip.band.key] : ''}">
 						dip {formatWholeLitres(shownDip.dipLitres)} · gap {formatSigned(shownDip.gapLitres)}
@@ -218,9 +221,6 @@
 					<span class="chip {latestDip.band ? TONE[latestDip.band.key] : ''}">
 						last gap {formatSigned(latestDip.gapLitres)} · {fmtDayMonth(latestDip.date)}
 					</span>
-				{/if}
-				{#if !isToday}
-					<button class="chip today" onclick={() => (picked = null)}>Today →</button>
 				{/if}
 			</div>
 		{/if}
@@ -391,21 +391,47 @@
 		box-shadow: var(--shadow-sm);
 	}
 
-	/* ---- Readout ---- */
+	/* ---- Readout ----
+	   A fixed height whatever the day holds, so the chart under it never
+	   jumps as the scrub line crosses a dip or a delivery. Phones: two rows
+	   (day and litres, then the tags); wider: one row. The tags never wrap. */
 	.readout {
-		display: flex;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: 1.75rem 1.5rem;
 		align-items: center;
-		justify-content: space-between;
-		flex-wrap: wrap;
-		gap: 0.375rem 0.75rem;
-		min-height: 2.25rem;
+		height: 3.5rem;
 		font-variant-numeric: tabular-nums;
+	}
+
+	@media (min-width: 640px) {
+		.readout {
+			grid-template-columns: auto minmax(0, 1fr);
+			grid-template-rows: 2.25rem;
+			height: 2.25rem;
+			column-gap: 0.75rem;
+		}
+
+		.r-chips {
+			justify-content: flex-end;
+		}
 	}
 
 	.r-main {
 		display: flex;
 		align-items: baseline;
 		gap: 0.625rem;
+	}
+
+	.r-main .today {
+		margin-left: auto;
+		align-self: center;
+	}
+
+	@media (min-width: 640px) {
+		.r-main .today {
+			margin-left: 0.25rem;
+		}
 	}
 
 	.r-date {
@@ -432,8 +458,10 @@
 
 	.r-chips {
 		display: flex;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		gap: 0.25rem;
+		min-width: 0;
+		overflow: hidden;
 	}
 
 	.chip {
@@ -444,6 +472,7 @@
 		background: var(--gray-100);
 		color: var(--gray-600);
 		white-space: nowrap;
+		flex: none;
 	}
 
 	.chip.in,

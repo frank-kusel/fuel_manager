@@ -125,6 +125,16 @@
 			{#if tank.capacity}
 				<TankGauge litres={tank.bookLitres} capacity={tank.capacity} />
 			{/if}
+			<!-- How today's book is made up, since the close it carries forward -->
+			<p class="flow">
+				<span class="flow-k">Since the {anchorLabel(tank.anchor)}</span>
+				<span class="flow-sum">
+					<span class="flow-v">{formatWholeLitres(tank.anchor.litres)}</span>
+					<span class="flow-op in">+{formatWholeLitres(tank.deliveriesSinceAnchor)}</span>
+					<span class="flow-op">−{formatWholeLitres(tank.dispensedSinceAnchor)}</span>
+					<span class="flow-eq">= {formatWholeLitres(tank.bookLitres)} L</span>
+				</span>
+			</p>
 			{#if stale || dipAge === null}
 				<p class="due">
 					<span class="ui-pill warn"
@@ -146,14 +156,6 @@
 				capacity={tank.capacity}
 				toleranceL={tolerance}
 			/>
-			<!-- How today's book is made up, since the close it carries forward -->
-			<p class="flow">
-				<span class="flow-k">Since the {anchorLabel(tank.anchor)}</span>
-				<span class="flow-v">{formatWholeLitres(tank.anchor.litres)}</span>
-				<span class="flow-op in">+{formatWholeLitres(tank.deliveriesSinceAnchor)}</span>
-				<span class="flow-op">−{formatWholeLitres(tank.dispensedSinceAnchor)}</span>
-				<span class="flow-eq">= {formatWholeLitres(tank.bookLitres)} L</span>
-			</p>
 			<ul class="legend" aria-hidden="true">
 				<li><i class="k-line"></i>Book</li>
 				<li><i class="k-in"></i>Delivery</li>
@@ -284,15 +286,14 @@
 		margin: 0.5rem 0 0;
 	}
 
-	/* ---- Flow strip under the chart ---- */
+	/* ---- Flow line under the gauge ---- */
 	.flow {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 0.25rem 0.625rem;
-		margin: 0.5rem 0 0;
+		margin: 0.25rem 0 0;
 		padding-top: 0.625rem;
-		padding-bottom: 0.125rem;
 		border-top: 1px solid var(--gray-100);
 		font-size: var(--text-sm);
 		font-variant-numeric: tabular-nums;
@@ -319,8 +320,23 @@
 		color: #1f6b3a;
 	}
 
+	.flow-sum {
+		display: flex;
+		align-items: baseline;
+		gap: 0.625rem;
+		flex: 1;
+		white-space: nowrap;
+	}
+
 	.flow-eq {
 		margin-left: auto;
+	}
+
+	/* Narrow phones: the label on its own line, the sum across the card */
+	@media (max-width: 479px) {
+		.flow-k {
+			width: 100%;
+		}
 	}
 
 	/* ---- Chart ---- */
@@ -339,7 +355,6 @@
 
 	.chart-panel .ui-panel-head,
 	.chart-panel .legend,
-	.chart-panel .flow,
 	.chart-panel :global(.readout) {
 		padding-left: var(--inset);
 		padding-right: var(--inset);
