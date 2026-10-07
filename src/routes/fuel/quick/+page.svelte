@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatNumber } from '$lib/utils/formatting';
+	import { todayIso } from '$lib/utils/dates';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import type { Vehicle, Driver, Activity, Field, Zone, Bowser } from '$lib/types';
@@ -231,7 +232,9 @@
 
 		// Default date/time to "now" (the store's module-level defaults can be stale)
 		const now = new Date();
-		entryDate = now.toISOString().split('T')[0];
+		// Local calendar day: toISOString() is UTC, so before 02:00 SAST it
+		// defaulted to yesterday.
+		entryDate = todayIso();
 		entryTime = now.toTimeString().substring(0, 8);
 		fuelEntryWorkflowStore.setEntryDate(entryDate);
 		fuelEntryWorkflowStore.setEntryTime(entryTime);

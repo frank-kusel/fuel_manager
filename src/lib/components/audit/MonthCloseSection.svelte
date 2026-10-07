@@ -97,6 +97,11 @@
 		if (!data?.closingDip || !ledger || !ledger.dip || leakVariance === null || carryForward === null)
 			return;
 
+		if (rebaseline && !note.trim()) {
+			error = 'A re-baseline needs a reason — it writes off the accumulated gap.';
+			return;
+		}
+
 		const isUpdate = !!data.existingClose;
 		const action = rebaseline ? 'Re-baseline and close' : isUpdate ? 'Update the close for' : 'Close';
 		const confirmed = confirm(
@@ -109,11 +114,6 @@
 				`Balance carried forward: ${nf1.format(carryForward)} L.`
 		);
 		if (!confirmed) return;
-
-		if (rebaseline && !note.trim()) {
-			error = 'A re-baseline needs a reason — it writes off the accumulated gap.';
-			return;
-		}
 
 		closing = true;
 		error = null;
@@ -297,7 +297,7 @@
 					bind:value={note}
 					maxlength="200"
 				/>
-				<button class="close-btn" onclick={closeMonth} disabled={closing}>
+				<button class="close-btn" onclick={closeMonth} disabled={closing || (rebaseline && !note.trim())}>
 					{closing
 						? 'Recording…'
 						: rebaseline

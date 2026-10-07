@@ -14,15 +14,24 @@
 	let { show = $bindable(false), onClose, onSuccess }: Props = $props();
 
 	// Form fields
-	let dipstickReading = $state('');
+	let dipstickReading = $state<number | string | null>('');
 	let dipstickDate = $state(todayIso());
 	let dipstickNotes = $state('');
 	let submitting = $state(false);
 
+	// 0 L is a real (empty-tank) reading; a negative one is not. The old
+	// `!dipstickReading` check rejected 0 and let -50 through.
+	let readingValid = $derived(
+		dipstickReading !== '' &&
+			dipstickReading !== null &&
+			Number.isFinite(Number(dipstickReading)) &&
+			Number(dipstickReading) >= 0
+	);
+
 	async function submitDipstickReading() {
-		if (!dipstickReading) return;
+		if (!readingValid) return;
 		// Never allow a future dip date (month-flip mistake in the picker)
-		if (dipstickDate > new Date().toLocaleDateString('en-CA')) {
+		if (dipstickDate > todayIso()) {
 			toast.error('Dip date cannot be in the future — check the month on the calendar.');
 			return;
 		}
@@ -31,7 +40,7 @@
 		try {
 			await supabaseService.init();
 			const result = await supabaseService.addTankReading({
-				reading_value: parseFloat(dipstickReading),
+				reading_value: Number(dipstickReading),
 				reading_date: dipstickDate,
 				notes: dipstickNotes || null
 			});
@@ -89,12 +98,13 @@
 					bind:value={dipstickReading}
 					placeholder="Enter dipstick reading"
 					step="0.1"
+					min="0"
 					autofocus
 				/>
 			</div>
 			<div class="form-group">
 				<label>Date</label>
-				<input type="date" max={new Date().toLocaleDateString('en-CA')} bind:value={dipstickDate} />
+				<input type="date" max={todayIso()} bind:value={dipstickDate} />
 			</div>
 			<div class="form-group">
 				<label>Notes (Optional)</label>
@@ -115,7 +125,7 @@
 			</Button>
 			<Button
 				onclick={submitDipstickReading}
-				disabled={submitting || !dipstickReading}
+				disabled={submitting || !readingValid}
 			>
 				{submitting ? 'Saving...' : 'Save Reading'}
 			</Button>

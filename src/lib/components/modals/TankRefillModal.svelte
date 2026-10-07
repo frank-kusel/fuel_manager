@@ -14,7 +14,7 @@
 	let { show = $bindable(false), onClose, onSuccess }: Props = $props();
 
 	// Form fields
-	let refillLitres = $state('');
+	let refillLitres = $state<number | string | null>('');
 	let refillSupplier = $state('');
 	let refillDate = $state(todayIso());
 	let refillInvoice = $state('');
@@ -22,10 +22,18 @@
 	let refillNotes = $state('');
 	let submitting = $state(false);
 
+	// A delivery adds fuel: zero or negative litres is a typo, not a delivery.
+	let litresValid = $derived(
+		refillLitres !== '' &&
+			refillLitres !== null &&
+			Number.isFinite(Number(refillLitres)) &&
+			Number(refillLitres) > 0
+	);
+
 	async function submitRefill() {
-		if (!refillLitres) return;
+		if (!litresValid) return;
 		// Never allow a future delivery date (month-flip mistake in the picker)
-		if (refillDate > new Date().toLocaleDateString('en-CA')) {
+		if (refillDate > todayIso()) {
 			toast.error('Delivery date cannot be in the future — check the month on the calendar.');
 			return;
 		}
@@ -34,7 +42,7 @@
 		try {
 			await supabaseService.init();
 			const result = await supabaseService.addTankRefill({
-				litres_added: parseFloat(refillLitres),
+				litres_added: Number(refillLitres),
 				supplier: refillSupplier || null,
 				delivery_date: refillDate,
 				invoice_number: refillInvoice || null,
@@ -102,6 +110,7 @@
 						bind:value={refillLitres}
 						placeholder="Enter litres"
 						step="0.1"
+						min="0"
 						autofocus
 					/>
 				</div>
@@ -115,7 +124,7 @@
 				</div>
 				<div class="form-group">
 					<label>Delivery Date</label>
-					<input type="date" max={new Date().toLocaleDateString('en-CA')} bind:value={refillDate} />
+					<input type="date" max={todayIso()} bind:value={refillDate} />
 				</div>
 				<div class="form-group">
 					<label>Invoice Number</label>
@@ -154,7 +163,7 @@
 			</Button>
 			<Button
 				onclick={submitRefill}
-				disabled={submitting || !refillLitres}
+				disabled={submitting || !litresValid}
 			>
 				{submitting ? 'Saving...' : 'Save Refill'}
 			</Button>
