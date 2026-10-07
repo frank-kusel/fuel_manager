@@ -1,12 +1,14 @@
 <script lang="ts">
 	/**
-	 * The tank's whole history on one scrollable timeline: the book balance
-	 * line, every delivery as a green jump with its litres, every dip as a dot
-	 * with a ±tolerance bar — so whether the book and the dipstick agree, and
-	 * whether the gap is drifting, reads straight off the chart. Closes are
-	 * small squares on the line.
+	 * The tank's history: the book balance line, every delivery as a green
+	 * jump with its litres, every dip as a dot with a ±tolerance bar — so
+	 * whether the book and the dipstick agree, and whether the gap is
+	 * drifting, reads straight off the chart. Closes are small squares.
+	 *
+	 * The chosen span (3M / 6M / All) always fits the width, ending today —
+	 * no sideways scrolling, so a finger dragged across the chart moves the
+	 * readout instead of the timeline. Vertical swipes still scroll the page.
 	 */
-	import { onMount, tick } from 'svelte';
 	import { fmtDayMonth, fmtFull } from '$lib/utils/dates';
 	import { formatSigned, formatWholeLitres } from '$lib/utils/formatting';
 	import {
@@ -31,15 +33,16 @@
 	type Range = keyof typeof RANGES;
 	let range = $state<Range>('3M');
 
-	let scroller: HTMLDivElement | undefined = $state();
 	let viewW = $state(600);
 	const PAD = { top: 26, bottom: 24 };
 	const AXIS_W = 44;
 	let plotH = $derived(height - PAD.top - PAD.bottom);
 
-	let days = $derived(points.length);
-	let pxPerDay = $derived(Math.max(2, viewW / Math.min(RANGES[range], Math.max(days, 1))));
-	let chartW = $derived(Math.max(viewW, Math.round(days * pxPerDay)));
+	/** The days in the chosen span, ending today. */
+	let win = $derived(points.slice(Math.max(0, points.length - RANGES[range])));
+	let fromDate = $derived(win[0]?.date ?? '');
+	let winDips = $derived(dips.filter((d) => d.date >= fromDate));
+	let pxPerDay = $derived(viewW / Math.max(win.length, 1));
 
 	/** A round step (1, 2 or 5 × 10ⁿ) giving about four gridlines. */
 	function niceStep(span: number): number {
@@ -48,58 +51,64 @@
 		const norm = raw / mag;
 		return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
 	}
-	// The vertical scale fits the days on screen, not the whole history: the
-	// top of the axis follows the highest book or dip in view as you scroll,
-	// so the line uses the full height of the chart.
-	let scrollX = $state(0);
-	let visible = $derived({
-		from: Math.max(0, Math.floor(scrollX / pxPerDay)),
-		to: Math.min(points.length - 1, Math.ceil((scrollX + viewW) / pxPerDay))
-	});
-	let dataMax = $derived.by(() => {
-		let max = 1;
-		for (let i = visible.from; i <= visible.to; i++) max = Math.max(max, points[i]?.litres ?? 0);
-		const fromDate = points[visible.from]?.date ?? '';
-		const toDate = points[visible.to]?.date ?? '';
-		for (const d of dips)
-			if (d.date >= fromDate && d.date <= toDate) max = Math.max(max, d.dipLitres + toleranceL);
-		return max;
-	});
+	// The vertical scale fits the span on screen, so the line uses the full
+	// height of the chart.
+	let dataMax = $derived(
+		Math.max(1, ...win.map((p) => p.litres), ...winDips.map((d) => d.dipLitres + toleranceL))
+	);
 	let yMax = $derived(dataMax * 1.04);
 	let step = $derived(niceStep(yMax));
-	let yMin = $derived(Math.min(0, ...points.map((p) => p.litres)));
+	let yMin = $derived(Math.min(0, ...win.map((p) => p.litres)));
 	const yAt = (litres: number) => PAD.top + (1 - (litres - yMin) / (yMax - yMin)) * plotH;
 	const xAt = (i: number) => (i + 0.5) * pxPerDay;
 
-	let indexOf = $derived(new Map(points.map((p, i) => [p.date, i])));
+	let indexOf = $derived(new Map(win.map((p, i) => [p.date, i])));
 
 	let linePath = $derived(
-		points.map((p, i) => `${i ? 'L' : 'M'}${xAt(i).toFixed(1)},${yAt(p.litres).toFixed(1)}`).join('')
+		win.map((p, i) => `${i ? 'L' : 'M'}${xAt(i).toFixed(1)},${yAt(p.litres).toFixed(1)}`).join('')
 	);
 	let areaPath = $derived(
-		points.length
-			? `${linePath}L${xAt(points.length - 1).toFixed(1)},${yAt(0)}L${xAt(0).toFixed(1)},${yAt(0)}Z`
+		win.length
+			? `${linePath}L${xAt(win.length - 1).toFixed(1)},${yAt(0)}L${xAt(0).toFixed(1)},${yAt(0)}Z`
 			: ''
 	);
 
-	/** Month bands: alternate shading and a label at each month's start. */
+	/** Month bands: alternate shading, labelled as fully as the width allows. */
 	let months = $derived.by(() => {
 		const out: { i: number; end: number; label: string; odd: boolean }[] = [];
-		points.forEach((p, i) => {
+		win.forEach((p, i) => {
 			if (i === 0 || p.date.endsWith('-01')) {
-				const d = new Date(`${p.date}T12:00:00`);
-				const label =
-					d.getMonth() === 0 || out.length === 0
-						? d.toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })
-						: d.toLocaleDateString('en-ZA', { month: 'short' });
 				if (out.length) out[out.length - 1].end = i;
-				out.push({ i, end: points.length, label, odd: out.length % 2 === 1 });
+				out.push({ i, end: win.length, label: p.date, odd: out.length % 2 === 1 });
 			}
 		});
-		return out;
+		return out.map((m, k) => {
+			const width = (m.end - m.i) * pxPerDay;
+			const d = new Date(`${m.label}T12:00:00`);
+			const label =
+				width < 10
+					? ''
+					: width < 28
+						? d.toLocaleDateString('en-ZA', { month: 'narrow' })
+						: d.getMonth() === 0 || k === 0
+							? d.toLocaleDateString('en-ZA', { month: 'short', year: '2-digit' })
+							: d.toLocaleDateString('en-ZA', { month: 'short' });
+			return { ...m, label };
+		});
 	});
 
-	let deliveries = $derived(points.map((p, i) => ({ p, i })).filter(({ p }) => p.delivered > 0));
+	/** Delivery jumps; labels are dropped where they would collide. */
+	let deliveries = $derived.by(() => {
+		let lastLabelX = -Infinity;
+		return win
+			.map((p, i) => ({ p, i }))
+			.filter(({ p }) => p.delivered > 0)
+			.map(({ p, i }) => {
+				const labelled = xAt(i) - lastLabelX > 46;
+				if (labelled) lastLabelX = xAt(i);
+				return { p, i, labelled };
+			});
+	});
 	let closeMarks = $derived(
 		closes
 			.filter((c) => indexOf.has(c.reconciliation_date))
@@ -111,36 +120,23 @@
 	let lowLine = $derived(capacity ? (capacity * LOW_TANK_PCT) / 100 : null);
 	const TONE = { good: 'good', acceptable: 'warn', high: 'bad' } as const;
 
-	// ---- Hover ----
+	// ---- Readout: hover with a mouse, drag a finger on a phone ----
 	let hover = $state<number | null>(null);
-	function onpointermove(event: PointerEvent) {
+	function track(event: PointerEvent) {
 		const rect = (event.currentTarget as SVGElement).getBoundingClientRect();
 		const i = Math.floor((event.clientX - rect.left) / pxPerDay);
-		hover = Math.max(0, Math.min(points.length - 1, i));
+		hover = Math.max(0, Math.min(win.length - 1, i));
 	}
-	let hovered = $derived(hover === null ? null : points[hover]);
-	let hoveredDip = $derived(hovered ? dips.find((d) => d.date === hovered.date) : undefined);
-
-	async function toLatest() {
-		await tick();
-		if (!scroller) return;
-		scroller.scrollLeft = scroller.scrollWidth;
-		scrollX = scroller.scrollLeft;
+	function onpointerleave(event: PointerEvent) {
+		// A lifted finger leaves the readout up to read; a mouse moving off clears it.
+		if (event.pointerType === 'mouse') hover = null;
 	}
-
-	let frame = 0;
-	function onscroll() {
-		cancelAnimationFrame(frame);
-		frame = requestAnimationFrame(() => {
-			if (scroller) scrollX = scroller.scrollLeft;
-		});
-	}
-	onMount(toLatest);
 	$effect(() => {
 		void range;
-		void points.length;
-		toLatest();
+		hover = null;
 	});
+	let hovered = $derived(hover === null ? null : win[hover]);
+	let hoveredDip = $derived(hovered ? winDips.find((d) => d.date === hovered.date) : undefined);
 </script>
 
 <div class="history">
@@ -156,35 +152,40 @@
 	</div>
 
 	<div class="frame" style="height: {height}px">
-		<div class="scroller" bind:this={scroller} bind:clientWidth={viewW} {onscroll} style="right: {AXIS_W}px">
+		<div class="plot" bind:clientWidth={viewW} style="right: {AXIS_W}px">
 			<svg
-				width={chartW}
+				width={viewW}
 				{height}
 				role="img"
-				aria-label="Book balance from {points.length ? fmtFull(points[0].date) : ''}: {deliveries.length} deliveries, {dips.length} dips"
-				{onpointermove}
-				onpointerleave={() => (hover = null)}
+				aria-label="Book balance from {win.length ? fmtFull(win[0].date) : ''}: {deliveries.length} deliveries, {winDips.length} dips"
+				onpointerdown={track}
+				onpointermove={track}
+				{onpointerleave}
 			>
 				{#each months as m (m.i)}
 					{#if m.odd}
 						<rect class="band" x={m.i * pxPerDay} y={PAD.top} width={(m.end - m.i) * pxPerDay} height={plotH} />
 					{/if}
-					<text class="month" x={m.i * pxPerDay + 4} y={height - 7}>{m.label}</text>
+					{#if m.label}<text class="month" x={m.i * pxPerDay + 3} y={height - 7}>{m.label}</text>{/if}
 				{/each}
 
 				{#each gridValues as g (g)}
-					<line class="grid" x1="0" x2={chartW} y1={yAt(g)} y2={yAt(g)} />
+					<line class="grid" x1="0" x2={viewW} y1={yAt(g)} y2={yAt(g)} />
 				{/each}
 				{#if lowLine !== null && lowLine < yMax}
-					<line class="low" x1="0" x2={chartW} y1={yAt(lowLine)} y2={yAt(lowLine)} />
+					<line class="low" x1="0" x2={viewW} y1={yAt(lowLine)} y2={yAt(lowLine)} />
 				{/if}
 
 				<path class="area" d={areaPath} />
 				<path class="line" d={linePath} />
 
-				{#each deliveries as { p, i } (p.date)}
+				{#each deliveries as { p, i, labelled } (p.date)}
 					<line class="jump" x1={xAt(i)} x2={xAt(i)} y1={yAt(p.litres - p.delivered)} y2={yAt(p.litres)} />
-					<text class="jump-label" x={xAt(i)} y={yAt(p.litres) - 6}>+{formatWholeLitres(p.delivered)}</text>
+					{#if labelled}
+						<text class="jump-label" x={Math.min(Math.max(xAt(i), 22), viewW - 22)} y={yAt(p.litres) - 6}
+							>+{formatWholeLitres(p.delivered)}</text
+						>
+					{/if}
 				{/each}
 
 				{#each closeMarks as { c, i }, k (k)}
@@ -192,13 +193,13 @@
 						class="close"
 						class:rebased={c.is_rebaseline}
 						x={xAt(i) - 3}
-						y={yAt(points[i].litres) - 3}
+						y={yAt(win[i].litres) - 3}
 						width="6"
 						height="6"
 					/>
 				{/each}
 
-				{#each dips as d, k (k)}
+				{#each winDips as d, k (k)}
 					{@const i = indexOf.get(d.date)!}
 					<line class="err {d.band ? TONE[d.band.key] : ''}" x1={xAt(i)} x2={xAt(i)} y1={yAt(d.dipLitres + toleranceL)} y2={yAt(d.dipLitres - toleranceL)} />
 					<line class="cap {d.band ? TONE[d.band.key] : ''}" x1={xAt(i) - 3} x2={xAt(i) + 3} y1={yAt(d.dipLitres + toleranceL)} y2={yAt(d.dipLitres + toleranceL)} />
@@ -213,7 +214,7 @@
 			</svg>
 
 			{#if hovered && hover !== null}
-				<div class="tip" style="left: {Math.min(Math.max(xAt(hover), 80), chartW - 80)}px">
+				<div class="tip" style="left: {Math.min(Math.max(xAt(hover), 80), viewW - 80)}px">
 					<strong>{fmtDayMonth(hovered.date)}</strong>
 					<span>Book {formatWholeLitres(hovered.litres)} L</span>
 					{#if hovered.delivered > 0}<span class="in">+{formatWholeLitres(hovered.delivered)} delivered</span>{/if}
@@ -273,18 +274,19 @@
 		position: relative;
 	}
 
-	.scroller {
+	.plot {
 		position: absolute;
 		inset: 0;
-		overflow-x: auto;
-		overflow-y: hidden;
-		scrollbar-width: thin;
-		overscroll-behavior-x: contain;
+		overflow: hidden;
 	}
 
 	svg {
 		display: block;
-		touch-action: pan-x pan-y;
+		/* Horizontal drags drive the readout; vertical swipes scroll the page. */
+		touch-action: pan-y;
+		cursor: crosshair;
+		user-select: none;
+		-webkit-user-select: none;
 	}
 
 	.axis {
