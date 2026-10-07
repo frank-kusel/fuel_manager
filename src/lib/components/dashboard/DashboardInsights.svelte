@@ -8,7 +8,9 @@
 	import { referenceDataStore, activeVehicles, activeDrivers } from '$lib/stores/reference-data';
 	import { onVisible } from '$lib/stores/freshness';
 	import { tankStore, tankData } from '$lib/stores/tank';
-	import { pctFull, tankAttention } from '$lib/utils/tank-balance';
+	import { tankAttention } from '$lib/utils/tank-balance';
+	import { formatWholeLitres } from '$lib/utils/formatting';
+	import PaceChart from '$lib/components/charts/PaceChart.svelte';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
@@ -43,7 +45,11 @@
 	);
 
 	let tank = $derived($tankData?.insight ?? null);
-	let tankPct = $derived(tank ? pctFull(tank.bookLitres, tank.capacity) : null);
+	let avgPerDay = $derived(
+		$insightsData && $insightsData.daily.length > 0
+			? $insightsData.totalLitres / $insightsData.daily.length
+			: 0
+	);
 
 	const SEVERITY_ORDER = { danger: 0, warning: 1, info: 2 } as const;
 	let attention = $derived.by(() => {
@@ -122,38 +128,25 @@
 	{:else if $insightsData}
 		{@const d = $insightsData}
 
-		<!-- Month overview: the three numbers you open the page for -->
+		<!-- The month: how much, how fast, against last month -->
 		<section class="overview">
-			<div class="ov-cell ov-main">
-				<div class="ov-k">Used in {d.monthLabel}</div>
-				<div class="ov-v">{nf.format(Math.round(d.totalLitres))}<span class="ov-unit">L</span></div>
+			<div class="ov-figures">
+				<p class="ui-label">Used in {d.monthLabel}</p>
+				<p class="ui-figure ov-v">{formatWholeLitres(d.totalLitres)}<small>L</small></p>
 				{#if d.momPct !== null}
-					<div class="mom" class:up={d.momPct > 0} class:down={d.momPct <= 0}>
-						{d.momPct > 0 ? '▲' : '▼'} {Math.abs(d.momPct)}% on the same days last month
-					</div>
+					<span class="ui-pill {d.momPct > 10 ? 'warn' : d.momPct < 0 ? 'good' : 'plain'}">
+						{d.momPct > 0 ? '▲' : '▼'} {Math.abs(d.momPct)}% vs same days last month
+					</span>
 				{/if}
+				<dl class="ov-stats">
+					<div><dt>Entries</dt><dd>{formatWholeLitres(d.entryCount)}</dd></div>
+					<div><dt>Vehicles</dt><dd>{d.fleet.length}</dd></div>
+					<div><dt>Per day</dt><dd>{formatWholeLitres(avgPerDay)}</dd></div>
+				</dl>
 			</div>
-			<div class="ov-cell">
-				<div class="ov-k">Entries</div>
-				<div class="ov-v ov-v-sm">{nf.format(d.entryCount)}</div>
-				<div class="ov-sub">{d.fleet.length} {d.fleet.length === 1 ? 'vehicle' : 'vehicles'} fuelled</div>
+			<div class="ov-pace">
+				<PaceChart current={d.daily} previous={d.prevDaily ?? []} />
 			</div>
-			{#if tank}
-				<a class="ov-cell ov-tank" href="/tank">
-					<div class="ov-k">{tank.name} book balance</div>
-					<div class="ov-v ov-v-sm" class:tank-negative={tank.bookLitres <= 0}>
-						{nf.format(Math.round(tank.bookLitres))}<span class="ov-unit">L</span>
-					</div>
-					{#if tankPct !== null}
-						<div class="tank-track" title="{Math.round(tankPct)}% full">
-							<div class="tank-fill" class:low={tankPct < 15} style="width: {tankPct}%"></div>
-						</div>
-					{/if}
-					<div class="ov-sub">
-						{tank.runwayDays !== null ? `About ${tank.runwayDays} days left` : `${Math.round(tankPct ?? 0)}% full`}
-					</div>
-				</a>
-			{/if}
 		</section>
 
 		<!--
@@ -237,7 +230,7 @@
 			{/if}
 
 			<section class="panel p-fleet">
-				<h2 class="panel-title">Top consumers <span class="title-note">against their own average</span></h2>
+				<h2 class="panel-title">Top consumers <span class="title-note">vs own average</span></h2>
 				<table class="fleet-table">
 					<tbody>
 						{#each d.fleet.slice(0, 6) as row}
@@ -313,126 +306,59 @@
 		gap: 0.875rem;
 	}
 
-	/* ---- Month overview band ---- */
+	/* ---- Month overview ---- */
 	.overview {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1rem;
 		background: var(--white);
 		border: 1px solid var(--gray-200);
 		border-radius: var(--radius-lg);
-	}
-
-	.ov-cell {
 		padding: 1rem 1.125rem;
-		min-width: 0;
-		color: inherit;
-		text-decoration: none;
 	}
 
-	.ov-main {
-		grid-column: 1 / -1;
-		border-bottom: 1px solid var(--gray-100);
+	@media (min-width: 720px) {
+		.overview {
+			grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+			align-items: center;
+			gap: 1.5rem;
+			padding: 1.25rem 1.5rem;
+		}
 	}
 
-	.ov-cell + .ov-cell:not(.ov-main) {
-		border-left: 1px solid var(--gray-100);
-	}
-
-	.ov-main + .ov-cell {
-		border-left: none;
-	}
-
-	.ov-k {
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-600);
-		margin-bottom: 0.375rem;
+	.ov-figures p {
+		margin: 0;
 	}
 
 	.ov-v {
-		font-size: 3rem;
-		font-weight: 750;
+		font-size: clamp(2.5rem, 7vw, 3.25rem);
+		margin: 0.375rem 0 0.5rem !important;
+	}
+
+	.ov-stats {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.5rem;
+		margin: 1rem 0 0;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--gray-100);
+	}
+
+	.ov-stats dt {
+		font-size: var(--text-xs);
+		color: var(--gray-500);
+	}
+
+	.ov-stats dd {
+		margin: 0;
+		font-size: 1.125rem;
+		font-weight: 700;
 		font-stretch: var(--figure-stretch);
-		color: var(--gray-900);
-		letter-spacing: -0.02em;
-		line-height: 1;
 		font-variant-numeric: tabular-nums;
 	}
 
-	.ov-v-sm {
-		font-size: 2rem;
-	}
-
-	.ov-v.tank-negative {
-		color: var(--error);
-	}
-
-	.ov-unit {
-		font-size: 0.45em;
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-400);
-		margin-left: 0.2rem;
-	}
-
-	.ov-sub {
-		font-size: var(--text-sm);
-		color: var(--gray-500);
-		margin-top: 0.375rem;
-	}
-
-	.ov-tank:hover .ov-k {
-		color: var(--brand);
-	}
-
-	.mom {
-		font-size: var(--text-sm);
-		font-weight: 500;
-		margin-top: 0.5rem;
-	}
-
-	.mom.down {
-		color: var(--success-dark);
-	}
-
-	.mom.up {
-		color: var(--warning-dark);
-	}
-
-	.tank-track {
-		height: 6px;
-		background: var(--gray-100);
-		border-radius: 3px;
-		margin-top: 0.625rem;
-		overflow: hidden;
-	}
-
-	.tank-fill {
-		height: 100%;
-		background: var(--brand);
-	}
-
-	.tank-fill.low {
-		background: var(--error);
-	}
-
-	/* Wide: one row of three, the month total leading */
-	@media (min-width: 900px) {
-		.overview {
-			grid-template-columns: 1.6fr 1fr 1.2fr;
-		}
-
-		.ov-main {
-			grid-column: auto;
-			border-bottom: none;
-		}
-
-		.ov-main + .ov-cell {
-			border-left: 1px solid var(--gray-100);
-		}
-
-		.ov-cell {
-			padding: 1.25rem 1.5rem;
-		}
+	.ov-pace {
+		min-width: 0;
 	}
 
 	/* ---- Board ---- */
@@ -486,12 +412,14 @@
 		}
 	}
 
+	/* Same small-caps label as the Tank and Audit panels */
 	.panel-title {
-		font-size: 1rem;
+		font-size: 0.6875rem;
 		font-weight: var(--font-weight-semibold);
-		color: var(--gray-900);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--gray-500);
 		margin: 0 0 0.75rem;
-		letter-spacing: 0;
 	}
 
 	/* ---- Where fuel went: ranked bars ---- */
@@ -706,7 +634,7 @@
 
 	.title-note {
 		font-weight: 400;
-		color: var(--gray-500);
+		color: var(--gray-400);
 		margin-left: 0.25rem;
 	}
 
@@ -899,14 +827,6 @@
 	}
 
 	@media (max-width: 768px) {
-		.ov-v {
-			font-size: 2.6rem;
-		}
-
-		.ov-v-sm {
-			font-size: 1.75rem;
-		}
-
 		.daily-bars {
 			gap: 2px;
 			height: 130px;

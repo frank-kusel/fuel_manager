@@ -4,67 +4,16 @@
 
 <svelte:head>
 	<title>Dashboard - FarmTrack</title>
-	<meta name="description" content="FarmTrack operations dashboard: monthly fuel breakdown, fleet outliers, tank runway, and attention flags" />
+	<meta
+		name="description"
+		content="FarmTrack: this month's diesel use, its pace against last month, and where it went"
+	/>
 </svelte:head>
 
-<div class="dashboard-page">
-	<div class="dashboard-header">
-		<div class="header-content">
-			<h1>Dashboard</h1>
-			<p>Where this month's diesel went, and what needs a look</p>
-		</div>
+<div class="ui-page">
+	<div class="ui-head">
+		<h1>Dashboard</h1>
 	</div>
 
 	<DashboardInsights />
 </div>
-
-<style>
-	.dashboard-page {
-		width: 100%;
-		max-width: 1400px;
-		margin: 0 auto;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.dashboard-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		gap: 1rem;
-	}
-
-	.header-content h1 {
-		font-size: 2rem;
-		font-weight: 700;
-		color: var(--color-text-primary);
-		line-height: 1.2;
-	}
-
-	.header-content p {
-		margin: 0.25rem 0 0;
-		color: var(--gray-500);
-		font-size: var(--text-base);
-	}
-
-	/* Mobile Responsiveness */
-	@media (max-width: 768px) {
-		.dashboard-page {
-			padding: 0 0.5rem 0.5rem;
-			gap: 0.5rem;
-		}
-
-		.dashboard-header {
-			flex-direction: column;
-			gap: 0.75rem;
-			padding: 0.5rem 0;
-		}
-
-		.header-content h1 {
-			font-size: 1.75rem;
-		}
-	}
-
-</style>

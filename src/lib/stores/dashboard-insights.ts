@@ -54,6 +54,8 @@ export interface DashboardInsights {
 	/** Fleet and logbook items only — tank items come from the tank store. */
 	attention: AttentionItem[];
 	daily: DailyPoint[];
+	/** Every day of the previous month, for the pace chart. */
+	prevDaily: DailyPoint[];
 	brokenGaugeCount: number;
 }
 
@@ -67,7 +69,7 @@ interface InsightsState {
 }
 
 const CACHE_MS = 5 * 60 * 1000;
-const STORAGE_KEY = 'farmtrack_insights_cache_v3';
+const STORAGE_KEY = 'farmtrack_insights_cache_v4';
 
 // Hydrate from localStorage so a cold app-open paints the dashboard (and the
 // month figures) instantly; fresh data replaces it silently.
@@ -141,13 +143,16 @@ function createInsightsStore() {
 					offset === 0
 						? now
 						: new Date(now.getFullYear(), now.getMonth() - offset + 1, 0);
-				// Comparison window: same span, one month earlier
+				// Comparison window: same span, one month earlier. The whole
+				// previous month is fetched for the pace chart; the comparison
+				// only counts its first `prevEnd` days.
 				const prevStart = new Date(now.getFullYear(), now.getMonth() - offset - 1, 1);
 				const prevEnd =
 					offset === 0
 						? new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
 						: new Date(now.getFullYear(), now.getMonth() - offset, 0);
-				return { start, end, prevStart, prevEnd };
+				const prevMonthEnd = new Date(now.getFullYear(), now.getMonth() - offset, 0);
+				return { start, end, prevStart, prevEnd, prevMonthEnd };
 			}
 
 			// Current month; if it has no entries yet (e.g. the 1st/2nd of the
@@ -181,7 +186,7 @@ function createInsightsStore() {
 					.select('entry_date, litres_dispensed')
 					.is('deleted_at', null)
 					.gte('entry_date', isoDate(win.prevStart))
-					.lte('entry_date', isoDate(win.prevEnd)),
+					.lte('entry_date', isoDate(win.prevMonthEnd)),
 				client
 					.from('vehicles')
 					.select('id, code, name, average_consumption_l_per_100km')
@@ -202,7 +207,10 @@ function createInsightsStore() {
 
 			// ---- Totals ----
 			const totalLitres = entries.reduce((s, e) => s + (e.litres_dispensed || 0), 0);
-			const prevMonthLitres = prevEntries.reduce((s, e) => s + (e.litres_dispensed || 0), 0);
+			const prevCutoff = isoDate(win.prevEnd);
+			const prevMonthLitres = prevEntries
+				.filter((e) => e.entry_date <= prevCutoff)
+				.reduce((s, e) => s + (e.litres_dispensed || 0), 0);
 			const momPct =
 				prevMonthLitres > 0
 					? Math.round(((totalLitres - prevMonthLitres) / prevMonthLitres) * 100)
@@ -289,6 +297,17 @@ function createInsightsStore() {
 				daily.push({ date: key, litres: dailyTotals.get(key) || 0 });
 			}
 
+			// The whole previous month, day by day, for the pace comparison
+			const prevTotals = new Map<string, number>();
+			for (const e of prevEntries) {
+				prevTotals.set(e.entry_date, (prevTotals.get(e.entry_date) || 0) + (e.litres_dispensed || 0));
+			}
+			const prevDaily: DailyPoint[] = [];
+			for (let d = new Date(win.prevStart); d <= win.prevMonthEnd; d.setDate(d.getDate() + 1)) {
+				const key = isoDate(d);
+				prevDaily.push({ date: key, litres: prevTotals.get(key) || 0 });
+			}
+
 			// ---- Attention items ----
 			const attention: AttentionItem[] = [];
 			const brokenGaugeCount = entries.filter((e) => e.gauge_working === false).length;
@@ -334,6 +353,7 @@ function createInsightsStore() {
 				fleet,
 				attention,
 				daily,
+				prevDaily,
 				brokenGaugeCount
 			};
 			const now2 = Date.now();
