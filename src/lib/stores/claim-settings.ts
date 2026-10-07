@@ -131,8 +131,14 @@ function createClaimSettingsStore() {
 
 				let row = result.data;
 				const local = readLocal();
-				if (!row.migrated_from_browser_at) {
-					const take = local.found ? browserValuesToMigrate(row, local.settings) : {};
+				// Only a browser that actually brings values closes the one-time
+				// copy: one with nothing to add (a new phone, a fresh preview)
+				// must not shut out the device that holds the real settings.
+				const take =
+					!row.migrated_from_browser_at && local.found
+						? browserValuesToMigrate(row, local.settings)
+						: {};
+				if (Object.keys(take).length > 0) {
 					const migrated = await supabaseService.updateAppSettings({
 						...toPatch(take),
 						migrated_from_browser_at: new Date().toISOString()
