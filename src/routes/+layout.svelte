@@ -136,13 +136,13 @@
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
 				<span class="sb-label">Log fuel entry</span>
 			</button>
-			<button class="sb-item" title="Dipstick reading" onclick={() => handleAction('dipstick')}>
+			<button class="sb-item" title="Record dip" onclick={() => handleAction('dipstick')}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V6M8 10l4-4 4 4"/><path d="M5 20h14"/></svg>
-				<span class="sb-label">Dipstick reading</span>
+				<span class="sb-label">Record dip</span>
 			</button>
-			<button class="sb-item" title="Tank delivery" onclick={() => handleAction('refill')}>
+			<button class="sb-item" title="Record delivery" onclick={() => handleAction('refill')}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0l-4-4m4 4l4-4"/><path d="M5 20h14"/></svg>
-				<span class="sb-label">Tank delivery</span>
+				<span class="sb-label">Record delivery</span>
 			</button>
 			<button class="sb-item" title="Full entry workflow" onclick={() => handleAction('fuel')}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h11M10 12h11M10 18h11"/><path d="m3 6 1.5 1.5L7 5"/><path d="m3 12 1.5 1.5L7 11"/><path d="m3 18 1.5 1.5L7 17"/></svg>
@@ -319,8 +319,8 @@
 					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/></svg>
 				</div>
 				<div class="action-menu-content">
-					<div class="action-menu-title">Log Dipstick Reading</div>
-					<div class="action-menu-desc">Record tank dipstick measurement</div>
+					<div class="action-menu-title">Record dip</div>
+					<div class="action-menu-desc">Litres on the dipstick</div>
 				</div>
 			</button>
 			<button class="action-menu-item" onclick={() => handleAction('refill')}>
@@ -328,8 +328,8 @@
 					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="m3 15 6-6 3 3 6-6"/></svg>
 				</div>
 				<div class="action-menu-content">
-					<div class="action-menu-title">Tank Refill</div>
-					<div class="action-menu-desc">Record tank delivery and refill</div>
+					<div class="action-menu-title">Record delivery</div>
+					<div class="action-menu-desc">Diesel delivered into the tank</div>
 				</div>
 			</button>
 			<button class="action-menu-item" onclick={() => handleAction('quick')}>

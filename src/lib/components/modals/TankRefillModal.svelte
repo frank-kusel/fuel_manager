@@ -59,7 +59,7 @@
 				refillNotes = '';
 				refillDate = todayIso();
 
-				// Deliveries move the derived tank level everywhere — modal-level
+				// Deliveries move the book balance everywhere — modal-level
 				// so FAB/sidebar launches count, not just the Tank page's onSuccess.
 				markFuelDataStale();
 
@@ -71,10 +71,10 @@
 				// Close modal
 				onClose();
 			} else {
-				toast.error('Failed to save refill: ' + result.error);
+				toast.error('Delivery not saved: ' + result.error);
 			}
 		} catch (error) {
-			toast.error('Failed to save refill');
+			toast.error('Delivery not saved');
 		}
 		submitting = false;
 	}
@@ -95,7 +95,7 @@
 	<div class="modal-overlay" onclick={handleClose}></div>
 	<div class="modal">
 		<div class="modal-header">
-			<h3>New Tank Refill</h3>
+			<h3>Record delivery</h3>
 			<button class="close-btn" onclick={handleClose}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 			</button>
@@ -104,7 +104,7 @@
 		<div class="modal-body">
 			<div class="form-grid">
 				<div class="form-group">
-					<label>Litres Added</label>
+					<label>Litres delivered</label>
 					<input
 						type="number"
 						bind:value={refillLitres}
@@ -123,11 +123,11 @@
 					/>
 				</div>
 				<div class="form-group">
-					<label>Delivery Date</label>
+					<label>Date</label>
 					<input type="date" max={todayIso()} bind:value={refillDate} />
 				</div>
 				<div class="form-group">
-					<label>Invoice Number</label>
+					<label>Invoice no.</label>
 					<input
 						type="text"
 						bind:value={refillInvoice}
@@ -135,7 +135,7 @@
 					/>
 				</div>
 				<div class="form-group">
-					<label>Total Cost (Optional)</label>
+					<label>Total cost (optional)</label>
 					<input
 						type="number"
 						bind:value={refillCost}
@@ -144,7 +144,7 @@
 					/>
 				</div>
 				<div class="form-group">
-					<label>Notes (Optional)</label>
+					<label>Note (optional)</label>
 					<input
 						type="text"
 						bind:value={refillNotes}
@@ -165,7 +165,7 @@
 				onclick={submitRefill}
 				disabled={submitting || !litresValid}
 			>
-				{submitting ? 'Saving...' : 'Save Refill'}
+				{submitting ? 'Saving…' : 'Save delivery'}
 			</Button>
 		</div>
 	</div>

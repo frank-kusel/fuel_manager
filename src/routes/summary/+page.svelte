@@ -88,50 +88,6 @@
 		}
 	}
 
-	// Helper function to fetch field names for ALL entries (field_id is deprecated, all fields now in junction table)
-	// OPTIMIZED: Single batched query instead of N queries (fixes N+1 problem)
-	async function fetchFieldNamesForEntries(entries: FuelSummaryEntry[]) {
-		// Only fetch for entries we don't have cached
-		const entryIds = entries.map(e => e.id).filter(id => !fieldNamesMap[id]);
-		if (entryIds.length === 0) return;
-
-		try {
-			const client = supabaseService.getClient();
-
-			// Single query for all entries using IN clause
-			const result = await client
-				.from('fuel_entry_fields')
-				.select(`
-					fuel_entry_id,
-					field_id,
-					fields!inner(name, code)
-				`)
-				.in('fuel_entry_id', entryIds);
-
-			if (result.data && result.data.length > 0) {
-				// Group field names by entry_id
-				const grouped = result.data.reduce((acc: Record<string, string[]>, row: any) => {
-					if (!acc[row.fuel_entry_id]) {
-						acc[row.fuel_entry_id] = [];
-					}
-					acc[row.fuel_entry_id].push(row.fields.name || row.fields.code);
-					return acc;
-				}, {});
-
-				// Convert to comma-separated strings
-				const newMap: Record<string, string> = {};
-				for (const [entryId, fields] of Object.entries(grouped)) {
-					newMap[entryId] = fields.join(', ');
-				}
-
-				// Merge with existing map to trigger reactivity
-				fieldNamesMap = { ...fieldNamesMap, ...newMap };
-			}
-		} catch (error) {
-			console.error('Failed to fetch fields for entries:', error);
-		}
-	}
-
 	async function loadEntries(silent = false) {
 		try {
 			// Silent mode = stale-while-revalidate background refresh: the

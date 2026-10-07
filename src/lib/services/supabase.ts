@@ -509,7 +509,7 @@ class SupabaseService {
 	async addTankReading(reading: {
 		reading_value: number;
 		reading_date: string;
-		notes?: string;
+		notes?: string | null;
 	}): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();
 
@@ -525,18 +525,6 @@ class SupabaseService {
 				.select()
 				.single();
 
-			// Update tank config with latest dipstick reading
-			if (result.data) {
-				await client
-					.from('tank_config')
-					.update({
-						last_dipstick_level: reading.reading_value,
-						last_dipstick_date: reading.reading_date,
-						updated_at: new Date().toISOString()
-					})
-					.eq('tank_id', 'tank_a');
-			}
-
 			return { data: result.data, error: result.error?.message };
 		} catch (error) {
 			return {
@@ -548,11 +536,11 @@ class SupabaseService {
 
 	async addTankRefill(refill: {
 		litres_added: number;
-		supplier?: string;
+		supplier?: string | null;
 		delivery_date: string;
-		invoice_number?: string;
-		total_cost?: number;
-		notes?: string;
+		invoice_number?: string | null;
+		total_cost?: number | null;
+		notes?: string | null;
 	}): Promise<ApiResponse<any>> {
 		const client = this.ensureInitialized();
 

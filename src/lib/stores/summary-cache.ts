@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable } from 'svelte/store';
 
 interface FuelSummaryEntry {
 	id: string;
@@ -101,26 +101,6 @@ function createSummaryCacheStore() {
 			return isValid;
 		},
 
-		// Get cached data (only if valid)
-		getCachedData: (): { entries: FuelSummaryEntry[]; fieldNamesMap: Record<string, string> } | null => {
-			let result: { entries: FuelSummaryEntry[]; fieldNamesMap: Record<string, string> } | null = null;
-			subscribe(state => {
-				if (!state.timestamp || state.stale) {
-					result = null;
-					return;
-				}
-				const now = Date.now();
-				const age = now - state.timestamp;
-				if (age < CACHE_DURATION) {
-					result = {
-						entries: state.entries,
-						fieldNamesMap: state.fieldNamesMap
-					};
-				}
-			})();
-			return result;
-		},
-
 		// Set loading state
 		setLoading: (loading: boolean) => {
 			update(state => ({ ...state, loading }));
@@ -174,14 +154,6 @@ function createSummaryCacheStore() {
 			});
 		},
 
-		// Update field names map only (for incremental updates)
-		updateFieldNamesMap: (newFieldNames: Record<string, string>) => {
-			update(state => ({
-				...state,
-				fieldNamesMap: { ...state.fieldNamesMap, ...newFieldNames }
-			}));
-		},
-
 		// Mark stale: the next load refetches, but pages keep rendering the
 		// old data meanwhile (never a spinner over a populated list).
 		invalidate: () => {
@@ -201,9 +173,3 @@ function createSummaryCacheStore() {
 
 export const summaryCacheStore = createSummaryCacheStore();
 
-// Derived stores for convenient access
-export const summaryEntries = derived(summaryCacheStore, $store => $store.entries);
-export const summaryFieldNamesMap = derived(summaryCacheStore, $store => $store.fieldNamesMap);
-export const summaryLoading = derived(summaryCacheStore, $store => $store.loading);
-export const summaryError = derived(summaryCacheStore, $store => $store.error);
-export const summaryCacheTimestamp = derived(summaryCacheStore, $store => $store.timestamp);

@@ -62,7 +62,7 @@
 				dipstickNotes = '';
 				dipstickDate = initialDate();
 
-				// Dips move the derived tank level everywhere — modal-level so
+				// Dips move the book balance everywhere — modal-level so
 				// FAB/sidebar launches count, not just the Tank page's onSuccess.
 				markFuelDataStale();
 
@@ -103,11 +103,11 @@
 
 		<div class="modal-body">
 			<div class="form-group">
-				<label>Reading (Litres)</label>
+				<label>Dip (litres)</label>
 				<input
 					type="number"
 					bind:value={dipstickReading}
-					placeholder="Enter dipstick reading"
+					placeholder="e.g. 12 400"
 					step="0.1"
 					min="0"
 					autofocus
@@ -118,7 +118,7 @@
 				<input type="date" max={todayIso()} bind:value={dipstickDate} />
 			</div>
 			<div class="form-group">
-				<label>Notes (Optional)</label>
+				<label>Note (optional)</label>
 				<input
 					type="text"
 					bind:value={dipstickNotes}
@@ -138,7 +138,7 @@
 				onclick={submitDipstickReading}
 				disabled={submitting || !readingValid}
 			>
-				{submitting ? 'Saving...' : 'Save Reading'}
+				{submitting ? 'Saving…' : 'Save dip'}
 			</Button>
 		</div>
 	</div>

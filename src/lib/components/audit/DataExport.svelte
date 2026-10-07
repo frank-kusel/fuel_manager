@@ -1,70 +1,48 @@
 <script lang="ts">
-	import Button from '$lib/components/ui/Button.svelte';
+	/**
+	 * Exports for the selected month: the claim pack (PDF or Excel, for the
+	 * month or a custom period) and every entry as Excel. The month comes from
+	 * the Audit page; both date ranges follow it.
+	 */
 	import { claimSettings } from '$lib/stores/claim-settings';
-
-	// Initialize date range with current month immediately.
-	// Format in LOCAL time — toISOString() is UTC and shifts the date back a
-	// day for any timezone ahead of UTC (SAST included).
-	const now = new Date();
-	const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-	const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-	const isoLocal = (d: Date) =>
-		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	import { toast } from '$lib/stores/toast';
+	import { monthRange } from '$lib/utils/dates';
 
 	interface Props {
-		selectedYear?: number;
-		selectedMonth?: number;
-		/**
-		 * Hide the year/month selects when the host page already owns the month
-		 * (Audit drives everything from one selector). The custom-period mode
-		 * stays available either way.
-		 */
-		hideMonthPicker?: boolean;
+		selectedYear: number;
+		/** 1–12 */
+		selectedMonth: number;
 	}
 
-	let {
-		selectedYear = $bindable(now.getFullYear()),
-		selectedMonth = $bindable(now.getMonth() + 1),
-		hideMonthPicker = false
-	}: Props = $props();
+	let { selectedYear, selectedMonth }: Props = $props();
 
-	// State management
-	let startDate = $state(isoLocal(monthStart));
-	let endDate = $state(isoLocal(monthEnd));
-	let isExporting = $state(false);
-	let exportError = $state('');
-	let exportSuccess = $state(false);
+	const COMPANY = 'KCT Farming (Pty) Ltd';
 
-	// Claim summary state: whole calendar month, or any custom date range
+	let month = $derived(monthRange(selectedYear, selectedMonth));
 	let claimMode = $state<'month' | 'range'>('month');
-	let claimStart = $state(isoLocal(monthStart));
-	let claimEnd = $state(isoLocal(now));
-	let isExportingMonthly = $state(false);
-	let isExportingPDF = $state(false);
-	let monthlyExportError = $state('');
-	let monthlyExportSuccess = $state(false);
-	let pdfExportError = $state('');
-	let pdfExportSuccess = $state(false);
+	let claimStart = $state('');
+	let claimEnd = $state('');
+	let entriesStart = $state('');
+	let entriesEnd = $state('');
+	let busy = $state<'pdf' | 'claim-xlsx' | 'entries-xlsx' | null>(null);
 
-	// When the host page owns the month (Audit), the daily-capture range has to
-	// follow it. Without this the panel stayed pinned to TODAY's month, so
-	// claiming June armed the capture export for July — the last surviving
-	// instance of the conflicting-period-state this page set out to remove.
-	// The user can still override either input by hand; this only reseeds when
-	// the selected month itself changes.
+	// Follow the page's month; either range can still be edited by hand.
 	$effect(() => {
-		if (!hideMonthPicker) return;
-		const first = new Date(selectedYear, selectedMonth - 1, 1);
-		const last = new Date(selectedYear, selectedMonth, 0);
-		startDate = isoLocal(first);
-		endDate = isoLocal(last);
-		claimStart = isoLocal(first);
-		claimEnd = isoLocal(last);
+		claimStart = entriesStart = month.start;
+		claimEnd = entriesEnd = month.end;
 	});
 
-	// The export service pulls in SheetJS + jsPDF (~1 MB); load it only when
-	// an export button is actually clicked so the page chunk stays small.
-	async function loadExportDeps() {
+	let claimRange = $derived(
+		claimMode === 'month'
+			? month
+			: claimStart && claimEnd && claimStart <= claimEnd
+				? { start: claimStart, end: claimEnd }
+				: null
+	);
+	let entriesValid = $derived(!!entriesStart && !!entriesEnd && entriesStart <= entriesEnd);
+
+	// SheetJS + jsPDF (~1 MB) load only when an export is clicked.
+	async function deps() {
 		const [{ default: exportService }, { default: supabaseService }] = await Promise.all([
 			import('$lib/services/export'),
 			import('$lib/services/supabase')
@@ -72,727 +50,179 @@
 		return { exportService, supabaseService };
 	}
 
-	async function handleExport() {
-		if (!startDate || !endDate) {
-			exportError = 'Please select both start and end dates';
-			return;
-		}
-
-		if (new Date(startDate) > new Date(endDate)) {
-			exportError = 'Start date must be before end date';
-			return;
-		}
-
-		isExporting = true;
-		exportError = '';
-		exportSuccess = false;
-
+	async function run(
+		kind: NonNullable<typeof busy>,
+		task: (d: Awaited<ReturnType<typeof deps>>) => Promise<{ success: boolean; error?: string }>
+	) {
+		busy = kind;
 		try {
-			const { exportService, supabaseService } = await loadExportDeps();
-			const result = await exportService.exportToExcel(
-				startDate,
-				endDate,
-				supabaseService,
-				'KCT Farming (Pty) Ltd'
-			);
-
-			if (result.success) {
-				exportSuccess = true;
-				setTimeout(() => {
-					exportSuccess = false;
-				}, 3000);
-			} else {
-				exportError = result.error || 'Export failed';
-			}
-		} catch (error) {
-			console.error('Export error:', error);
-			exportError = error instanceof Error ? error.message : 'Export failed';
+			const result = await task(await deps());
+			if (result.success) toast.success('Export ready');
+			else toast.error(result.error || 'Export failed');
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Export failed');
 		} finally {
-			isExporting = false;
+			busy = null;
 		}
 	}
 
-	function claimRange(): { start: string; end: string } | null {
-		if (claimMode === 'month') {
-			return {
-				start: new Date(Date.UTC(selectedYear, selectedMonth - 1, 1)).toISOString().split('T')[0],
-				end: new Date(Date.UTC(selectedYear, selectedMonth, 0)).toISOString().split('T')[0]
-			};
-		}
-		if (!claimStart || !claimEnd || claimStart > claimEnd) return null;
-		return { start: claimStart, end: claimEnd };
+	function claimPdf() {
+		if (!claimRange) return;
+		const { start, end } = claimRange;
+		run('pdf', ({ exportService, supabaseService }) =>
+			exportService.exportClaimSummaryPDF(start, end, supabaseService, {
+				companyName: COMPANY,
+				toleranceL: $claimSettings.dipToleranceL
+			})
+		);
 	}
 
-	async function handleMonthlySummaryExport() {
-		const range = claimRange();
-		if (!range) {
-			monthlyExportError = 'Pick a valid period: start date must not be after end date';
-			return;
-		}
-		isExportingMonthly = true;
-		monthlyExportError = '';
-		monthlyExportSuccess = false;
-
-		try {
-			const { exportService, supabaseService } = await loadExportDeps();
-			const result = await exportService.exportClaimSummary(
-				range.start,
-				range.end,
-				supabaseService,
-				'KCT Farming (Pty) Ltd'
-			);
-
-			if (result.success) {
-				monthlyExportSuccess = true;
-				setTimeout(() => {
-					monthlyExportSuccess = false;
-				}, 3000);
-			} else {
-				monthlyExportError = result.error || 'Monthly summary export failed';
-			}
-		} catch (error) {
-			console.error('Monthly summary export error:', error);
-			monthlyExportError = error instanceof Error ? error.message : 'Monthly summary export failed';
-		} finally {
-			isExportingMonthly = false;
-		}
+	function claimExcel() {
+		if (!claimRange) return;
+		const { start, end } = claimRange;
+		run('claim-xlsx', ({ exportService, supabaseService }) =>
+			exportService.exportClaimSummary(start, end, supabaseService, COMPANY)
+		);
 	}
 
-	function clearMessages() {
-		exportError = '';
-		exportSuccess = false;
-	}
-
-	async function handleMonthlySummaryPDFExport() {
-		const range = claimRange();
-		if (!range) {
-			pdfExportError = 'Pick a valid period: start date must not be after end date';
-			return;
-		}
-		isExportingPDF = true;
-		pdfExportError = '';
-		pdfExportSuccess = false;
-
-		try {
-			const { exportService, supabaseService } = await loadExportDeps();
-			const result = await exportService.exportClaimSummaryPDF(
-				range.start,
-				range.end,
-				supabaseService,
-				{ companyName: 'KCT Farming (Pty) Ltd', toleranceL: $claimSettings.dipToleranceL }
-			);
-
-			if (result.success) {
-				pdfExportSuccess = true;
-				setTimeout(() => {
-					pdfExportSuccess = false;
-				}, 3000);
-			} else {
-				pdfExportError = result.error || 'PDF export failed';
-			}
-		} catch (error) {
-			console.error('Enhanced PDF export error:', error);
-			pdfExportError = error instanceof Error ? error.message : 'PDF export failed';
-		} finally {
-			isExportingPDF = false;
-		}
-	}
-
-	function clearMonthlyMessages() {
-		monthlyExportError = '';
-		monthlyExportSuccess = false;
-		pdfExportError = '';
-		pdfExportSuccess = false;
+	function entriesExcel() {
+		if (!entriesValid) return;
+		run('entries-xlsx', ({ exportService, supabaseService }) =>
+			exportService.exportToExcel(entriesStart, entriesEnd, supabaseService, COMPANY)
+		);
 	}
 </script>
 
-<div class="export-panels">
-	<section class="panel">
-		<div class="panel-head">
-			<div class="panel-icon" aria-hidden="true">
-				<svg
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.8"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg
-				>
+<div class="exports">
+	<div class="row">
+		<div class="what">
+			<p class="ui-label">Claim pack</p>
+			<div class="seg" role="radiogroup" aria-label="Claim period">
+				<button role="radio" aria-checked={claimMode === 'month'} class:on={claimMode === 'month'} onclick={() => (claimMode = 'month')}>Month</button>
+				<button role="radio" aria-checked={claimMode === 'range'} class:on={claimMode === 'range'} onclick={() => (claimMode = 'range')}>Custom</button>
 			</div>
-			<div>
-				<h4 class="panel-title">Vehicle claim summary</h4>
-				<p class="panel-sub">Per-vehicle totals for a month or custom period, as Excel or a signed PDF</p>
-			</div>
-		</div>
-
-		<div class="monthly-controls">
-			<div class="mode-toggle" role="group" aria-label="Period type">
-				<button
-					type="button"
-					class="mode-btn"
-					class:active={claimMode === 'month'}
-					disabled={isExportingMonthly || isExportingPDF}
-					onclick={() => {
-						claimMode = 'month';
-						clearMonthlyMessages();
-					}}
-				>
-					Month
-				</button>
-				<button
-					type="button"
-					class="mode-btn"
-					class:active={claimMode === 'range'}
-					disabled={isExportingMonthly || isExportingPDF}
-					onclick={() => {
-						claimMode = 'range';
-						clearMonthlyMessages();
-					}}
-				>
-					Custom period
-				</button>
-			</div>
-
-			{#if claimMode === 'month'}
-				{#if hideMonthPicker}
-					<p class="month-locked">
-						Using the month selected above. Switch to <strong>Custom period</strong> for any other range.
-					</p>
-				{:else}
-				<div class="month-inputs">
-					<div class="month-field">
-						<label for="export-year">Year</label>
-						<select
-							id="export-year"
-							bind:value={selectedYear}
-							disabled={isExportingMonthly}
-							onchange={clearMonthlyMessages}
-						>
-							{#each Array(5) as _, i}
-								<option value={now.getFullYear() - i}>{now.getFullYear() - i}</option>
-							{/each}
-						</select>
-					</div>
-
-					<div class="month-field">
-						<label for="export-month">Month</label>
-						<select
-							id="export-month"
-							bind:value={selectedMonth}
-							disabled={isExportingMonthly}
-							onchange={clearMonthlyMessages}
-						>
-							<option value={1}>January</option>
-							<option value={2}>February</option>
-							<option value={3}>March</option>
-							<option value={4}>April</option>
-							<option value={5}>May</option>
-							<option value={6}>June</option>
-							<option value={7}>July</option>
-							<option value={8}>August</option>
-							<option value={9}>September</option>
-							<option value={10}>October</option>
-							<option value={11}>November</option>
-							<option value={12}>December</option>
-						</select>
-					</div>
-				</div>
-				{/if}
-			{:else}
-				<div class="month-inputs">
-					<div class="month-field">
-						<label for="claim-start">From</label>
-						<input
-							id="claim-start"
-							type="date"
-							bind:value={claimStart}
-							disabled={isExportingMonthly || isExportingPDF}
-							onchange={clearMonthlyMessages}
-						/>
-					</div>
-
-					<div class="month-field">
-						<label for="claim-end">To</label>
-						<input
-							id="claim-end"
-							type="date"
-							bind:value={claimEnd}
-							disabled={isExportingMonthly || isExportingPDF}
-							onchange={clearMonthlyMessages}
-						/>
-					</div>
+			{#if claimMode === 'range'}
+				<div class="dates">
+					<input type="date" bind:value={claimStart} aria-label="Claim from" />
+					<span>–</span>
+					<input type="date" bind:value={claimEnd} aria-label="Claim to" />
 				</div>
 			{/if}
+		</div>
+		<div class="btns">
+			<button class="ui-btn primary" onclick={claimPdf} disabled={!claimRange || busy !== null}>
+				{busy === 'pdf' ? 'Building…' : 'PDF'}
+			</button>
+			<button class="ui-btn" onclick={claimExcel} disabled={!claimRange || busy !== null}>
+				{busy === 'claim-xlsx' ? 'Building…' : 'Excel'}
+			</button>
+		</div>
+	</div>
 
-			<div class="monthly-actions">
-				<div class="export-buttons-grid">
-					<Button
-						variant="primary"
-						size="medium"
-						loading={isExportingMonthly}
-						disabled={isExportingMonthly || isExportingPDF}
-						onclick={handleMonthlySummaryExport}
-					>
-						{#if isExportingMonthly}
-							Generating...
-						{:else}
-							Excel
-						{/if}
-					</Button>
-
-					<Button
-						variant="outline"
-						size="medium"
-						loading={isExportingPDF}
-						disabled={isExportingMonthly || isExportingPDF}
-						onclick={handleMonthlySummaryPDFExport}
-					>
-						{#if isExportingPDF}
-							Generating...
-						{:else}
-							PDF
-						{/if}
-					</Button>
-				</div>
+	<div class="row">
+		<div class="what">
+			<p class="ui-label">All entries</p>
+			<div class="dates">
+				<input type="date" bind:value={entriesStart} aria-label="Entries from" />
+				<span>–</span>
+				<input type="date" bind:value={entriesEnd} aria-label="Entries to" />
 			</div>
 		</div>
-
-		<!-- Monthly Status messages -->
-		{#if monthlyExportError}
-			<div class="export-message error">
-				<span class="message-icon">⚠️</span>
-				<span class="message-text">{monthlyExportError}</span>
-			</div>
-		{/if}
-
-		{#if pdfExportError}
-			<div class="export-message error">
-				<span class="message-icon">⚠️</span>
-				<span class="message-text">{pdfExportError}</span>
-			</div>
-		{/if}
-
-		{#if monthlyExportSuccess}
-			<div class="export-message success">
-				<span class="message-icon">✅</span>
-				<span class="message-text">Excel file downloaded successfully!</span>
-			</div>
-		{/if}
-
-		{#if pdfExportSuccess}
-			<div class="export-message success">
-				<span class="message-icon">✅</span>
-				<span class="message-text">PDF report generated successfully!</span>
-			</div>
-		{/if}
-	</section>
-
-	<section class="panel">
-		<div class="panel-head">
-			<div class="panel-icon" aria-hidden="true">
-				<svg
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.8"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline
-						points="14 2 14 8 20 8"
-					/><path d="M12 18v-6M9 15l3 3 3-3" /></svg
-				>
-			</div>
-			<div>
-				<h4 class="panel-title">Daily capture export</h4>
-				<p class="panel-sub">Every entry in a date range, as Excel</p>
-			</div>
+		<div class="btns">
+			<button class="ui-btn" onclick={entriesExcel} disabled={!entriesValid || busy !== null}>
+				{busy === 'entries-xlsx' ? 'Building…' : 'Excel'}
+			</button>
 		</div>
-		<div class="export-controls">
-			<div class="date-inputs">
-				<div class="date-field">
-					<label for="start-date">Start Date</label>
-					<input
-						id="start-date"
-						type="date"
-						bind:value={startDate}
-						disabled={isExporting}
-						onchange={clearMessages}
-					/>
-				</div>
-
-				<div class="date-field">
-					<label for="end-date">End Date</label>
-					<input
-						id="end-date"
-						type="date"
-						bind:value={endDate}
-						disabled={isExporting}
-						onchange={clearMessages}
-					/>
-				</div>
-			</div>
-
-			<div class="export-actions">
-				<Button
-					variant="primary"
-					size="medium"
-					loading={isExporting}
-					disabled={!startDate || !endDate || isExporting}
-					onclick={handleExport}
-				>
-					{#if isExporting}
-						Generating...
-					{:else}
-						Export Excel
-					{/if}
-				</Button>
-			</div>
-		</div>
-
-		<!-- Status messages -->
-		{#if exportError}
-			<div class="export-message error">
-				<span class="message-icon">⚠️</span>
-				<span class="message-text">{exportError}</span>
-			</div>
-		{/if}
-
-		{#if exportSuccess}
-			<div class="export-message success">
-				<span class="message-icon">✅</span>
-				<span class="message-text">Excel file downloaded successfully!</span>
-			</div>
-		{/if}
-	</section>
+	</div>
 </div>
 
 <style>
-	.export-panels {
-		display: flex;
-		flex-direction: column;
-		gap: 0.875rem;
+	.exports {
+		display: grid;
+		gap: 0.5rem;
 	}
 
-	.panel {
-		background: var(--white);
+	.row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.625rem 1rem;
+		min-width: 0;
+		padding: 0.75rem 0.875rem;
 		border: 1px solid var(--gray-200);
 		border-radius: var(--radius-lg);
-		padding: 1rem 1.125rem;
 	}
 
-	.panel-head {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.75rem;
-		margin-bottom: 0.875rem;
-	}
-
-	.panel-icon {
-		flex-shrink: 0;
-		width: 2.25rem;
-		height: 2.25rem;
+	.what {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		border-radius: var(--radius-md);
-		background: #faf1f2;
-		color: var(--brand-hover);
-	}
-
-	.panel-icon svg {
-		width: 1.25rem;
-		height: 1.25rem;
-	}
-
-	.panel-title {
-		font-size: var(--text-base);
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-900);
-		margin: 0;
-	}
-
-	.panel-sub {
-		font-size: var(--text-sm);
-		color: var(--gray-500);
-		margin: 0.125rem 0 0;
-	}
-
-	.export-controls {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		margin-bottom: 1rem;
-	}
-
-	.date-inputs {
-		display: flex;
-		gap: 1rem;
 		flex-wrap: wrap;
+		gap: 0.5rem 0.75rem;
+		flex: 1 1 auto;
 	}
 
-	.date-field {
-		flex: 1;
-		min-width: 140px;
+	.what .ui-label {
+		min-width: 5.5rem;
 	}
 
-	.date-field label {
-		display: block;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--gray-700);
-		margin-bottom: 0.5rem;
-	}
-
-	.date-field input {
-		width: 100%;
-		min-height: 2.75rem;
-		padding: 0.625rem 0.75rem;
-		border: 1px solid var(--gray-300);
-		border-radius: var(--radius-md);
-		font-size: var(--text-base);
-		background: white;
-		color: var(--gray-900);
-		transition:
-			border-color 0.15s ease,
-			box-shadow 0.15s ease;
-		box-sizing: border-box;
-	}
-
-	.date-field input:focus {
-		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
-	}
-
-	.date-field input:disabled {
-		background: var(--gray-50);
-		color: var(--gray-500);
-		cursor: not-allowed;
-	}
-
-	.export-actions {
-		display: flex;
-		justify-content: flex-start;
-		margin-top: 0.5rem;
-	}
-
-	.export-message {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		font-size: 0.875rem;
-	}
-
-	.export-message.error {
-		background: var(--red-50);
-		border: 1px solid var(--red-200);
-		color: var(--red-800);
-	}
-
-	.export-message.success {
-		background: var(--green-50);
-		border: 1px solid var(--green-200);
-		color: var(--green-800);
-	}
-
-	.message-icon {
-		font-size: 1rem;
-		flex-shrink: 0;
-	}
-
-	.export-info {
-		border-top: 1px solid var(--gray-200);
-		padding-top: 1rem;
-		margin-top: 1rem;
-	}
-
-	.monthly-controls {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		margin-bottom: 1rem;
-	}
-
-	.month-locked {
-		font-size: var(--text-sm);
-		color: var(--gray-500);
-		margin: 0;
-	}
-
-	.month-inputs {
-		display: flex;
-		gap: 1rem;
-		flex-wrap: wrap;
-	}
-
-	.month-field {
-		flex: 1;
-		min-width: 150px;
-	}
-
-	.month-field label {
-		display: block;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--gray-700);
-		margin-bottom: 0.5rem;
-	}
-
-	.month-field select {
-		width: 100%;
-		min-height: 2.75rem;
-		padding: 0.625rem 0.75rem;
-		border: 1px solid var(--gray-300);
-		border-radius: var(--radius-md);
-		font-size: var(--text-base);
-		background: white;
-		color: var(--gray-900);
-		transition:
-			border-color 0.15s ease,
-			box-shadow 0.15s ease;
-	}
-
-	.month-field select:focus {
-		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
-	}
-
-	.month-field select:disabled {
-		background: var(--gray-50);
-		color: var(--gray-500);
-		cursor: not-allowed;
-	}
-
-	.month-field input {
-		width: 100%;
-		min-height: 2.75rem;
-		padding: 0.625rem 0.75rem;
-		border: 1px solid var(--gray-300);
-		border-radius: var(--radius-md);
-		font-size: var(--text-base);
-		background: white;
-		color: var(--gray-900);
-		box-sizing: border-box;
-		transition:
-			border-color 0.15s ease,
-			box-shadow 0.15s ease;
-	}
-
-	.month-field input:focus {
-		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(142, 43, 52, 0.1);
-	}
-
-	.month-field input:disabled {
-		background: var(--gray-50);
-		color: var(--gray-500);
-		cursor: not-allowed;
-	}
-
-	.mode-toggle {
+	.seg {
 		display: inline-flex;
-		width: fit-content;
-		border: 1px solid var(--gray-300);
+		padding: 2px;
 		border-radius: var(--radius-md);
-		overflow: hidden;
+		background: var(--gray-100);
 	}
 
-	.mode-btn {
-		font-size: var(--text-sm);
-		font-weight: 500;
-		padding: 0.45rem 0.9rem;
-		background: white;
-		border: none;
-		color: var(--gray-600);
+	.seg button {
+		padding: 0.25rem 0.625rem;
+		border: 0;
+		border-radius: 4px;
+		background: none;
+		font: inherit;
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-500);
 		cursor: pointer;
 	}
 
-	.mode-btn + .mode-btn {
-		border-left: 1px solid var(--gray-300);
+	.seg button.on {
+		background: var(--white);
+		color: var(--gray-900);
+		box-shadow: var(--shadow-sm);
 	}
 
-	.mode-btn.active {
-		background: var(--primary);
-		color: white;
+	.dates {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		color: var(--gray-400);
 	}
 
-	.mode-btn:disabled {
-		cursor: not-allowed;
-		opacity: 0.6;
-	}
-
-	.monthly-actions {
-		display: flex;
-		justify-content: flex-start;
-		margin-top: 0.5rem;
-	}
-
-	.export-buttons-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-		width: 100%;
-		max-width: 300px;
-	}
-
-	/* Mobile responsiveness */
-	@media (max-width: 768px) {
-		.panel {
-			padding: 0.875rem;
-		}
-
-		.date-inputs {
-			display: grid;
-			grid-template-columns: 1fr 1fr;
-			gap: 0.5rem;
-		}
-
-		.date-field {
-			min-width: 0;
-			max-width: 100%;
-		}
-
-		.export-actions {
-			justify-content: stretch;
-		}
-
-		.export-actions :global(.btn) {
-			width: 100%;
-		}
-
-		.month-locked {
+	.dates input {
+		min-width: 0;
+		max-width: 9.5rem;
+		padding: 0.3125rem 0.5rem;
+		border: 1px solid var(--gray-300);
+		border-radius: var(--radius-md);
+		font: inherit;
 		font-size: var(--text-sm);
-		color: var(--gray-500);
-		margin: 0;
+		color: var(--gray-800);
 	}
 
-	.month-inputs {
-			display: grid;
-			grid-template-columns: 1fr 1fr;
-			gap: 0.75rem;
+	.btns {
+		display: flex;
+		gap: 0.375rem;
+		flex: none;
+	}
+
+	@media (max-width: 560px) {
+		.row {
+			flex-direction: column;
+			align-items: stretch;
 		}
 
-		.month-field {
-			min-width: unset;
-		}
-
-		.monthly-actions {
-			justify-content: stretch;
-		}
-
-		.export-buttons-grid {
-			grid-template-columns: 1fr 1fr;
-			max-width: none;
-		}
-
-		.export-buttons-grid :global(.btn) {
-			width: 100%;
+		.btns .ui-btn {
+			flex: 1;
 		}
 	}
 </style>

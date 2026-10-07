@@ -291,14 +291,41 @@
 <div class="ui-page">
 	<div class="ui-head">
 		<h1>Audit</h1>
-		<button
-			class="ui-btn icon"
-			onclick={() => (showSettings = true)}
-			aria-label="Settings"
-			title="Rate, DRS number, dip tolerance"
-		>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg>
-		</button>
+		<div class="head-tools">
+			<!-- Phones and tablets: the sidebar's Database, Vehicle history and
+		     Settings live on /menu, reached from here. -->
+			<a
+				class="ui-btn icon more"
+				href="/menu"
+				aria-label="More: database, vehicle history, settings"
+				title="More"
+			>
+				<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
+					><circle cx="5" cy="12" r="1.75" /><circle cx="12" cy="12" r="1.75" /><circle
+						cx="19"
+						cy="12"
+						r="1.75"
+					/></svg
+				>
+			</a>
+			<button
+				class="ui-btn icon"
+				onclick={() => (showSettings = true)}
+				aria-label="Settings"
+				title="Rate, DRS number, dip tolerance"
+			>
+				<svg
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+					><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg
+				>
+			</button>
+		</div>
 	</div>
 
 	<nav class="months" aria-label="Month">
@@ -378,11 +405,15 @@
 							{#if ledger}
 								<div>
 									<p class="ui-label">Book expects</p>
-									<p class="ui-figure dip-fig">{formatWholeLitres(ledger.bookAtDip)}<small>L</small></p>
+									<p class="ui-figure dip-fig">
+										{formatWholeLitres(ledger.bookAtDip)}<small>L</small>
+									</p>
 									<p class="ui-muted">at {fmtDayMonth(selected.monthEnd)}, before the dip</p>
 								</div>
 							{/if}
-							<button class="ui-btn primary" onclick={() => (showDipModal = true)}>Record dip</button>
+							<button class="ui-btn primary" onclick={() => (showDipModal = true)}
+								>Record dip</button
+							>
 						{/if}
 					</div>
 				</Step>
@@ -441,7 +472,7 @@
 							{openStepCount === 1 ? 'step is' : 'steps are'} still open, and the export will show it
 						</p>
 					{/if}
-					<DataExport selectedYear={selected.year} selectedMonth={selected.month} hideMonthPicker />
+					<DataExport selectedYear={selected.year} selectedMonth={selected.month} />
 					<ul class="facts">
 						{#each stepOf.export.items as item (item.id)}
 							<li><span class="ui-label">{item.title}</span>{item.detail}</li>
@@ -471,6 +502,17 @@
 <style>
 	.ui-btn.icon {
 		padding: 0.5rem;
+	}
+
+	.head-tools {
+		display: flex;
+		gap: 0.375rem;
+	}
+
+	@media (min-width: 1024px) {
+		.more {
+			display: none;
+		}
 	}
 
 	/* ---- Months ---- */
