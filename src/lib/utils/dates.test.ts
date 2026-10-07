@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	addDays,
 	daysBetween,
+	financialYearStart,
+	fyLabel,
 	isoDayBefore,
 	isoLocal,
 	monthKey,
@@ -91,5 +94,19 @@ describe('isoDayBefore', () => {
 		expect(isoDayBefore('2026-03-01')).toBe('2026-02-28');
 		expect(isoDayBefore('2026-01-01')).toBe('2025-12-31');
 		expect(isoDayBefore('2026-07-15')).toBe('2026-07-14');
+	});
+});
+
+describe('financial year', () => {
+	it('starts on 1 March, and before March belongs to last year', () => {
+		expect(isoLocal(financialYearStart(new Date(2026, 9, 7)))).toBe('2026-03-01');
+		expect(isoLocal(financialYearStart(new Date(2026, 1, 28)))).toBe('2025-03-01');
+		expect(isoLocal(financialYearStart(new Date(2026, 2, 1)))).toBe('2026-03-01');
+		expect(fyLabel(new Date(2025, 2, 1))).toBe('2025/26');
+	});
+
+	it('adds days across months', () => {
+		expect(addDays('2026-02-27', 2)).toBe('2026-03-01');
+		expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
 	});
 });

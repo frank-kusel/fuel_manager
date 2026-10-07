@@ -1,30 +1,31 @@
 <script lang="ts">
 	/**
-	 * The tank right now: the book balance, how far it can be trusted, how it
-	 * got here, and the two things you do to it (dip, delivery). Month-end work
-	 * — closing, the leak trend — lives on Audit.
+	 * The tank: what the book says now, its whole history on one chart, and
+	 * the deliveries. Dips appear on the chart against the book line — each
+	 * with a ±tolerance bar — so the dip-vs-book check and its drift over time
+	 * read straight off it. Closing a month lives on Audit.
 	 */
 	import { onMount } from 'svelte';
 	import DipstickModal from '$lib/components/modals/DipstickModal.svelte';
 	import TankRefillModal from '$lib/components/modals/TankRefillModal.svelte';
 	import TankGauge from '$lib/components/charts/TankGauge.svelte';
-	import BalanceChart from '$lib/components/charts/BalanceChart.svelte';
-	import BulletGap from '$lib/components/charts/BulletGap.svelte';
+	import HistoryChart from '$lib/components/charts/HistoryChart.svelte';
 	import { tankStore, tankData, tankError } from '$lib/stores/tank';
 	import { claimSettings } from '$lib/stores/claim-settings';
 	import { onVisible } from '$lib/stores/freshness';
-	import { fmtDayMonth } from '$lib/utils/dates';
+	import { financialYearStart, fmtDayMonth, fmtFull, isoLocal } from '$lib/utils/dates';
 	import { formatSigned, formatWholeLitres } from '$lib/utils/formatting';
 	import {
 		anchorLabel,
-		bandVariance,
 		dipAgeDays,
+		dipChecks,
 		isDipStale,
 		pctFull
 	} from '$lib/utils/tank-balance';
 
 	let showDipModal = $state(false);
 	let showRefillModal = $state(false);
+	let showAllDeliveries = $state(false);
 
 	onMount(() => {
 		tankStore.load();
@@ -33,41 +34,21 @@
 
 	let tank = $derived($tankData?.insight ?? null);
 	let pct = $derived(tank ? pctFull(tank.bookLitres, tank.capacity) : null);
-	let dipAge = $derived(dipAgeDays(tank?.lastDipDate ?? null));
-	let stale = $derived(isDipStale(dipAge));
 	let tolerance = $derived($claimSettings.dipToleranceL);
-
-	/**
-	 * The latest book-vs-dip comparison: a dip taken since the anchor if there
-	 * is one, otherwise the gap the anchoring close was signed off on.
-	 */
-	let check = $derived.by(() => {
-		if (!tank) return null;
-		if (tank.dipCheck)
-			return {
-				source: `dip ${fmtDayMonth(tank.dipCheck.date)}`,
-				book: tank.dipCheck.bookAtDip,
-				dip: tank.dipCheck.dipLitres,
-				gap: tank.dipCheck.gapLitres
-			};
-		const a = tank.anchor;
-		if (a.kind === 'close' && a.measuredAtClose !== null && a.varianceLitres !== null)
-			return {
-				source: anchorLabel(a),
-				book: a.measuredAtClose + a.varianceLitres,
-				dip: a.measuredAtClose,
-				gap: a.varianceLitres
-			};
-		return null;
-	});
-	let band = $derived(check ? bandVariance(check.gap, check.dip, tolerance) : null);
+	let checks = $derived(
+		$tankData ? dipChecks($tankData.history, $tankData.dips, tolerance) : []
+	);
+	let lastCheck = $derived(checks.at(-1) ?? null);
+	let lastDip = $derived($tankData?.dips.at(-1) ?? null);
+	let dipAge = $derived(dipAgeDays(lastDip?.reading_date ?? null));
+	let stale = $derived(isDipStale(dipAge));
 	const TONE = { good: 'good', acceptable: 'warn', high: 'bad' } as const;
 
-	let dips = $derived(
-		($tankData?.recent ?? [])
-			.filter((a) => a.kind === 'dip')
-			.map((a) => ({ date: a.date, litres: a.litres }))
-	);
+	const seasonStart = isoLocal(financialYearStart());
+	let deliveries = $derived($tankData?.deliveries ?? []);
+	let seasonDeliveries = $derived(deliveries.filter((d) => d.date >= seasonStart));
+	let seasonDelivered = $derived(seasonDeliveries.reduce((s, d) => s + d.litres, 0));
+	let shownDeliveries = $derived(showAllDeliveries ? deliveries : deliveries.slice(0, 8));
 </script>
 
 <svelte:head>
@@ -99,137 +80,124 @@
 			<button class="ui-btn" onclick={() => tankStore.load(true)}>Retry</button>
 		</section>
 	{:else if !$tankData}
-		<div class="grid">
-			<div class="ui-skeleton" style="height: 13rem"></div>
-			<div class="ui-skeleton" style="height: 13rem"></div>
-		</div>
+		<div class="ui-skeleton" style="height: 11rem"></div>
+		<div class="ui-skeleton" style="height: 17rem"></div>
 	{:else if !tank}
-		<section class="ui-panel empty">
+		<section class="ui-panel">
 			<p class="ui-label">Book balance</p>
-			<p>No close or dip yet. Record a dip to start the book.</p>
+			<p class="ui-muted">No close or dip yet. Record a dip to start the book.</p>
 		</section>
 	{:else}
-		<div class="grid">
-			<!-- The balance -->
-			<section class="ui-panel hero" class:negative={tank.bookLitres <= 0}>
-				<div class="hero-top">
+		<!-- Now: the balance, how it got here, and the latest check -->
+		<section class="ui-panel hero" class:negative={tank.bookLitres <= 0}>
+			<div class="now">
+				<div class="top">
 					<div>
 						<p class="ui-label">{tank.name} · book balance</p>
 						<p class="ui-figure big">{formatWholeLitres(tank.bookLitres)}<small>L</small></p>
 					</div>
-					<div class="hero-side">
+					<div class="side">
 						{#if pct !== null}<span class="pct">{Math.round(pct)}<small>%</small></span>{/if}
 						{#if tank.runwayDays !== null}
-							<span class="ui-pill plain" title="At the last 14 days' burn rate"
-								>≈ {tank.runwayDays} days</span
-							>
+							<span class="ui-pill plain" title="At the last 14 days' burn rate">≈ {tank.runwayDays} days</span>
 						{/if}
 					</div>
 				</div>
-
 				{#if tank.capacity}
 					<TankGauge litres={tank.bookLitres} capacity={tank.capacity} />
 				{/if}
+			</div>
 
-				<div class="flow">
-					<div>
-						<p class="ui-label">Opening</p>
-						<p class="flow-v">{formatWholeLitres(tank.anchor.litres)}</p>
-						<p class="flow-s">{anchorLabel(tank.anchor)}</p>
-					</div>
-					<div>
-						<p class="ui-label">In</p>
-						<p class="flow-v in">+{formatWholeLitres(tank.deliveriesSinceAnchor)}</p>
-						<p class="flow-s">deliveries</p>
-					</div>
-					<div>
-						<p class="ui-label">Out</p>
-						<p class="flow-v">−{formatWholeLitres(tank.dispensedSinceAnchor)}</p>
-						<p class="flow-s">dispensed</p>
-					</div>
+			<dl class="facts">
+				<div>
+					<dt>Opening <small>{anchorLabel(tank.anchor)}</small></dt>
+					<dd>{formatWholeLitres(tank.anchor.litres)}</dd>
 				</div>
-			</section>
-
-			<!-- Can it be trusted? -->
-			<section class="ui-panel check">
-				<div class="ui-panel-head">
-					<p class="ui-label">Book vs dip</p>
-					{#if check}<span class="ui-muted src">{check.source}</span>{/if}
+				<div>
+					<dt>Delivered</dt>
+					<dd class="in">+{formatWholeLitres(tank.deliveriesSinceAnchor)}</dd>
 				</div>
-
-				{#if check}
-					<p class="gap {band ? TONE[band.key] : ''}">
-						<span class="ui-figure">{formatSigned(check.gap)}<small>L</small></span>
-						<span class="ui-pill {band ? TONE[band.key] : ''}">{band?.label}</span>
-					</p>
-					<BulletGap gap={check.gap} measured={check.dip} toleranceL={tolerance} labels />
-					<dl class="pair">
-						<div><dt>Book</dt><dd>{formatWholeLitres(check.book)}</dd></div>
-						<div><dt>Dip</dt><dd>{formatWholeLitres(check.dip)}</dd></div>
-						<div><dt>Tolerance</dt><dd>±{formatWholeLitres(tolerance)}</dd></div>
-					</dl>
-				{:else}
-					<p class="ui-muted none">No dip to check the book against yet.</p>
-				{/if}
-
-				<div class="check-foot">
-					{#if dipAge !== null}
-						<span class="ui-pill {stale ? 'warn' : 'good'}">
-							Dip {dipAge === 0 ? 'today' : `${dipAge} d ago`}{stale ? ' · take a fresh one' : ''}
-						</span>
-					{:else}
-						<span class="ui-pill warn">No dip on record</span>
+				<div>
+					<dt>Used</dt>
+					<dd>−{formatWholeLitres(tank.dispensedSinceAnchor)}</dd>
+				</div>
+				<div class="check">
+					<dt>
+						Last dip
+						{#if lastDip}<small>{fmtDayMonth(lastDip.reading_date)}{dipAge !== null ? ` · ${dipAge} d ago` : ''}</small>{/if}
+					</dt>
+					<dd>
+						{#if lastCheck && lastCheck.date === lastDip?.reading_date}
+							<span class="gap {lastCheck.band ? TONE[lastCheck.band.key] : ''}">{formatSigned(lastCheck.gapLitres)}</span>
+							<span class="ui-muted">vs book</span>
+						{:else if lastDip}
+							{formatWholeLitres(lastDip.reading_value)}
+						{:else}
+							—
+						{/if}
+					</dd>
+					{#if stale || dipAge === null}
+						<span class="ui-pill warn due">Dip due</span>
 					{/if}
-					<a class="link" href="/audit#leak-trend">Leak trend →</a>
 				</div>
-			</section>
+			</dl>
+		</section>
 
-			<!-- How it got here -->
-			<section class="ui-panel chart-panel">
-				<div class="ui-panel-head">
-					<p class="ui-label">Since the {anchorLabel(tank.anchor)}</p>
-					<span class="legend" aria-hidden="true">
-						<i class="k-line"></i>Book <i class="k-dip"></i>Dip ±{formatWholeLitres(tolerance)}
-						<i class="k-in"></i>Delivery
-					</span>
-				</div>
-				<BalanceChart
-					series={$tankData.series}
-					{dips}
-					capacity={tank.capacity}
-					toleranceL={tolerance}
-				/>
-			</section>
+		<!-- History -->
+		<section class="ui-panel chart-panel">
+			<div class="ui-panel-head">
+				<p class="ui-label">History</p>
+			</div>
+			<HistoryChart
+				points={$tankData.history}
+				dips={checks}
+				closes={$tankData.closes}
+				capacity={tank.capacity}
+				toleranceL={tolerance}
+			/>
+			<ul class="legend" aria-hidden="true">
+				<li><i class="k-line"></i>Book</li>
+				<li><i class="k-in"></i>Delivery</li>
+				<li><i class="k-dip"></i>Dip ±{formatWholeLitres(tolerance)} L</li>
+				<li><i class="k-close"></i>Close</li>
+			</ul>
+		</section>
 
-			<!-- What happened -->
-			<section class="ui-panel activity">
-				<div class="ui-panel-head">
-					<p class="ui-label">Dips and deliveries</p>
-				</div>
-				{#if $tankData.recent.length === 0}
-					<p class="ui-muted none">Nothing recorded yet.</p>
-				{:else}
-					<ul class="ui-rows">
-						{#each $tankData.recent as row, i (i)}
-							<li>
-								<span class="when">{fmtDayMonth(row.date)}</span>
-								<span class="what">
-									{row.kind === 'dip' ? 'Dip' : 'Delivery'}
-									{#if row.kind === 'delivery'}
-										<small
-											>{row.supplier ?? ''}{row.invoice ? ` · ${row.invoice}` : ' · no invoice'}</small
-										>
-									{/if}
-								</span>
-								<span class="val" class:in={row.kind === 'delivery'}>
-									{row.kind === 'delivery' ? '+' : ''}{formatWholeLitres(row.litres)}
-								</span>
-							</li>
+		<!-- Deliveries -->
+		<section class="ui-panel">
+			<div class="ui-panel-head">
+				<p class="ui-label">Deliveries</p>
+				<span class="ui-muted season">
+					{seasonDeliveries.length} this season · {formatWholeLitres(seasonDelivered)} L
+				</span>
+			</div>
+			{#if deliveries.length === 0}
+				<p class="ui-muted">None recorded yet.</p>
+			{:else}
+				<table class="deliveries">
+					<thead>
+						<tr><th>Date</th><th class="num">Litres</th><th>Supplier</th><th>Invoice</th></tr>
+					</thead>
+					<tbody>
+						{#each shownDeliveries as d, i (i)}
+							<tr>
+								<td>{fmtFull(d.date)}</td>
+								<td class="num in">+{formatWholeLitres(d.litres)}</td>
+								<td class="muted">{d.supplier ?? '—'}</td>
+								<td>
+									{#if d.invoice}{d.invoice}{:else}<span class="ui-pill warn">none</span>{/if}
+								</td>
+							</tr>
 						{/each}
-					</ul>
+					</tbody>
+				</table>
+				{#if deliveries.length > 8}
+					<button class="more" onclick={() => (showAllDeliveries = !showAllDeliveries)}>
+						{showAllDeliveries ? 'Show fewer' : `Show all ${deliveries.length}`}
+					</button>
 				{/if}
-			</section>
-		</div>
+			{/if}
+		</section>
 	{/if}
 
 	{@render actions(true)}
@@ -239,19 +207,6 @@
 <TankRefillModal bind:show={showRefillModal} onClose={() => (showRefillModal = false)} />
 
 <style>
-	.grid {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-		gap: 0.875rem;
-	}
-
-	@media (min-width: 900px) {
-		.grid {
-			grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-			align-items: start;
-		}
-	}
-
 	/* Actions: in the header from tablet up, a sticky bar on phones */
 	.head-actions {
 		display: none;
@@ -268,15 +223,29 @@
 	}
 
 	/* ---- Hero ---- */
-	.hero-top {
+	.hero {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1rem;
+	}
+
+	@media (min-width: 860px) {
+		.hero {
+			grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+			gap: 2rem;
+			align-items: center;
+		}
+	}
+
+	.top {
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-start;
 		gap: 1rem;
-		margin-bottom: 1rem;
+		margin-bottom: 0.875rem;
 	}
 
-	.hero-top p {
+	.top p {
 		margin: 0;
 	}
 
@@ -289,7 +258,7 @@
 		color: var(--error);
 	}
 
-	.hero-side {
+	.side {
 		display: grid;
 		justify-items: end;
 		gap: 0.375rem;
@@ -307,124 +276,100 @@
 		font-size: 0.6em;
 	}
 
-	.flow {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 0.75rem;
-		margin-top: 0.5rem;
-		padding-top: 0.875rem;
-		border-top: 1px solid var(--gray-100);
-	}
-
-	.flow p {
+	.facts {
 		margin: 0;
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.875rem 1rem;
 	}
 
-	.flow-v {
-		font-size: 1.125rem;
+	@media (min-width: 860px) {
+		.facts {
+			padding-left: 1.5rem;
+			border-left: 1px solid var(--gray-100);
+		}
+	}
+
+	.facts dt {
+		font-size: var(--text-xs);
+		color: var(--gray-500);
+	}
+
+	.facts dt small {
+		color: var(--gray-400);
+		margin-left: 0.25rem;
+	}
+
+	.facts dd {
+		margin: 0.125rem 0 0;
+		font-size: 1.25rem;
 		font-weight: 700;
 		font-stretch: var(--figure-stretch);
 		font-variant-numeric: tabular-nums;
-		margin-top: 0.125rem !important;
 	}
 
-	.flow-v.in {
+	.facts .in {
 		color: #1f6b3a;
 	}
 
-	.flow-s {
+	.facts .ui-muted {
 		font-size: var(--text-xs);
-		color: var(--gray-400);
+		font-weight: 400;
+		font-stretch: normal;
 	}
 
-	/* ---- Check ---- */
-	.src {
-		font-size: var(--text-xs);
-	}
-
-	.gap {
-		display: flex;
-		align-items: center;
-		gap: 0.625rem;
-		margin: 0 0 0.75rem;
-	}
-
-	.gap .ui-figure {
-		font-size: 2rem;
-	}
-
-	.gap.good .ui-figure {
+	.gap.good {
 		color: #1f6b3a;
 	}
-
-	.gap.warn .ui-figure {
+	.gap.warn {
 		color: #8a4b08;
 	}
-
-	.gap.bad .ui-figure {
+	.gap.bad {
 		color: var(--error);
 	}
 
-	.pair {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 0.5rem;
-		margin: 0.5rem 0 0;
+	.check {
+		position: relative;
 	}
 
-	.pair dt {
-		font-size: var(--text-xs);
-		color: var(--gray-400);
-	}
-
-	.pair dd {
-		margin: 0;
-		font-weight: 700;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.check-foot {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-		margin-top: 1rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid var(--gray-100);
-	}
-
-	.link {
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-semibold);
-		color: var(--brand);
-		text-decoration: none;
-	}
-
-	.none {
-		margin: 0.5rem 0;
-		font-size: var(--text-sm);
+	.due {
+		margin-top: 0.25rem;
 	}
 
 	/* ---- Chart ---- */
-	.legend {
-		display: inline-flex;
+	.chart-panel .ui-panel-head {
+		min-height: 1.75rem;
 		align-items: center;
-		gap: 0.375rem;
+	}
+
+	.legend {
+		list-style: none;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem 1rem;
+		margin: 0.5rem 0 0;
+		padding: 0;
 		font-size: 0.6875rem;
 		color: var(--gray-500);
-		white-space: nowrap;
 	}
 
 	.legend i {
 		display: inline-block;
-		margin-left: 0.375rem;
+		margin-right: 0.375rem;
+		vertical-align: middle;
 	}
 
 	.k-line {
 		width: 12px;
 		height: 2px;
 		background: var(--brand);
+	}
+
+	.k-in {
+		width: 4px;
+		height: 10px;
+		border-radius: 2px;
+		background: var(--success);
 	}
 
 	.k-dip {
@@ -434,28 +379,81 @@
 		border-radius: 50%;
 	}
 
-	.k-in {
-		width: 0;
-		height: 0;
-		border-left: 4px solid transparent;
-		border-right: 4px solid transparent;
-		border-bottom: 6px solid var(--success);
+	.k-close {
+		width: 6px;
+		height: 6px;
+		border: 1.5px solid var(--gray-700);
 	}
 
-	@media (max-width: 480px) {
-		.legend {
+	/* ---- Deliveries ---- */
+	.season {
+		font-size: var(--text-xs);
+	}
+
+	.deliveries {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--text-sm);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.deliveries th {
+		text-align: left;
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
+		color: var(--gray-500);
+		padding: 0 0.5rem 0.375rem 0;
+	}
+
+	.deliveries td {
+		padding: 0.4375rem 0.5rem 0.4375rem 0;
+		border-top: 1px solid var(--gray-100);
+		white-space: nowrap;
+	}
+
+	.deliveries .num {
+		text-align: right;
+		padding-right: 1.25rem;
+	}
+
+	.deliveries .in {
+		color: #1f6b3a;
+		font-weight: 700;
+	}
+
+	.deliveries .muted {
+		color: var(--gray-500);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 10rem;
+	}
+
+	@media (max-width: 520px) {
+		.deliveries th:nth-child(3),
+		.deliveries td:nth-child(3) {
 			display: none;
 		}
 	}
 
-	.empty p,
-	.error p {
-		margin: 0.25rem 0;
+	.more {
+		margin-top: 0.5rem;
+		border: 0;
+		background: none;
+		padding: 0;
+		font: inherit;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		color: var(--brand);
+		cursor: pointer;
 	}
 
 	.error {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+	}
+
+	.error p {
+		margin: 0;
 	}
 </style>

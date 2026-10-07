@@ -33,7 +33,6 @@ import {
 	type DispenseRow,
 	type MonthCloseData,
 	type RefillRow,
-	type TankActivity,
 	type TankAnchor,
 	type TankBalanceInputs
 } from '$lib/utils/tank-balance';
@@ -1083,56 +1082,6 @@ class SupabaseService {
 	}
 
 	/**
-	 * Dips and deliveries merged into one newest-first list — the Tank page's
-	 * recent activity. `limit` rows of each are fetched, then the merge is cut
-	 * to `limit`, so neither kind can crowd the other out of the window.
-	 */
-	async getRecentTankActivity(limit = 8): Promise<ApiResponse<TankActivity[]>> {
-		const client = this.ensureInitialized();
-		try {
-			const [dips, deliveries] = await Promise.all([
-				client
-					.from('tank_readings')
-					.select('reading_value, reading_date')
-					.eq('reading_type', 'dipstick')
-					.order('reading_date', { ascending: false })
-					.limit(limit),
-				client
-					.from('tank_refills')
-					.select('litres_added, delivery_date, supplier, invoice_number')
-					.order('delivery_date', { ascending: false })
-					.limit(limit)
-			]);
-			const firstError = dips.error || deliveries.error;
-			if (firstError) throw new Error(firstError.message);
-
-			const activity: TankActivity[] = [
-				...(dips.data || []).map((d) => ({
-					kind: 'dip' as const,
-					date: d.reading_date,
-					litres: Number(d.reading_value || 0),
-					supplier: null,
-					invoice: null
-				})),
-				...(deliveries.data || []).map((r) => ({
-					kind: 'delivery' as const,
-					date: r.delivery_date,
-					litres: Number(r.litres_added || 0),
-					supplier: r.supplier?.trim() || null,
-					invoice: r.invoice_number || null
-				}))
-			];
-			activity.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-			return { data: activity.slice(0, limit), error: null };
-		} catch (error) {
-			return {
-				data: null,
-				error: error instanceof Error ? error.message : 'Failed to load tank activity'
-			};
-		}
-	}
-
-	/**
 	 * Everything the Month-end close screen needs for one month, as a RUNNING
 	 * TALLY: opening = the most recent close on or before the previous month end,
 	 * then every movement after it, with the month's last dip as the leak check —
@@ -1267,6 +1216,119 @@ class SupabaseService {
 				data: null,
 				error: error instanceof Error ? error.message : 'Failed to load month close data'
 			};
+		}
+	}
+
+	/**
+	 * Every row of a query, past PostgREST's 1 000-row cap: pages until a
+	 * short page comes back. `build` must apply a stable order.
+	 */
+	private async allRows<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+		const PAGE = 1000;
+		const rows: T[] = [];
+		for (let from = 0; from < 50_000; from += PAGE) {
+			const { data, error } = await build(from, from + PAGE - 1);
+			if (error) throw new Error(error.message);
+			rows.push(...(data || []));
+			if (!data || data.length < PAGE) break;
+		}
+		return rows;
+	}
+
+	/** Litres dispensed per entry from `start` (inclusive) — for long history charts. */
+	async getDispensedSince(start: string, end: string = todayIso()): Promise<ApiResponse<DispenseRow[]>> {
+		const client = this.ensureInitialized();
+		try {
+			const rows = await this.allRows<DispenseRow>((from, to) =>
+				client
+					.from('fuel_entries')
+					.select('entry_date, litres_dispensed')
+					.is('deleted_at', null)
+					.gte('entry_date', start)
+					.lte('entry_date', end)
+					.order('entry_date')
+					.order('id')
+					.range(from, to)
+			);
+			return { data: rows, error: null };
+		} catch (error) {
+			return { data: null, error: error instanceof Error ? error.message : 'Failed to load usage' };
+		}
+	}
+
+	/** Every entry in a range, reduced to what the claim needs. */
+	async getClaimEntries(
+		start: string,
+		end: string
+	): Promise<ApiResponse<{ vehicleId: string; date: string; litres: number; eligible: boolean; method: 'activity_only' | 'monthly_classifier' }[]>> {
+		const client = this.ensureInitialized();
+		const one = <T>(relation: T | T[] | null | undefined): T | null =>
+			Array.isArray(relation) ? (relation[0] ?? null) : (relation ?? null);
+		try {
+			const rows = await this.allRows<any>((from, to) =>
+				client
+					.from('fuel_entries')
+					.select(
+						'id, entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
+					)
+					.is('deleted_at', null)
+					.gte('entry_date', start)
+					.lte('entry_date', end)
+					.order('entry_date')
+					.order('id')
+					.range(from, to)
+			);
+			return {
+				data: rows.map((row) => ({
+					vehicleId: row.vehicle_id,
+					date: row.entry_date,
+					litres: Number(row.litres_dispensed || 0),
+					eligible: one<{ diesel_claim_eligible: boolean }>(row.activities)?.diesel_claim_eligible === true,
+					method: one<{ diesel_claim_method: 'activity_only' | 'monthly_classifier' }>(row.vehicles)?.diesel_claim_method ?? 'activity_only'
+				})),
+				error: null
+			};
+		} catch (error) {
+			return { data: null, error: error instanceof Error ? error.message : 'Failed to load claim entries' };
+		}
+	}
+
+	/** Every close, and the dips and deliveries since `start`, for the tank history. */
+	async getTankHistory(start: string): Promise<
+		ApiResponse<{
+			closes: CloseRow[];
+			dips: DipRow[];
+			deliveries: { delivery_date: string; litres_added: number | null; supplier: string | null; invoice_number: string | null }[];
+		}>
+	> {
+		const client = this.ensureInitialized();
+		try {
+			const [closes, dips, deliveries] = await Promise.all([
+				client.from('tank_reconciliations').select('*').order('reconciliation_date'),
+				client
+					.from('tank_readings')
+					.select('reading_value, reading_date')
+					.eq('reading_type', 'dipstick')
+					.gte('reading_date', start)
+					.order('reading_date'),
+				client
+					.from('tank_refills')
+					.select('delivery_date, litres_added, supplier, invoice_number')
+					.gte('delivery_date', start)
+					.order('delivery_date')
+			]);
+			const firstError = closes.error || dips.error || deliveries.error;
+			if (firstError) throw new Error(firstError.message);
+			return {
+				data: {
+					closes: (closes.data || []) as CloseRow[],
+					dips: (dips.data || []) as DipRow[],
+					deliveries: deliveries.data || []
+				},
+				error: null
+			};
+		} catch (error) {
+			return { data: null, error: error instanceof Error ? error.message : 'Failed to load tank history' };
 		}
 	}
 

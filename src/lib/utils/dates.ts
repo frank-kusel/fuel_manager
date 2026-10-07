@@ -48,6 +48,25 @@ export function monthKey(year: number, month: number): string {
 	return `${year}-${String(month).padStart(2, '0')}`;
 }
 
+/** `iso` moved by `days` calendar days (negative for earlier). */
+export function addDays(iso: string, days: number): string {
+	const d = new Date(`${iso}T12:00:00`);
+	d.setDate(d.getDate() + days);
+	return isoLocal(d);
+}
+
+/** The financial year (and the farm's season) starts on 1 March. */
+export function financialYearStart(now: Date = new Date()): Date {
+	const year = now.getMonth() >= 2 ? now.getFullYear() : now.getFullYear() - 1;
+	return new Date(year, 2, 1);
+}
+
+/** "2025/26" for the financial year that opens on 1 March of `start`'s year. */
+export function fyLabel(start: Date): string {
+	const y = start.getFullYear();
+	return `${y}/${String((y + 1) % 100).padStart(2, '0')}`;
+}
+
 /** The calendar day before `iso`, e.g. the opening date for a period. */
 export function isoDayBefore(iso: string): string {
 	const d = new Date(`${iso}T12:00:00`);

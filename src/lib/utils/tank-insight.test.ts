@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	anchorLabel,
-	balanceSeries,
+	bookHistory,
 	buildTankInsight,
+	dipChecks,
 	pctFull,
 	resolveAnchor,
 	tankAttention,
@@ -119,30 +120,70 @@ describe('tankAttention', () => {
 	});
 });
 
-describe('balanceSeries', () => {
-	it('walks the book day by day from the anchor', () => {
-		const series = balanceSeries(inputs(), '2026-09-03');
+describe('bookHistory', () => {
+	const closes = [
+		{ reconciliation_date: '2026-07-31', calculated_level: 5000, measured_level: 5000, variance: 0, variance_percentage: 0, accepted: true },
+		{ reconciliation_date: '2026-08-31', calculated_level: 13597, measured_level: 13000, variance: null, variance_percentage: null, accepted: true }
+	];
 
-		expect(series.map((p) => p.date)).toEqual(['2026-08-31', '2026-09-01', '2026-09-02', '2026-09-03']);
-		expect(series.map((p) => p.litres)).toEqual([13597, 13597, 13197, 13197]);
-		expect(series[2]).toMatchObject({ dispensed: 400, delivered: 0 });
+	it('walks the book from the oldest close, re-syncing to each close', () => {
+		const points = bookHistory({
+			closes,
+			refills: [{ delivery_date: '2026-08-21', litres_added: 10000 }],
+			// 1 403 L of entries in August that the 31 Aug close does not quite match
+			dispenses: [{ entry_date: '2026-08-10', litres_dispensed: 1403 }],
+			to: '2026-09-02'
+		});
+
+		expect(points[0]).toMatchObject({ date: '2026-07-31', litres: 5000 });
+		expect(points.find((p) => p.date === '2026-08-10')!.litres).toBe(3597);
+		expect(points.find((p) => p.date === '2026-08-21')).toMatchObject({ litres: 13597, delivered: 10000 });
+		// The close carries its own figure forward
+		expect(points.find((p) => p.date === '2026-08-31')!.litres).toBe(13597);
+		expect(points.at(-1)!.date).toBe('2026-09-02');
 	});
 
-	it('ends on the live book balance', () => {
-		const series = balanceSeries(inputs(), '2026-10-07');
-		const insight = buildTankInsight(inputs(), BOWSER, '2026-10-07')!;
-
-		expect(series.at(-1)!.litres).toBe(insight.bookLitres);
-		expect(series.find((p) => p.date === '2026-09-23')!.delivered).toBe(10000);
+	it('shows a re-baseline as a reset', () => {
+		const points = bookHistory({
+			closes: [closes[0], { ...closes[1], calculated_level: 12000, is_rebaseline: true }],
+			refills: [],
+			dispenses: [],
+			to: '2026-08-31'
+		});
+		expect(points.at(-1)!.litres).toBe(12000);
 	});
 
-	it('crosses month ends without skipping or repeating a day', () => {
-		const series = balanceSeries(inputs(), '2026-10-07');
-		expect(series).toHaveLength(38); // 31 Aug … 7 Oct inclusive
-		expect(new Set(series.map((p) => p.date)).size).toBe(38);
+	it('starts from a dip when nothing has been closed', () => {
+		const points = bookHistory({
+			closes: [],
+			refills: [],
+			dispenses: [{ entry_date: '2026-09-02', litres_dispensed: 100 }],
+			to: '2026-09-02',
+			fallbackDip: { reading_date: '2026-09-01', reading_value: 4000 }
+		});
+		expect(points.map((p) => p.litres)).toEqual([4000, 3900]);
 	});
 
-	it('is empty without an anchor', () => {
-		expect(balanceSeries({ ...inputs(), anchor: null }, '2026-10-07')).toEqual([]);
+	it('is empty with no close and no dip', () => {
+		expect(bookHistory({ closes: [], refills: [], dispenses: [], to: '2026-09-02' })).toEqual([]);
+	});
+});
+
+describe('dipChecks', () => {
+	it('checks each dip against the book on its day and bands the gap', () => {
+		const points = [
+			{ date: '2026-09-14', litres: 12597, delivered: 0, dispensed: 0 },
+			{ date: '2026-09-15', litres: 12597, delivered: 0, dispensed: 0 }
+		];
+		const checks = dipChecks(
+			points,
+			[
+				{ reading_date: '2026-09-15', reading_value: 12400 },
+				{ reading_date: '2026-06-01', reading_value: 9000 } // outside the history
+			],
+			200
+		);
+		expect(checks).toHaveLength(1);
+		expect(checks[0]).toMatchObject({ gapLitres: 197, band: { key: 'good' } });
 	});
 });

@@ -259,15 +259,6 @@ export interface TankBalanceInputs {
 	burnDispenses: DispenseRow[];
 }
 
-/** One row of the Tank page's recent activity. */
-export interface TankActivity {
-	kind: 'dip' | 'delivery';
-	date: string;
-	litres: number;
-	supplier: string | null;
-	invoice: string | null;
-}
-
 export interface DipCheck {
 	date: string;
 	dipLitres: number;
@@ -405,38 +396,94 @@ export interface BalancePoint {
 	dispensed: number;
 }
 
+// ---------------------------------------------------------------------------
+// History: the book day by day across every close
+// ---------------------------------------------------------------------------
+
 /**
- * The book balance at the end of each day from the anchor through `asOf`,
- * from the movements already fetched for the live balance — no extra query.
- * The first point is the anchor itself.
+ * The book balance at the end of each day from the oldest close to `to`.
+ *
+ * Between closes it moves by deliveries in and fuel out. At each close it is
+ * set to that close's carried-forward figure — the signed-off book, so the
+ * line agrees with the closes (and ends on the live balance) even where an
+ * entry was edited after a month was closed. A re-baseline shows as the reset
+ * it is. With no close yet, it starts from `fallbackDip`.
  */
-export function balanceSeries(inputs: TankBalanceInputs | null, asOf: string): BalancePoint[] {
-	if (!inputs?.anchor || asOf < inputs.anchor.date) return [];
-	const { anchor } = inputs;
+export function bookHistory(input: {
+	closes: CloseRow[];
+	refills: RefillRow[];
+	dispenses: DispenseRow[];
+	to: string;
+	fallbackDip?: DipRow | null;
+}): BalancePoint[] {
+	const closes = input.closes
+		.filter((c) => c.calculated_level !== null && c.calculated_level !== undefined)
+		.sort((a, b) => (a.reconciliation_date < b.reconciliation_date ? -1 : 1));
+	const closeOn = new Map(closes.map((c) => [c.reconciliation_date, c.calculated_level as number]));
+
+	let start: { date: string; litres: number } | null = closes.length
+		? { date: closes[0].reconciliation_date, litres: closes[0].calculated_level as number }
+		: input.fallbackDip
+			? { date: input.fallbackDip.reading_date, litres: input.fallbackDip.reading_value || 0 }
+			: null;
+	if (!start || start.date > input.to) return [];
 
 	const delivered = new Map<string, number>();
-	for (const r of inputs.refills) {
-		if (r.delivery_date > anchor.date && r.delivery_date <= asOf)
-			delivered.set(r.delivery_date, (delivered.get(r.delivery_date) || 0) + (r.litres_added || 0));
-	}
+	for (const r of input.refills)
+		delivered.set(r.delivery_date, (delivered.get(r.delivery_date) || 0) + (r.litres_added || 0));
 	const dispensed = new Map<string, number>();
-	for (const d of inputs.dispenses) {
-		if (d.entry_date > anchor.date && d.entry_date <= asOf)
-			dispensed.set(d.entry_date, (dispensed.get(d.entry_date) || 0) + (d.litres_dispensed || 0));
-	}
+	for (const d of input.dispenses)
+		dispensed.set(d.entry_date, (dispensed.get(d.entry_date) || 0) + (d.litres_dispensed || 0));
 
-	const points: BalancePoint[] = [];
-	let litres = anchor.litres;
-	const day = new Date(`${anchor.date}T12:00:00`);
-	for (let date = anchor.date; date <= asOf; ) {
-		const inn = date === anchor.date ? 0 : delivered.get(date) || 0;
-		const out = date === anchor.date ? 0 : dispensed.get(date) || 0;
-		litres += inn - out;
-		points.push({ date, litres, delivered: inn, dispensed: out });
+	const points: BalancePoint[] = [{ date: start.date, litres: start.litres, delivered: 0, dispensed: 0 }];
+	let litres = start.litres;
+	const day = new Date(`${start.date}T12:00:00`);
+	for (;;) {
 		day.setDate(day.getDate() + 1);
-		date = isoLocal(day);
+		const date = isoLocal(day);
+		if (date > input.to) break;
+		const inn = delivered.get(date) || 0;
+		const out = dispensed.get(date) || 0;
+		litres += inn - out;
+		const closed = closeOn.get(date);
+		if (closed !== undefined) litres = closed;
+		points.push({ date, litres, delivered: inn, dispensed: out });
 	}
 	return points;
+}
+
+export interface DipCheckPoint {
+	date: string;
+	dipLitres: number;
+	/** The book at the end of the dip's day. */
+	bookLitres: number;
+	/** Book − dip. Positive: the book claims more than the dipstick found. */
+	gapLitres: number;
+	band: VarianceBand | null;
+}
+
+/** Every dip inside the history, checked against the book on its day. */
+export function dipChecks(
+	points: BalancePoint[],
+	dips: DipRow[],
+	toleranceL: number = DEFAULT_DIP_TOLERANCE_L
+): DipCheckPoint[] {
+	const bookOn = new Map(points.map((p) => [p.date, p.litres]));
+	return dips
+		.filter((d) => bookOn.has(d.reading_date) && d.reading_value !== null)
+		.map((d) => {
+			const dipLitres = d.reading_value as number;
+			const bookLitres = bookOn.get(d.reading_date) as number;
+			const gapLitres = bookLitres - dipLitres;
+			return {
+				date: d.reading_date,
+				dipLitres,
+				bookLitres,
+				gapLitres,
+				band: bandVariance(gapLitres, dipLitres, toleranceL)
+			};
+		})
+		.sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
 // ---------------------------------------------------------------------------

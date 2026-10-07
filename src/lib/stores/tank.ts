@@ -1,10 +1,11 @@
 import { derived, get, writable } from 'svelte/store';
 import { todayIso } from '$lib/utils/dates';
 import {
-	balanceSeries,
+	bookHistory,
 	buildTankInsight,
 	type BalancePoint,
-	type TankActivity,
+	type CloseRow,
+	type DipRow,
 	type TankInsight
 } from '$lib/utils/tank-balance';
 
@@ -16,12 +17,23 @@ import {
  * a whole month of fleet analytics (~10 queries) to show one number.
  */
 
+export interface Delivery {
+	date: string;
+	litres: number;
+	supplier: string | null;
+	invoice: string | null;
+}
+
 export interface TankData {
 	/** Null on a fresh install: nothing to anchor a book to yet. */
 	insight: TankInsight | null;
-	/** Daily book balance from the anchor to today. */
-	series: BalancePoint[];
-	recent: TankActivity[];
+	/** The book at the end of every day since the oldest close. */
+	history: BalancePoint[];
+	/** Every dip, oldest first; checked against `history` by the page. */
+	dips: DipRow[];
+	/** Every delivery, newest first. */
+	deliveries: Delivery[];
+	closes: CloseRow[];
 }
 
 interface TankState {
@@ -34,7 +46,7 @@ interface TankState {
 }
 
 const CACHE_MS = 5 * 60 * 1000;
-const STORAGE_KEY = 'farmtrack_tank_cache_v1';
+const STORAGE_KEY = 'farmtrack_tank_cache_v2';
 
 function loadPersisted(): Pick<TankState, 'data' | 'timestamp' | 'stale'> {
 	try {
@@ -94,19 +106,44 @@ function createTankStore() {
 				const client = supabaseService.getClient();
 				const asOf = todayIso();
 
-				const [inputsRes, bowserRes, recentRes] = await Promise.all([
+				const [inputsRes, bowserRes, historyRes] = await Promise.all([
 					supabaseService.getTankBalanceInputs(asOf),
 					client.from('bowsers').select('name, capacity').eq('active', true).limit(1),
-					supabaseService.getRecentTankActivity(8)
+					supabaseService.getTankHistory('2000-01-01')
 				]);
 				if (inputsRes.error) throw new Error(inputsRes.error);
 				if (bowserRes.error) throw new Error(bowserRes.error.message);
-				if (recentRes.error) throw new Error(recentRes.error);
+				if (historyRes.error || !historyRes.data) throw new Error(historyRes.error ?? 'No history');
+
+				const { closes, dips, deliveries } = historyRes.data;
+				// The history starts at the oldest close (or the newest dip on a
+				// tank that has never been closed).
+				const fallbackDip = closes.length ? null : (dips.at(-1) ?? null);
+				const start = closes[0]?.reconciliation_date ?? fallbackDip?.reading_date ?? null;
+				const dispensedRes = start
+					? await supabaseService.getDispensedSince(start, asOf)
+					: { data: [], error: null };
+				if (dispensedRes.error) throw new Error(dispensedRes.error);
 
 				const data: TankData = {
 					insight: buildTankInsight(inputsRes.data, bowserRes.data?.[0] ?? null, asOf),
-					series: balanceSeries(inputsRes.data, asOf),
-					recent: recentRes.data || []
+					history: bookHistory({
+						closes,
+						refills: deliveries,
+						dispenses: dispensedRes.data || [],
+						to: asOf,
+						fallbackDip
+					}),
+					dips,
+					deliveries: deliveries
+						.map((d) => ({
+							date: d.delivery_date,
+							litres: Number(d.litres_added || 0),
+							supplier: d.supplier?.trim() || null,
+							invoice: d.invoice_number || null
+						}))
+						.reverse(),
+					closes
 				};
 				const timestamp = Date.now();
 				persist(data, timestamp, false);

@@ -12,6 +12,7 @@
 		fields as allFields,
 		zones as allZones
 	} from '$lib/stores/reference-data';
+	import { financialYearStart, fyLabel } from '$lib/utils/dates';
 
 	/**
 	 * All entries — the desk-review table. One row per fuel entry, per-cell
@@ -46,18 +47,6 @@
 	let modalOpen = $state(false);
 
 	const today = () => new Date().toLocaleDateString('en-CA');
-
-	/** Financial year starts 1 March — before then we're still in last year's. */
-	function financialYearStart(now: Date): Date {
-		const year = now.getMonth() >= 2 ? now.getFullYear() : now.getFullYear() - 1;
-		return new Date(year, 2, 1);
-	}
-
-	/** "2025/26" for the financial year that 1 March `start` opens. */
-	function fyLabel(start: Date): string {
-		const y = start.getFullYear();
-		return `${y}/${String((y + 1) % 100).padStart(2, '0')}`;
-	}
 
 	const thisFyStart = $derived(financialYearStart(new Date()));
 	// 1 March a year earlier through the last day of February
