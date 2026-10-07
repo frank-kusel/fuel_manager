@@ -18,6 +18,7 @@
 	import { tick } from 'svelte';
 	import { calculateDieselClaim } from '$lib/utils/diesel-claim';
 	import { formatLitres, formatNumber } from '$lib/utils/formatting';
+	import { toast } from '$lib/stores/toast';
 	import type { Activity, DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
 
 	const SETTINGS_KEY = 'farmtrack_audit_settings_v1';
@@ -57,7 +58,12 @@
 	const months: MonthOption[] = recentMonths(6);
 	let selectedKey = $state(months[1].key); // the month you are closing
 	let selected = $derived(months.find((m) => m.key === selectedKey) ?? months[1]);
-	let loading = $state(true);
+	// The skeleton is for a month we have never shown, not for every load():
+	// load() is also the onclosed/onsaved callback, and replacing the workspace
+	// with a skeleton then would unmount MonthCloseSection and
+	// ActrosClaimAdjustment, discarding their banners and half-typed input.
+	let loadedKey = $state<string | null>(null);
+	let loadSeq = 0;
 	let error = $state<string | null>(null);
 	let showClaimSetup = $state(false);
 	// Plain let, not $state: this must not re-trigger. prepareEligibilityDraft
@@ -131,8 +137,8 @@
 	}
 
 	async function load() {
-		loading = true;
-		error = null;
+		const seq = ++loadSeq;
+		const key = selectedKey;
 		try {
 			const { default: supabaseService } = await import('$lib/services/supabase');
 			await supabaseService.init();
@@ -182,6 +188,8 @@
 				adjustmentsRes.error;
 			if (firstError)
 				throw new Error(typeof firstError === 'string' ? firstError : firstError.message);
+			// A newer load (month switched mid-flight) owns the page now.
+			if (seq !== loadSeq) return;
 
 			entries = (entriesRes.data || []).map((row: any) => {
 				const activity = one(row.activities) as {
@@ -206,10 +214,16 @@
 			closes = (closesRes.data || []) as CloseRow[];
 			missingInvoices12m = (invoiceRes.data || []).length;
 			prepareEligibilityDraft();
+			error = null;
+			loadedKey = key;
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load audit data';
+			if (seq !== loadSeq) return;
+			const message = err instanceof Error ? err.message : 'Failed to load audit data';
+			// A failed refresh keeps the month on screen; only a month we could
+			// never load gets the full-page error.
+			if (loadedKey === key) toast.error(`Couldn't refresh audit data: ${message}`);
+			else error = message;
 		}
-		loading = false;
 	}
 
 	onMount(() => {
@@ -220,6 +234,7 @@
 	function selectMonth(key: string) {
 		if (key === selectedKey) return;
 		selectedKey = key;
+		error = null;
 		load();
 	}
 
@@ -335,7 +350,6 @@
 
 	let readinessNext = $derived(nextAction(checklist));
 	let readinessOutstanding = $derived(outstandingCount(checklist));
-	let overTolerance = $derived(selectedClose?.accepted === false);
 
 	// ---- Tabs ----
 	// URL-backed so a reload or a trip to /tank and back keeps your place.
@@ -401,12 +415,12 @@
 		{/each}
 	</div>
 
-	{#if error}
+	{#if error && loadedKey !== selectedKey}
 		<div class="error-banner">
 			<p>Couldn't load audit data</p>
 			<small>{error}</small>
 		</div>
-	{:else if loading}
+	{:else if loadedKey !== selectedKey}
 		<div class="skeleton" style="height: 9rem"></div>
 	{:else}
 		<ReadinessBand
@@ -416,7 +430,6 @@
 			monthLabel={selected.label}
 			{eligibleLitres}
 			{refundRands}
-			{overTolerance}
 			onact={goToTarget}
 			onexports={goToExports}
 		/>

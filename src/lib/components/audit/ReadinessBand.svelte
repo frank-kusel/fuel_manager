@@ -14,7 +14,11 @@
 	 * summary already names the top blocker.
 	 */
 	import { formatLitres, formatNumber } from '$lib/utils/formatting';
-	import type { ReadinessItem, ReadinessTarget } from '$lib/utils/audit-readiness';
+	import {
+		firstOutstanding,
+		type ReadinessItem,
+		type ReadinessTarget
+	} from '$lib/utils/audit-readiness';
 
 	interface Props {
 		items: ReadinessItem[];
@@ -23,8 +27,6 @@
 		monthLabel: string;
 		eligibleLitres: number;
 		refundRands: number;
-		/** Closed, but the leak check fell outside tolerance. */
-		overTolerance: boolean;
 		onact: (target: ReadinessTarget) => void;
 		onexports: () => void;
 	}
@@ -36,14 +38,16 @@
 		monthLabel,
 		eligibleLitres,
 		refundRands,
-		overTolerance,
 		onact,
 		onexports
 	}: Props = $props();
 
 	let open = $state(false);
 
-	let tone = $derived(outstanding === 0 ? (overTolerance ? 'warn' : 'ok') : 'warn');
+	// A close over tolerance is a `warn` check, so it already counts as
+	// outstanding — no separate over-tolerance state is needed.
+	let tone = $derived(outstanding === 0 ? 'ok' : 'warn');
+	let headline = $derived(next ?? firstOutstanding(items));
 
 	// Month-scoped rows and standing ones read very differently next to a month
 	// selector: without the split, two failures that have nothing to do with
@@ -68,10 +72,7 @@
 					</strong>
 					<!-- The detail, not the title: titles name the goal ("June closed"),
 					     which reads as already done next to an outstanding count. -->
-					{#if next}<span class="sub">{next.detail}</span>{/if}
-				{:else if overTolerance}
-					<strong>{monthLabel} closed over tolerance</strong>
-					<span class="sub">Review the leak check before claiming</span>
+					{#if headline}<span class="sub">{headline.detail}</span>{/if}
 				{:else}
 					<strong>{monthLabel} ready</strong>
 					<span class="sub"
@@ -95,7 +96,7 @@
 			<button class="cta" onclick={() => onact(next.action!.target)}>
 				{next.action.label}
 			</button>
-		{:else if outstanding === 0 && !overTolerance}
+		{:else if outstanding === 0}
 			<!-- Green still gets a verb: exports are the month's actual last step. -->
 			<button class="cta ghost" onclick={onexports}>Claim and exports</button>
 		{/if}

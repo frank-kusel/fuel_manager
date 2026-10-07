@@ -204,3 +204,18 @@ export function nextAction(items: ReadinessItem[]): ReadinessItem | null {
 	}
 	return null;
 }
+
+/**
+ * The most urgent failing check, actionable or not — what the summary line
+ * names. Distinct from nextAction: a failing check with no action (no fuel
+ * entries this month) still needs saying, or the band reads "1 check
+ * outstanding" with nothing to explain it.
+ */
+export function firstOutstanding(items: ReadinessItem[]): ReadinessItem | null {
+	const failing = items.filter((i) => isCheck(i) && i.state !== 'ok');
+	for (const id of NEXT_ACTION_ORDER) {
+		const item = failing.find((i) => i.id === id);
+		if (item) return item;
+	}
+	return failing[0] ?? null;
+}

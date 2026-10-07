@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	buildReadiness,
 	checkCount,
+	firstOutstanding,
 	nextAction,
 	outstandingCount,
 	type ReadinessId,
@@ -138,5 +139,24 @@ describe('nextAction', () => {
 
 		expect(outstandingCount(items)).toBe(1);
 		expect(nextAction(items)).toBeNull();
+	});
+});
+
+describe('firstOutstanding', () => {
+	it('names an unactionable failure so the summary is never blank', () => {
+		const items = buildReadiness(ready({ entryCount: 0 }));
+
+		expect(firstOutstanding(items)?.id).toBe('usage');
+		expect(firstOutstanding(items)?.detail).toContain('No fuel entries');
+	});
+
+	it('follows the next-action priority when several checks fail', () => {
+		const items = buildReadiness(ready({ selectedClose: null, regNo: '' }));
+
+		expect(firstOutstanding(items)?.id).toBe('close');
+	});
+
+	it('is null when everything is clear', () => {
+		expect(firstOutstanding(buildReadiness(ready()))).toBeNull();
 	});
 });
