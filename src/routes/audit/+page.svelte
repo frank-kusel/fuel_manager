@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import DataExport from '$lib/components/dashboard/DataExport.svelte';
-	import ActrosClaimAdjustment from '$lib/components/audit/ActrosClaimAdjustment.svelte';
+	import ClassifierAdjustment, {
+		type ClassifierVehicle
+	} from '$lib/components/audit/ClassifierAdjustment.svelte';
 	import MonthCloseSection from '$lib/components/audit/MonthCloseSection.svelte';
 	import CloseHistory from '$lib/components/audit/CloseHistory.svelte';
 	import { recentMonths, type MonthOption } from '$lib/utils/dates';
@@ -16,7 +18,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { tick } from 'svelte';
-	import { calculateDieselClaim } from '$lib/utils/diesel-claim';
+	import { summariseClaim } from '$lib/utils/claim-totals';
 	import { formatLitres, formatNumber } from '$lib/utils/formatting';
 	import { toast } from '$lib/stores/toast';
 	import type { Activity, DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
@@ -35,8 +37,6 @@
 
 	interface AuditEntry {
 		litres: number;
-		activityId: string | null;
-		activityName: string;
 		activityEligible: boolean;
 		date: string;
 		vehicleId: string;
@@ -52,7 +52,7 @@
 	});
 	let legacySettingsFound = $state(false);
 
-	// ONE period for the whole page: the close, the claim figures, the Actros
+	// ONE period for the whole page: the close, the claim figures, the classifier
 	// classifier and the export target all follow this month. Previously these
 	// were three independent selectors that could silently disagree.
 	const months: MonthOption[] = recentMonths(6);
@@ -61,7 +61,7 @@
 	// The skeleton is for a month we have never shown, not for every load():
 	// load() is also the onclosed/onsaved callback, and replacing the workspace
 	// with a skeleton then would unmount MonthCloseSection and
-	// ActrosClaimAdjustment, discarding their banners and half-typed input.
+	// the classifier cards, discarding their banners and half-typed input.
 	let loadedKey = $state<string | null>(null);
 	let loadSeq = 0;
 	let error = $state<string | null>(null);
@@ -83,6 +83,7 @@
 	>([]);
 	let activities = $state<Activity[]>([]);
 	let adjustments = $state<VehicleMonthlyClaimAdjustment[]>([]);
+	let classifierVehicles = $state<ClassifierVehicle[]>([]);
 	let closes = $state<CloseRow[]>([]);
 	let missingInvoices12m = $state(0);
 
@@ -150,12 +151,19 @@
 			// while everything else is month-scoped.
 			const yearAgo = `${Number(start.slice(0, 4)) - 1}${start.slice(4)}`;
 
-			const [entriesRes, refillsRes, actsRes, closesRes, invoiceRes, adjustmentsRes] =
-				await Promise.all([
+			const [
+				entriesRes,
+				refillsRes,
+				actsRes,
+				closesRes,
+				invoiceRes,
+				adjustmentsRes,
+				classifierRes
+			] = await Promise.all([
 					client
 						.from('fuel_entries')
 						.select(
-							'entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(id, name, diesel_claim_eligible)'
+							'entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
 						)
 						.is('deleted_at', null)
 						.gte('entry_date', start)
@@ -178,30 +186,34 @@
 					supabaseService.getVehicleMonthlyClaimAdjustments(
 						`${start.slice(0, 7)}-01`,
 						`${end.slice(0, 7)}-01`
-					)
+					),
+					// Every vehicle whose claim share comes from a monthly classifier
+					// gets a card — not one hard-coded fleet code.
+					client
+						.from('vehicles')
+						.select('id, code, name')
+						.eq('diesel_claim_method', 'monthly_classifier')
+						.eq('active', true)
+						.order('code')
 				]);
 			const firstError =
 				entriesRes.error ||
 				refillsRes.error ||
 				actsRes.error ||
 				invoiceRes.error ||
-				adjustmentsRes.error;
+				adjustmentsRes.error ||
+				closesRes.error ||
+				classifierRes.error;
 			if (firstError)
 				throw new Error(typeof firstError === 'string' ? firstError : firstError.message);
 			// A newer load (month switched mid-flight) owns the page now.
 			if (seq !== loadSeq) return;
 
 			entries = (entriesRes.data || []).map((row: any) => {
-				const activity = one(row.activities) as {
-					id: string;
-					name: string;
-					diesel_claim_eligible: boolean;
-				} | null;
+				const activity = one(row.activities) as { diesel_claim_eligible: boolean } | null;
 				const vehicle = one(row.vehicles) as { diesel_claim_method: DieselClaimMethod } | null;
 				return {
 					litres: Number(row.litres_dispensed || 0),
-					activityId: activity?.id ?? null,
-					activityName: activity?.name ?? 'Unknown',
 					activityEligible: activity?.diesel_claim_eligible === true,
 					date: row.entry_date,
 					vehicleId: row.vehicle_id,
@@ -211,6 +223,7 @@
 			refills = refillsRes.data || [];
 			activities = actsRes.data || [];
 			adjustments = adjustmentsRes.data || [];
+			classifierVehicles = (classifierRes.data || []) as ClassifierVehicle[];
 			closes = (closesRes.data || []) as CloseRow[];
 			missingInvoices12m = (invoiceRes.data || []).length;
 			prepareEligibilityDraft();
@@ -269,53 +282,21 @@
 		}
 	}
 
-	let claimTotals = $derived.by(() => {
-		const adjustmentByVehicleMonth = new Map(
-			adjustments.map((item) => [`${item.vehicle_id}:${item.claim_month}`, item])
-		);
-		const groups = new Map<
-			string,
-			{
-				total: number;
-				eligible: number;
-				method: DieselClaimMethod;
-				vehicleId: string;
-				month: string;
-			}
-		>();
-		for (const entry of entries) {
-			const month = `${entry.date.slice(0, 7)}-01`;
-			const key = `${entry.vehicleId}:${month}`;
-			const group = groups.get(key) ?? {
-				total: 0,
-				eligible: 0,
-				method: entry.claimMethod,
-				vehicleId: entry.vehicleId,
-				month
-			};
-			group.total += entry.litres;
-			if (entry.activityEligible) group.eligible += entry.litres;
-			groups.set(key, group);
-		}
-		let total = 0;
-		let claimable = 0;
-		let missingAdjustments = 0;
-		for (const group of groups.values()) {
-			const result = calculateDieselClaim({
-				totalLitres: group.total,
-				baseEligibleLitres: group.eligible,
-				method: group.method,
-				adjustment: adjustmentByVehicleMonth.get(`${group.vehicleId}:${group.month}`)
-			});
-			total += result.totalLitres;
-			claimable += result.claimableLitres;
-			if (result.missingAdjustment) missingAdjustments++;
-		}
-		return { total, claimable, nonClaimable: total - claimable, missingAdjustments };
-	});
+	let claimTotals = $derived(
+		summariseClaim(
+			entries.map((e) => ({
+				vehicleId: e.vehicleId,
+				date: e.date,
+				litres: e.litres,
+				eligible: e.activityEligible,
+				method: e.claimMethod
+			})),
+			adjustments
+		)
+	);
 
-	let eligibleLitres = $derived(claimTotals.claimable);
-	let nonEligibleLitres = $derived(claimTotals.nonClaimable);
+	let eligibleLitres = $derived(claimTotals.claimableLitres);
+	let nonEligibleLitres = $derived(claimTotals.nonClaimableLitres);
 	let purchasedLitres = $derived(
 		refills.reduce((sum, refill) => sum + (refill.litres_added || 0), 0)
 	);
@@ -360,7 +341,7 @@
 	// Claim mounts on first visit and then stays. Neither panel is ever
 	// destroyed: MonthCloseSection refetches on mount (4-5 round trips) and
 	// holds a half-typed note and the post-close banner, which a remount would
-	// silently discard. ActrosClaimAdjustment is the same shape.
+	// silently discard. The classifier cards are the same shape.
 	let claimMounted = $state(false);
 	$effect(() => {
 		if (tab === 'claim') claimMounted = true;
@@ -573,7 +554,7 @@
 				{#if eligibilityError}<p class="elig-message error">{eligibilityError}</p>{/if}
 				<div class="elig-actions">
 					<p class="hint">
-						Non-claimable activities are excluded before any Actros percentage is applied.
+						Non-claimable activities are excluded before any classifier percentage is applied.
 					</p>
 					<button type="button" onclick={saveEligibility} disabled={savingEligibility}
 						>{savingEligibility ? 'Saving...' : 'Save eligibility'}</button
@@ -616,7 +597,19 @@
 		</section>
 
 		<div class="actros-slot">
-			<ActrosClaimAdjustment year={selected.year} month={selected.month} onsaved={load} />
+			{#each classifierVehicles as vehicle (vehicle.id)}
+				{@const vehicleClaim = claimTotals.byVehicle.get(vehicle.id)}
+				<ClassifierAdjustment
+					{vehicle}
+					claimMonth={`${selected.key}-01`}
+					totalLitres={vehicleClaim?.totalLitres ?? 0}
+					baseEligibleLitres={vehicleClaim?.baseEligibleLitres ?? 0}
+					existing={adjustments.find(
+						(a) => a.vehicle_id === vehicle.id && a.claim_month.startsWith(selected.key)
+					) ?? null}
+					onsaved={load}
+				/>
+			{/each}
 		</div>
 
 		<!-- Exports -->

@@ -1,45 +1,61 @@
 <script lang="ts">
-	import { calculateClassifierVariance, calculateDieselClaim } from '$lib/utils/diesel-claim';
+	/**
+	 * One monthly-classifier vehicle's claim share for one month: the telematics
+	 * classifier's measured and claimable litres, from which its percentage is
+	 * derived. Without a saved result that month's litres are excluded.
+	 *
+	 * The page owns the data (entries, saved adjustments) and passes it in, so
+	 * this card's figures are the same numbers the claim total uses.
+	 */
+	import {
+		adjustmentPercentage,
+		calculateClassifierVariance,
+		calculateDieselClaim
+	} from '$lib/utils/diesel-claim';
 	import { formatLitres, formatNumber } from '$lib/utils/formatting';
-	import type { DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
+	import type { VehicleMonthlyClaimAdjustment } from '$lib/types';
 
-	interface Props {
-		year: number;
-		month: number;
-		onsaved?: () => void;
-	}
-
-	interface ActrosVehicle {
+	export interface ClassifierVehicle {
 		id: string;
 		code: string;
 		name: string;
-		diesel_claim_method: DieselClaimMethod;
 	}
 
-	interface FuelRow {
-		litres_dispensed: number | null;
-		activities: { diesel_claim_eligible: boolean } | null;
+	interface Props {
+		vehicle: ClassifierVehicle;
+		/** YYYY-MM-01 */
+		claimMonth: string;
+		totalLitres: number;
+		baseEligibleLitres: number;
+		existing: VehicleMonthlyClaimAdjustment | null;
+		onsaved?: () => void;
 	}
 
-	let { year, month, onsaved }: Props = $props();
-	let loading = $state(true);
+	let { vehicle, claimMonth, totalLitres, baseEligibleLitres, existing, onsaved }: Props =
+		$props();
+
+	/** Bowser vs telematics totals further apart than this need a second look. */
+	const VARIANCE_THRESHOLD_PCT = 5;
+
 	let saving = $state(false);
 	let error = $state('');
 	let success = $state('');
-	let vehicle = $state<ActrosVehicle | null>(null);
-	let existing = $state<VehicleMonthlyClaimAdjustment | null>(null);
-	let totalLitres = $state(0);
-	let baseEligibleLitres = $state(0);
 	let measuredLitres = $state<number | null>(null);
 	let classifierClaimableLitres = $state<number | null>(null);
 	let sourceReference = $state('');
 	let notes = $state('');
-	let loadSequence = 0;
 
-	const monthKey = $derived(`${year}-${String(month).padStart(2, '0')}-01`);
-	const monthEnd = $derived(
-		`${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
-	);
+	// Re-seed the inputs when the month, the vehicle or the saved result changes.
+	$effect(() => {
+		void claimMonth;
+		void vehicle.id;
+		measuredLitres = existing?.classifier_measured_litres ?? null;
+		classifierClaimableLitres = existing?.classifier_claimable_litres ?? null;
+		sourceReference = existing?.source_reference ?? '';
+		notes = existing?.notes ?? '';
+		error = '';
+	});
+
 	const draftAdjustment = $derived.by(() => {
 		if (
 			typeof measuredLitres !== 'number' ||
@@ -51,82 +67,28 @@
 			classifierClaimableLitres > measuredLitres
 		)
 			return null;
-		return {
+		const draft = {
 			classifier_measured_litres: measuredLitres,
 			classifier_claimable_litres: classifierClaimableLitres,
-			claimable_percentage: (classifierClaimableLitres / measuredLitres) * 100
+			claimable_percentage: 0
 		};
+		draft.claimable_percentage = adjustmentPercentage(draft) ?? 0;
+		return draft;
 	});
 	const claim = $derived(
 		calculateDieselClaim({
 			totalLitres,
 			baseEligibleLitres,
-			method: vehicle?.diesel_claim_method ?? 'monthly_classifier',
+			method: 'monthly_classifier',
 			adjustment: draftAdjustment
 		})
 	);
-	const variance = $derived(calculateClassifierVariance(totalLitres, measuredLitres ?? 0));
-
-	$effect(() => {
-		void year;
-		void month;
-		load();
-	});
-
-	async function load() {
-		const sequence = ++loadSequence;
-		loading = true;
-		error = '';
-		success = '';
-		try {
-			const { default: supabaseService } = await import('$lib/services/supabase');
-			await supabaseService.init();
-			const client = supabaseService.getClient();
-			const vehicleResult = await client
-				.from('vehicles')
-				.select('id, code, name, diesel_claim_method')
-				.eq('code', 'KC06')
-				.maybeSingle();
-			if (vehicleResult.error) throw new Error(vehicleResult.error.message);
-			if (!vehicleResult.data) throw new Error('Actros vehicle KC06 was not found');
-			const actros = vehicleResult.data as ActrosVehicle;
-
-			const [entriesResult, adjustmentResult] = await Promise.all([
-				client
-					.from('fuel_entries')
-					.select('litres_dispensed, activities:activity_id(diesel_claim_eligible)')
-					.eq('vehicle_id', actros.id)
-					.is('deleted_at', null)
-					.gte('entry_date', monthKey)
-					.lte('entry_date', monthEnd),
-				supabaseService.getVehicleMonthlyClaimAdjustment(actros.id, monthKey)
-			]);
-			if (entriesResult.error) throw new Error(entriesResult.error.message);
-			if (adjustmentResult.error) throw new Error(adjustmentResult.error);
-			if (sequence !== loadSequence) return;
-
-			const rows = (entriesResult.data || []) as unknown as FuelRow[];
-			vehicle = actros;
-			totalLitres = rows.reduce((sum, row) => sum + Number(row.litres_dispensed || 0), 0);
-			baseEligibleLitres = rows
-				.filter((row) => row.activities?.diesel_claim_eligible === true)
-				.reduce((sum, row) => sum + Number(row.litres_dispensed || 0), 0);
-			existing = adjustmentResult.data;
-			measuredLitres = existing?.classifier_measured_litres ?? null;
-			classifierClaimableLitres = existing?.classifier_claimable_litres ?? null;
-			sourceReference = existing?.source_reference ?? '';
-			notes = existing?.notes ?? '';
-		} catch (err) {
-			if (sequence === loadSequence) {
-				error = err instanceof Error ? err.message : 'Failed to load the Actros adjustment';
-			}
-		} finally {
-			if (sequence === loadSequence) loading = false;
-		}
-	}
+	const variance = $derived(
+		calculateClassifierVariance(totalLitres, measuredLitres ?? 0, VARIANCE_THRESHOLD_PCT)
+	);
 
 	async function save() {
-		if (!vehicle || !draftAdjustment) {
+		if (!draftAdjustment) {
 			error = 'Enter valid measured and claimable litres from the classifier.';
 			return;
 		}
@@ -138,18 +100,17 @@
 			await supabaseService.init();
 			const result = await supabaseService.upsertVehicleMonthlyClaimAdjustment({
 				vehicle_id: vehicle.id,
-				claim_month: monthKey,
+				claim_month: claimMonth,
 				classifier_measured_litres: draftAdjustment.classifier_measured_litres,
 				classifier_claimable_litres: draftAdjustment.classifier_claimable_litres,
 				source_reference: sourceReference.trim() || null,
 				notes: notes.trim() || null
 			});
 			if (result.error || !result.data) throw new Error(result.error || 'Adjustment was not saved');
-			existing = result.data;
-			success = 'Monthly Actros claim adjustment saved.';
+			success = `${vehicle.code} classifier result saved.`;
 			onsaved?.();
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to save the Actros adjustment';
+			error = err instanceof Error ? err.message : 'Failed to save the classifier result';
 		} finally {
 			saving = false;
 		}
@@ -160,16 +121,11 @@
 	<div class="panel-heading">
 		<div>
 			<p class="eyebrow">Monthly classifier</p>
-			<h2>Actros claim adjustment</h2>
+			<h2>{vehicle.code} {vehicle.name}</h2>
 		</div>
 		{#if existing}<span class="saved-badge">Saved</span>{/if}
 	</div>
 
-	{#if loading}
-		<div class="loading-bar"></div>
-	{:else if error && !vehicle}
-		<p class="message error">{error}</p>
-	{:else}
 		<div class="metric-grid">
 			<div><span>Fuel Manager total</span><strong>{formatLitres(totalLitres)} L</strong></div>
 			<div>
@@ -243,13 +199,13 @@
 		</div>
 		{#if variance.exceedsThreshold}
 			<p class="message warning">
-				The two totals differ by more than 5%. Confirm the GPS file is for KC06 and the selected
-				month.
+				The two totals differ by more than {VARIANCE_THRESHOLD_PCT}%. Confirm the GPS file is for
+				{vehicle.code} and the selected month.
 			</p>
 		{:else if totalLitres > 0 && !existing && !draftAdjustment}
 			<p class="message warning">
-				No classifier result is saved. Until one is saved, the monthly report excludes all Actros
-				litres from the claim.
+				No classifier result is saved. Until one is saved, the claim excludes this month's
+				{vehicle.code} litres.
 			</p>
 		{/if}
 		{#if error}<p class="message error">{error}</p>{/if}
@@ -260,7 +216,6 @@
 				{saving ? 'Saving...' : existing ? 'Update adjustment' : 'Save adjustment'}
 			</button>
 		</div>
-	{/if}
 </section>
 
 <style>
@@ -399,11 +354,6 @@
 	.actions button:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
-	}
-	.loading-bar {
-		height: 6rem;
-		border-radius: var(--radius-md);
-		background: var(--gray-100);
 	}
 	@media (max-width: 640px) {
 		.metric-grid,

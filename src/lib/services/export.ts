@@ -8,7 +8,8 @@ import type {
 	FuelEntry,
 	VehicleMonthlyClaimAdjustment
 } from '$lib/types';
-import { calculateDieselClaim, roundClaimLitres } from '$lib/utils/diesel-claim';
+import { roundClaimLitres } from '$lib/utils/diesel-claim';
+import { summariseClaim, type ClaimEntry } from '$lib/utils/claim-totals';
 import {
 	bandVariance,
 	computeVariance,
@@ -512,11 +513,9 @@ class ExportService {
 			if (result.error) return { data: null, error: result.error.message };
 			if (adjustmentsResult.error) return { data: null, error: adjustmentsResult.error };
 			const adjustments = adjustmentsResult.data || [];
-			// Classifier percentages are monthly facts: key by vehicle AND month so
-			// a multi-month period applies each month's own percentage.
-			const adjustmentByVehicleMonth = new Map(
-				adjustments.map((item) => [`${item.vehicle_id}|${String(item.claim_month).slice(0, 7)}`, item])
-			);
+			// The claim itself comes from the shared summariser, so the PDF and
+			// the Audit page's claim card can never disagree.
+			const claimEntries: ClaimEntry[] = [];
 
 			// Group data by vehicle and calculate summaries
 			const vehicleSummaries = new Map<
@@ -536,7 +535,6 @@ class ExportService {
 					totalHours: number;
 					hasOdometerData: boolean;
 					hasHoursData: boolean;
-					months: Map<string, { total: number; eligible: number }>;
 					activities: Map<
 						string,
 						{ name: string; eligible: boolean; reviewed: boolean; litres: number }
@@ -568,7 +566,6 @@ class ExportService {
 						totalHours: 0,
 						hasOdometerData: false,
 						hasHoursData: false,
-						months: new Map(),
 						activities: new Map()
 					});
 				}
@@ -588,11 +585,13 @@ class ExportService {
 				activitySummary.litres += litres;
 				summary.activities.set(activityKey, activitySummary);
 
-				const monthKey = String(entry.entry_date).slice(0, 7);
-				const monthTotals = summary.months.get(monthKey) || { total: 0, eligible: 0 };
-				monthTotals.total += litres;
-				if (activityEligible) monthTotals.eligible += litres;
-				summary.months.set(monthKey, monthTotals);
+				claimEntries.push({
+					vehicleId,
+					date: String(entry.entry_date),
+					litres,
+					eligible: activityEligible,
+					method: summary.claimMethod
+				});
 
 				// Track odometer readings to get month start and end
 				if (entry.odometer_start && entry.odometer_start > 0) {
@@ -615,6 +614,7 @@ class ExportService {
 				}
 			});
 
+			const claim = summariseClaim(claimEntries, adjustments);
 			const warnings: string[] = [];
 			const summaryData: MonthlySummaryData[] = Array.from(vehicleSummaries.values())
 				.filter((summary) => summary.totalFuel > 0) // Only include vehicles with fuel consumption
@@ -658,30 +658,12 @@ class ExportService {
 					}
 					// If no odometer_unit, distance, consumption, and unit remain empty
 
-					// Classifier vehicles get each month's own percentage; a period
-					// spanning months is the sum of its monthly claims.
-					let claimableLitres = 0;
-					if (summary.claimMethod === 'monthly_classifier') {
-						for (const [monthKey, monthTotals] of summary.months) {
-							const claim = calculateDieselClaim({
-								totalLitres: monthTotals.total,
-								baseEligibleLitres: monthTotals.eligible,
-								method: summary.claimMethod,
-								adjustment: adjustmentByVehicleMonth.get(`${summary.vehicleId}|${monthKey}`)
-							});
-							if (claim.missingAdjustment)
-								warnings.push(
-									`${summary.code}: classifier result missing for ${monthKeyLabel(monthKey)}; that month's litres excluded.`
-								);
-							claimableLitres += claim.claimableLitres;
-						}
-					} else {
-						claimableLitres = calculateDieselClaim({
-							totalLitres: summary.totalFuel,
-							baseEligibleLitres: summary.baseEligibleFuel,
-							method: summary.claimMethod
-						}).claimableLitres;
-					}
+					const vehicleClaim = claim.byVehicle.get(summary.vehicleId);
+					const claimableLitres = vehicleClaim?.claimableLitres ?? 0;
+					for (const month of vehicleClaim?.missingMonths ?? [])
+						warnings.push(
+							`${summary.code}: classifier result missing for ${monthKeyLabel(month)}; that month's litres excluded.`
+						);
 					for (const activity of summary.activities.values()) {
 						if (!activity.reviewed)
 							warnings.push(`${activity.name}: activity eligibility has not been reviewed.`);
