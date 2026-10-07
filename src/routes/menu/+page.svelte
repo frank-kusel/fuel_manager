@@ -1,5 +1,5 @@
 <script lang="ts">
-	import SystemSettings from '$lib/components/settings/SystemSettings.svelte';
+	import AppSettingsPanel from '$lib/components/settings/AppSettingsPanel.svelte';
 
 	let showSettings = $state(false);
 
@@ -17,8 +17,8 @@
 			icon: 'database'
 		},
 		{
-			title: 'System Settings',
-			description: 'Configure operational parameters, thresholds, and system preferences',
+			title: 'Settings',
+			description: 'Refund rate, DRS registration number and dipstick tolerance',
 			onclick: () => (showSettings = true),
 			icon: 'settings'
 		},
@@ -81,7 +81,7 @@
 	</div>
 
 	{#if showSettings}
-		<SystemSettings onclose={() => (showSettings = false)} />
+		<AppSettingsPanel onclose={() => (showSettings = false)} />
 	{/if}
 </div>
 

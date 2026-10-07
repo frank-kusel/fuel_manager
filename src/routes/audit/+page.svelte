@@ -89,6 +89,7 @@
 	let missingInvoices12m = $state(0);
 
 	function loadSettings() {
+		// The legacy eligibility list still lives in this browser's storage.
 		try {
 			const raw = localStorage.getItem(SETTINGS_KEY);
 			if (raw) {
@@ -99,6 +100,15 @@
 			/* keep defaults */
 		}
 	}
+
+	// Rate, registration and tolerance follow the shared store (the database
+	// row once migration 022 is applied), not this browser.
+	$effect(() => {
+		const shared = $claimSettings;
+		settings.rateCents = shared.rateCents;
+		settings.regNo = shared.regNo;
+		settings.dipToleranceL = shared.dipToleranceL;
+	});
 
 	// Rate, registration and tolerance go through the shared store so the
 	// Tank page and the claim PDF band gaps with the same tolerance.

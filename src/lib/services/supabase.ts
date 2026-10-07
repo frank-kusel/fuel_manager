@@ -19,6 +19,8 @@ import type {
 	SoftDeleteFuelEntryResult,
 	VehicleMonthlyClaimAdjustment,
 	VehicleMonthlyClaimAdjustmentInput,
+	AppSettingsPatch,
+	AppSettingsRow,
 	ApiResponse
 } from '$lib/types';
 import { isoDayBefore, todayIso } from '$lib/utils/dates';
@@ -822,6 +824,45 @@ class SupabaseService {
 	 * break closing a month on an un-migrated database, drop the new columns and
 	 * retry — the close still records everything it did before.
 	 */
+	/**
+	 * The shared app settings row. `missing: true` means migration 022 has not
+	 * been applied yet; callers fall back to this browser's saved values so the
+	 * app keeps working until it is.
+	 */
+	async getAppSettings(): Promise<ApiResponse<AppSettingsRow> & { missing?: boolean }> {
+		const client = this.ensureInitialized();
+		const { data, error } = await client.from('app_settings').select('*').eq('id', true).maybeSingle();
+		if (error) {
+			if (this.isMissingTableError(error)) return { data: null, error: null, missing: true };
+			return { data: null, error: error.message };
+		}
+		return { data: (data as AppSettingsRow) ?? null, error: null };
+	}
+
+	async updateAppSettings(
+		patch: AppSettingsPatch
+	): Promise<ApiResponse<AppSettingsRow> & { missing?: boolean }> {
+		const client = this.ensureInitialized();
+		const { data, error } = await client
+			.from('app_settings')
+			.upsert({ id: true, ...patch })
+			.select()
+			.single();
+		if (error) {
+			if (this.isMissingTableError(error)) return { data: null, error: null, missing: true };
+			return { data: null, error: error.message };
+		}
+		return { data: data as AppSettingsRow, error: null };
+	}
+
+	private isMissingTableError(error: { code?: string; message?: string }): boolean {
+		return (
+			error.code === 'PGRST205' ||
+			error.code === '42P01' ||
+			/could not find the table|relation .* does not exist/i.test(error.message ?? '')
+		);
+	}
+
 	private isMissingColumnError(error: string | null): boolean {
 		return !!error && (error.includes('42703') || /column .* does not exist/i.test(error));
 	}

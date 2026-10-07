@@ -92,6 +92,22 @@ export interface VehicleMonthlyClaimAdjustment {
 	updated_at: string;
 }
 
+/** The single app_settings row (migration 022). */
+export interface AppSettingsRow {
+	diesel_rebate_rate_cents: number;
+	drs_registration_no: string | null;
+	dip_tolerance_litres: number;
+	migrated_from_browser_at: string | null;
+	updated_at: string;
+}
+
+export type AppSettingsPatch = Partial<
+	Pick<
+		AppSettingsRow,
+		'diesel_rebate_rate_cents' | 'drs_registration_no' | 'dip_tolerance_litres' | 'migrated_from_browser_at'
+	>
+>;
+
 export interface VehicleMonthlyClaimAdjustmentInput {
 	vehicle_id: string;
 	claim_month: string;

@@ -10,6 +10,7 @@
 	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
 	import { hasDraft } from '$lib/stores/fuel-entry-draft';
 	import { tankStore, tankData } from '$lib/stores/tank';
+	import { claimSettings } from '$lib/stores/claim-settings';
 	import { anchorLabel, pctFull } from '$lib/utils/tank-balance';
 
 	// Svelte 5 children prop
@@ -98,6 +99,10 @@
 				referenceDataStore.loadAllData()
 			);
 		});
+
+		// One small query: rate, DRS number and dip tolerance, shared by every
+		// device (migration 022). Pages render from the cached copy meanwhile.
+		claimSettings.load();
 
 		// Desktop sidebar: restore collapse state, and only fetch the tank
 		// strip's data when the sidebar can actually be seen — phones pay nothing.
