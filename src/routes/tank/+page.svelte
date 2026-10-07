@@ -175,7 +175,7 @@
 			<ul class="legend" aria-hidden="true">
 				<li><i class="k-line"></i>Book</li>
 				<li><i class="k-in"></i>Delivery</li>
-				<li><i class="k-dip"></i>Dip, stem = gap</li>
+				<li><i class="k-dip"></i>Dip (stem = gap)</li>
 				<li><i class="k-tol"></i>±{formatWholeLitres(tolerance)} L tolerance</li>
 				<li><i class="k-ok"></i><i class="k-warn"></i><i class="k-bad"></i>within · near · over</li>
 			</ul>
@@ -359,11 +359,31 @@
 		align-items: center;
 	}
 
+	/* The plot runs to the card's edges; text keeps the card's inset. */
+	.chart-panel {
+		--inset: 1.125rem;
+		padding-left: 0;
+		padding-right: 0;
+		overflow: hidden;
+	}
+
+	.chart-panel .ui-panel-head,
+	.chart-panel .legend,
+	.chart-panel :global(.readout) {
+		padding-left: var(--inset);
+		padding-right: var(--inset);
+	}
+
+	.chart-panel :global(.ranges) {
+		right: var(--inset);
+	}
+
 	/* Phones: no card — the chart runs edge to edge on the page background,
 	   so none of its width is lost to padding. The side margins cancel the
 	   page gutter (main 0.5rem + ui-page 0.25rem). */
 	@media (max-width: 639px) {
 		.chart-panel {
+			--inset: 0.75rem;
 			margin: 0 -0.75rem;
 			padding: 0.5rem 0 0;
 			background: none;
@@ -371,18 +391,6 @@
 			border-radius: 0;
 		}
 
-		.chart-panel .ui-panel-head,
-		.chart-panel .legend {
-			padding: 0 0.75rem;
-		}
-
-		.chart-panel :global(.ranges) {
-			right: 0.75rem;
-		}
-
-		.chart-panel :global(.readout) {
-			padding: 0 0.75rem;
-		}
 	}
 
 	.legend {
