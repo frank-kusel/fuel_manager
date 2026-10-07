@@ -14,8 +14,8 @@
 	import { tankStore, tankData, tankError } from '$lib/stores/tank';
 	import { claimSettings } from '$lib/stores/claim-settings';
 	import { onVisible } from '$lib/stores/freshness';
-	import { financialYearStart, fmtDayMonth, fmtFull, isoLocal } from '$lib/utils/dates';
-	import { formatSigned, formatWholeLitres } from '$lib/utils/formatting';
+	import { financialYearStart, fmtFull, isoLocal } from '$lib/utils/dates';
+	import { formatWholeLitres } from '$lib/utils/formatting';
 	import { anchorLabel, dipAgeDays, dipChecks, isDipStale, pctFull } from '$lib/utils/tank-balance';
 
 	let showDipModal = $state(false);
@@ -31,11 +31,19 @@
 	let pct = $derived(tank ? pctFull(tank.bookLitres, tank.capacity) : null);
 	let tolerance = $derived($claimSettings.dipToleranceL);
 	let checks = $derived($tankData ? dipChecks($tankData.history, $tankData.dips, tolerance) : []);
-	let lastCheck = $derived(checks.at(-1) ?? null);
 	let lastDip = $derived($tankData?.dips.at(-1) ?? null);
 	let dipAge = $derived(dipAgeDays(lastDip?.reading_date ?? null));
 	let stale = $derived(isDipStale(dipAge));
-	const TONE = { good: 'good', acceptable: 'warn', high: 'bad' } as const;
+	/** Days left: red under a week, amber under two. */
+	let runwayTone = $derived(
+		tank?.runwayDays === null || tank?.runwayDays === undefined
+			? ''
+			: tank.runwayDays < 7
+				? 'bad'
+				: tank.runwayDays < 14
+					? 'warn'
+					: ''
+	);
 
 	const seasonStart = isoLocal(financialYearStart());
 	let deliveries = $derived($tankData?.deliveries ?? []);
@@ -97,67 +105,33 @@
 			<p class="ui-muted">No close or dip yet. Record a dip to start the book.</p>
 		</section>
 	{:else}
-		<!-- Now: the balance, how it got here, and the latest check -->
+		<!-- Now: the balance and how long it lasts -->
 		<section class="ui-panel hero" class:negative={tank.bookLitres <= 0}>
-			<div class="now">
-				<div class="top">
-					<div>
-						<p class="ui-label">{tank.name} · book balance</p>
-						<p class="ui-figure big">{formatWholeLitres(tank.bookLitres)}<small>L</small></p>
-					</div>
-					<div class="side">
-						{#if pct !== null}<span class="pct">{Math.round(pct)}<small>%</small></span>{/if}
-						{#if tank.runwayDays !== null}
-							<span class="ui-pill plain" title="At the last 14 days' burn rate"
-								>≈ {tank.runwayDays} days</span
-							>
-						{/if}
-					</div>
-				</div>
-				{#if tank.capacity}
-					<TankGauge litres={tank.bookLitres} capacity={tank.capacity} />
-				{/if}
-			</div>
-
-			<dl class="facts">
+			<div class="hero-row">
 				<div>
-					<dt>Opening <small>{anchorLabel(tank.anchor)}</small></dt>
-					<dd>{formatWholeLitres(tank.anchor.litres)}</dd>
-				</div>
-				<div>
-					<dt>Delivered</dt>
-					<dd class="in">+{formatWholeLitres(tank.deliveriesSinceAnchor)}</dd>
-				</div>
-				<div>
-					<dt>Used</dt>
-					<dd>−{formatWholeLitres(tank.dispensedSinceAnchor)}</dd>
-				</div>
-				<div class="check">
-					<dt>
-						Last dip
-						{#if lastDip}<small
-								>{fmtDayMonth(lastDip.reading_date)}{dipAge !== null
-									? ` · ${dipAge} d ago`
-									: ''}</small
-							>{/if}
-					</dt>
-					<dd>
-						{#if lastCheck && lastCheck.date === lastDip?.reading_date}
-							<span class="gap {lastCheck.band ? TONE[lastCheck.band.key] : ''}"
-								>{formatSigned(lastCheck.gapLitres)}</span
-							>
-							<span class="ui-muted">vs book</span>
-						{:else if lastDip}
-							{formatWholeLitres(lastDip.reading_value)}
-						{:else}
-							—
-						{/if}
-					</dd>
-					{#if stale || dipAge === null}
-						<span class="ui-pill warn due">Dip due</span>
+					<p class="ui-label">{tank.name} · book balance</p>
+					<p class="ui-figure big">{formatWholeLitres(tank.bookLitres)}<small>L</small></p>
+					{#if pct !== null}
+						<p class="pct">{Math.round(pct)}% of {formatWholeLitres(tank.capacity)} L</p>
 					{/if}
 				</div>
-			</dl>
+				{#if tank.runwayDays !== null}
+					<div class="runway {runwayTone}" title="At the last 14 days' average use">
+						<p class="ui-figure days">{tank.runwayDays}<small>days</small></p>
+						<p class="runway-sub">left at recent use</p>
+					</div>
+				{/if}
+			</div>
+			{#if tank.capacity}
+				<TankGauge litres={tank.bookLitres} capacity={tank.capacity} />
+			{/if}
+			{#if stale || dipAge === null}
+				<p class="due">
+					<span class="ui-pill warn"
+						>Dip due{dipAge !== null ? ` · last one ${dipAge} days ago` : ''}</span
+					>
+				</p>
+			{/if}
 		</section>
 
 		<!-- History -->
@@ -172,6 +146,14 @@
 				capacity={tank.capacity}
 				toleranceL={tolerance}
 			/>
+			<!-- How today's book is made up, since the close it carries forward -->
+			<p class="flow">
+				<span class="flow-k">Since the {anchorLabel(tank.anchor)}</span>
+				<span class="flow-v">{formatWholeLitres(tank.anchor.litres)}</span>
+				<span class="flow-op in">+{formatWholeLitres(tank.deliveriesSinceAnchor)}</span>
+				<span class="flow-op">−{formatWholeLitres(tank.dispensedSinceAnchor)}</span>
+				<span class="flow-eq">= {formatWholeLitres(tank.bookLitres)} L</span>
+			</p>
 			<ul class="legend" aria-hidden="true">
 				<li><i class="k-line"></i>Book</li>
 				<li><i class="k-in"></i>Delivery</li>
@@ -240,29 +222,15 @@
 	}
 
 	/* ---- Hero ---- */
-	.hero {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-		gap: 1rem;
-	}
-
-	@media (min-width: 860px) {
-		.hero {
-			grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-			gap: 2rem;
-			align-items: center;
-		}
-	}
-
-	.top {
+	.hero-row {
 		display: flex;
 		justify-content: space-between;
-		align-items: flex-start;
+		align-items: flex-end;
 		gap: 1rem;
 		margin-bottom: 0.875rem;
 	}
 
-	.top p {
+	.hero-row p {
 		margin: 0;
 	}
 
@@ -275,82 +243,84 @@
 		color: var(--error);
 	}
 
-	.side {
-		display: grid;
-		justify-items: end;
-		gap: 0.375rem;
-	}
-
+	/* % full is plain on the gauge, so it stays quiet */
 	.pct {
-		font-size: 1.5rem;
-		font-weight: 800;
-		font-stretch: var(--figure-stretch);
-		color: var(--brand);
-		line-height: 1;
+		margin-top: 0.25rem !important;
+		font-size: var(--text-xs);
+		color: var(--gray-400);
+		font-variant-numeric: tabular-nums;
 	}
 
-	.pct small {
-		font-size: 0.6em;
+	/* Days left: the figure worth a glance */
+	.runway {
+		text-align: right;
 	}
 
-	.facts {
-		margin: 0;
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 0.875rem 1rem;
+	.days {
+		font-size: clamp(2rem, 6vw, 2.5rem);
+		color: var(--gray-900);
 	}
 
-	@media (min-width: 860px) {
-		.facts {
-			padding-left: 1.5rem;
-			border-left: 1px solid var(--gray-100);
-		}
+	.days small {
+		font-size: 0.42em;
+		margin-left: 0.25em;
 	}
 
-	.facts dt {
+	.runway-sub {
+		margin-top: 0.25rem !important;
 		font-size: var(--text-xs);
 		color: var(--gray-500);
 	}
 
-	.facts dt small {
-		color: var(--gray-400);
-		margin-left: 0.25rem;
+	.runway.warn .days {
+		color: #b45309;
 	}
 
-	.facts dd {
-		margin: 0.125rem 0 0;
-		font-size: 1.25rem;
-		font-weight: 700;
-		font-stretch: var(--figure-stretch);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.facts .in {
-		color: #1f6b3a;
-	}
-
-	.facts .ui-muted {
-		font-size: var(--text-xs);
-		font-weight: 400;
-		font-stretch: normal;
-	}
-
-	.gap.good {
-		color: #1f6b3a;
-	}
-	.gap.warn {
-		color: #8a4b08;
-	}
-	.gap.bad {
+	.runway.bad .days {
 		color: var(--error);
 	}
 
-	.check {
-		position: relative;
+	.due {
+		margin: 0.5rem 0 0;
 	}
 
-	.due {
-		margin-top: 0.25rem;
+	/* ---- Flow strip under the chart ---- */
+	.flow {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.25rem 0.625rem;
+		margin: 0.5rem 0 0;
+		padding-top: 0.625rem;
+		padding-bottom: 0.125rem;
+		border-top: 1px solid var(--gray-100);
+		font-size: var(--text-sm);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.flow-k {
+		font-size: var(--text-xs);
+		color: var(--gray-500);
+		margin-right: 0.125rem;
+	}
+
+	.flow-v,
+	.flow-eq {
+		font-weight: 700;
+		color: var(--gray-900);
+	}
+
+	.flow-op {
+		font-weight: 600;
+		color: var(--gray-600);
+	}
+
+	.flow-op.in {
+		color: #1f6b3a;
+	}
+
+	.flow-eq {
+		margin-left: auto;
 	}
 
 	/* ---- Chart ---- */
@@ -369,6 +339,7 @@
 
 	.chart-panel .ui-panel-head,
 	.chart-panel .legend,
+	.chart-panel .flow,
 	.chart-panel :global(.readout) {
 		padding-left: var(--inset);
 		padding-right: var(--inset);
