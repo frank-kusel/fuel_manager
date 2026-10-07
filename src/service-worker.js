@@ -14,6 +14,10 @@ import { build, files, version } from '$service-worker';
 const APP_CACHE = `farmtrack-app-${version}`;
 const API_CACHE = `farmtrack-api-${version}`;
 const PRECACHE = [...build, ...files, '/'];
+// Only these are safe to serve cache-first: their URLs are content-hashed (or
+// versioned static files). Anything else — notably the dev server's unhashed
+// /src/... modules — must go to the network, or edits never reach the page.
+const ASSETS = new Set([...build, ...files]);
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(
@@ -55,7 +59,7 @@ self.addEventListener('fetch', (event) => {
 	}
 
 	// Hashed build assets and static files never change under the same URL.
-	event.respondWith(cacheFirst(request));
+	if (ASSETS.has(url.pathname)) event.respondWith(cacheFirst(request));
 });
 
 async function cacheFirst(request) {
