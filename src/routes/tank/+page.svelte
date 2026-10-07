@@ -175,8 +175,9 @@
 			<ul class="legend" aria-hidden="true">
 				<li><i class="k-line"></i>Book</li>
 				<li><i class="k-in"></i>Delivery</li>
-				<li><i class="k-dip"></i>Dip ±{formatWholeLitres(tolerance)} L</li>
-				<li><i class="k-close"></i>Close</li>
+				<li><i class="k-dip"></i>Dip, stem = gap</li>
+				<li><i class="k-tol"></i>±{formatWholeLitres(tolerance)} L tolerance</li>
+				<li><i class="k-ok"></i><i class="k-warn"></i><i class="k-bad"></i>within · near · over</li>
 			</ul>
 		</section>
 
@@ -378,6 +379,10 @@
 		.chart-panel :global(.ranges) {
 			right: 0.75rem;
 		}
+
+		.chart-panel :global(.readout) {
+			padding: 0 0.75rem;
+		}
 	}
 
 	.legend {
@@ -413,14 +418,38 @@
 	.k-dip {
 		width: 7px;
 		height: 7px;
-		border: 2px solid var(--gray-900);
 		border-radius: 50%;
+		background: var(--gray-700);
+		box-shadow: 0 -5px 0 -2.5px var(--gray-700);
 	}
 
-	.k-close {
+	.k-tol {
+		width: 12px;
+		height: 8px;
+		border-radius: 2px;
+		background: #e3f1e7;
+	}
+
+	.k-ok,
+	.k-warn,
+	.k-bad {
 		width: 6px;
 		height: 6px;
-		border: 1.5px solid var(--gray-700);
+		border-radius: 50%;
+		margin-right: 2px !important;
+	}
+
+	.k-ok {
+		background: var(--success);
+	}
+
+	.k-warn {
+		background: var(--warning);
+	}
+
+	.k-bad {
+		background: var(--error);
+		margin-right: 0.375rem !important;
 	}
 
 	/* ---- Deliveries ---- */
