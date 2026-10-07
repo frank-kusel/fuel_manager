@@ -349,6 +349,28 @@
 		align-items: center;
 	}
 
+	/* Phones: no card — the chart runs edge to edge on the page background,
+	   so none of its width is lost to padding. The side margins cancel the
+	   page gutter (main 0.5rem + ui-page 0.25rem). */
+	@media (max-width: 639px) {
+		.chart-panel {
+			margin: 0 -0.75rem;
+			padding: 0.5rem 0 0;
+			background: none;
+			border: 0;
+			border-radius: 0;
+		}
+
+		.chart-panel .ui-panel-head,
+		.chart-panel .legend {
+			padding: 0 0.75rem;
+		}
+
+		.chart-panel :global(.ranges) {
+			right: 0.75rem;
+		}
+	}
+
 	.legend {
 		list-style: none;
 		display: flex;

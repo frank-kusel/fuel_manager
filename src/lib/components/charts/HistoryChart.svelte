@@ -48,11 +48,25 @@
 		const norm = raw / mag;
 		return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
 	}
-	let dataMax = $derived(
-		Math.max(...points.map((p) => p.litres), ...dips.map((d) => d.dipLitres + toleranceL), 1)
-	);
-	let step = $derived(niceStep(dataMax * 1.06));
-	let yMax = $derived(Math.ceil((dataMax * 1.06) / step) * step);
+	// The vertical scale fits the days on screen, not the whole history: the
+	// top of the axis follows the highest book or dip in view as you scroll,
+	// so the line uses the full height of the chart.
+	let scrollX = $state(0);
+	let visible = $derived({
+		from: Math.max(0, Math.floor(scrollX / pxPerDay)),
+		to: Math.min(points.length - 1, Math.ceil((scrollX + viewW) / pxPerDay))
+	});
+	let dataMax = $derived.by(() => {
+		let max = 1;
+		for (let i = visible.from; i <= visible.to; i++) max = Math.max(max, points[i]?.litres ?? 0);
+		const fromDate = points[visible.from]?.date ?? '';
+		const toDate = points[visible.to]?.date ?? '';
+		for (const d of dips)
+			if (d.date >= fromDate && d.date <= toDate) max = Math.max(max, d.dipLitres + toleranceL);
+		return max;
+	});
+	let yMax = $derived(dataMax * 1.04);
+	let step = $derived(niceStep(yMax));
 	let yMin = $derived(Math.min(0, ...points.map((p) => p.litres)));
 	const yAt = (litres: number) => PAD.top + (1 - (litres - yMin) / (yMax - yMin)) * plotH;
 	const xAt = (i: number) => (i + 0.5) * pxPerDay;
@@ -92,7 +106,7 @@
 			.map((c) => ({ c, i: indexOf.get(c.reconciliation_date)! }))
 	);
 	let gridValues = $derived(
-		Array.from({ length: Math.round(yMax / step) + 1 }, (_, i) => i * step)
+		Array.from({ length: Math.floor(yMax / step) + 1 }, (_, i) => i * step)
 	);
 	let lowLine = $derived(capacity ? (capacity * LOW_TANK_PCT) / 100 : null);
 	const TONE = { good: 'good', acceptable: 'warn', high: 'bad' } as const;
@@ -109,7 +123,17 @@
 
 	async function toLatest() {
 		await tick();
-		if (scroller) scroller.scrollLeft = scroller.scrollWidth;
+		if (!scroller) return;
+		scroller.scrollLeft = scroller.scrollWidth;
+		scrollX = scroller.scrollLeft;
+	}
+
+	let frame = 0;
+	function onscroll() {
+		cancelAnimationFrame(frame);
+		frame = requestAnimationFrame(() => {
+			if (scroller) scrollX = scroller.scrollLeft;
+		});
 	}
 	onMount(toLatest);
 	$effect(() => {
@@ -132,7 +156,7 @@
 	</div>
 
 	<div class="frame" style="height: {height}px">
-		<div class="scroller" bind:this={scroller} bind:clientWidth={viewW} style="right: {AXIS_W}px">
+		<div class="scroller" bind:this={scroller} bind:clientWidth={viewW} {onscroll} style="right: {AXIS_W}px">
 			<svg
 				width={chartW}
 				{height}
