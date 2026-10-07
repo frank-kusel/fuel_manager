@@ -1,19 +1,9 @@
 import { writable, derived } from 'svelte/store';
-import { todayIso } from '$lib/utils/dates';
-import {
-	burnRate,
-	computeVariance,
-	deriveBalance,
-	dipAgeDays,
-	isDipStale,
-	runwayDays as calcRunwayDays,
-	type TankAnchor
-} from '$lib/utils/tank-balance';
 
 /**
  * Dashboard insights store — month-scoped operational view.
  *
- * All figures are DERIVED from fuel_entries / tank_readings / tank_refills
+ * All figures are DERIVED from fuel_entries
  * in code. Deliberately does NOT read vehicles.current_odometer or
  * bowsers.current_reading: those columns are missing from the live DB
  * (schema drift) — fuel_entries is the source of truth here.
@@ -46,40 +36,6 @@ export interface AttentionItem {
 	href?: string;
 }
 
-export interface TankInsight {
-	name: string;
-	capacity: number | null;
-	lastDipLitres: number | null;
-	lastDipDate: string | null;
-	/** Deliveries and litres out since the ANCHOR, not since the dip. */
-	refillsSinceDip: number;
-	dispensedSinceDip: number;
-	/** anchor + deliveries − dispensed; null when nothing can anchor it */
-	derivedLevel: number | null;
-	/** Days of fuel left at the recent daily burn rate; null if unknown */
-	runwayDays: number | null;
-	/**
-	 * What the balance rests on — the latest month-end close, or a dip only
-	 * when nothing has ever been closed. Rendered wherever the number appears
-	 * so it is never a bare figure of unknown provenance.
-	 */
-	anchor: TankAnchor | null;
-	/** Date the movements were counted through. */
-	asOf: string;
-	/**
-	 * The latest dip measured against the book on that same date — the answer
-	 * to "is this number accurate?". Null when the only dip predates the
-	 * anchor, in which case the close already accounts for it.
-	 */
-	dipCheck: {
-		date: string;
-		dipLitres: number;
-		bookAtDip: number;
-		varianceLitres: number;
-		variancePct: number | null;
-	} | null;
-}
-
 export interface DailyPoint {
 	date: string; // YYYY-MM-DD
 	litres: number;
@@ -95,8 +51,8 @@ export interface DashboardInsights {
 	momPct: number | null;
 	byActivity: ActivitySlice[];
 	fleet: FleetRow[];
+	/** Fleet and logbook items only — tank items come from the tank store. */
 	attention: AttentionItem[];
-	tank: TankInsight | null;
 	daily: DailyPoint[];
 	brokenGaugeCount: number;
 }
@@ -111,10 +67,10 @@ interface InsightsState {
 }
 
 const CACHE_MS = 5 * 60 * 1000;
-const STORAGE_KEY = 'farmtrack_insights_cache_v2';
+const STORAGE_KEY = 'farmtrack_insights_cache_v3';
 
 // Hydrate from localStorage so a cold app-open paints the dashboard (and the
-// sidebar tank strip) instantly; fresh data replaces it silently.
+// month figures) instantly; fresh data replaces it silently.
 function loadPersisted(): { data: DashboardInsights | null; timestamp: number | null; stale: boolean } {
 	try {
 		if (typeof localStorage === 'undefined') return { data: null, timestamp: null, stale: false };
@@ -219,7 +175,7 @@ function createInsightsStore() {
 			const monthStartIso = isoDate(win.start);
 			const windowEnd = win.end;
 
-			const [prevRes, vehiclesRes, bowsersRes, futureRes] = await Promise.all([
+			const [prevRes, vehiclesRes, futureRes] = await Promise.all([
 				client
 					.from('fuel_entries')
 					.select('entry_date, litres_dispensed')
@@ -230,7 +186,6 @@ function createInsightsStore() {
 					.from('vehicles')
 					.select('id, code, name, average_consumption_l_per_100km')
 					.eq('active', true),
-				client.from('bowsers').select('name, capacity').eq('active', true).limit(1),
 				client
 					.from('fuel_entries')
 					.select('id, entry_date, vehicles(code)')
@@ -238,13 +193,12 @@ function createInsightsStore() {
 					.gt('entry_date', isoDate(now))
 			]);
 
-			const firstError = prevRes.error || vehiclesRes.error || bowsersRes.error;
+			const firstError = prevRes.error || vehiclesRes.error;
 			if (firstError) throw new Error(firstError.message);
 
 			const entries = entriesRes.data || [];
 			const prevEntries = prevRes.data || [];
 			const vehicles = vehiclesRes.data || [];
-			const bowser = bowsersRes.data?.[0] || null;
 
 			// ---- Totals ----
 			const totalLitres = entries.reduce((s, e) => s + (e.litres_dispensed || 0), 0);
@@ -335,63 +289,6 @@ function createInsightsStore() {
 				daily.push({ date: key, litres: dailyTotals.get(key) || 0 });
 			}
 
-			// ---- Tank (anchored balance + runway) ----
-			// Anchored to the latest month-end close, NOT the latest dip: a close
-			// is the signed-off book, and re-anchoring on every dip would reset a
-			// slow leak into dipstick noise. See $lib/utils/tank-balance.
-			let tank: TankInsight | null = null;
-			const asOf = todayIso(now);
-			const balanceRes = await supabaseService.getTankBalanceInputs(asOf);
-			if (balanceRes.error) throw new Error(balanceRes.error);
-
-			const balanceInputs = balanceRes.data;
-			if (balanceInputs?.anchor) {
-				const balance = deriveBalance({
-					anchor: balanceInputs.anchor,
-					refills: balanceInputs.refills,
-					dispenses: balanceInputs.dispenses,
-					asOf
-				});
-				const dailyBurn = burnRate(balanceInputs.burnDispenses);
-
-				// A dip taken after the anchor is a free accuracy check: derive the
-				// book on the dip's own date and compare. A dip before the anchor is
-				// already baked into the close it produced.
-				const dip = balanceInputs.latestDip;
-				let dipCheck: TankInsight['dipCheck'] = null;
-				if (dip && dip.reading_date > balanceInputs.anchor.date) {
-					const bookAtDip = deriveBalance({
-						anchor: balanceInputs.anchor,
-						refills: balanceInputs.refills,
-						dispenses: balanceInputs.dispenses,
-						asOf: dip.reading_date
-					}).litres;
-					const dipLitres = dip.reading_value || 0;
-					const check = computeVariance(bookAtDip, dipLitres);
-					dipCheck = {
-						date: dip.reading_date,
-						dipLitres,
-						bookAtDip,
-						varianceLitres: check.litres,
-						variancePct: check.pct
-					};
-				}
-
-				tank = {
-					name: bowser?.name || 'Tank',
-					capacity: bowser?.capacity ?? null,
-					lastDipLitres: balanceInputs.latestDip?.reading_value ?? null,
-					lastDipDate: balanceInputs.latestDip?.reading_date ?? null,
-					refillsSinceDip: balance.deliveries,
-					dispensedSinceDip: balance.dispensed,
-					derivedLevel: balance.litres,
-					runwayDays: calcRunwayDays(balance.litres, dailyBurn),
-					anchor: balanceInputs.anchor,
-					asOf,
-					dipCheck
-				};
-			}
-
 			// ---- Attention items ----
 			const attention: AttentionItem[] = [];
 			const brokenGaugeCount = entries.filter((e) => e.gauge_working === false).length;
@@ -404,29 +301,6 @@ function createInsightsStore() {
 						href: `/tools/database/vehicles/${row.vehicleId}`
 					});
 				}
-			}
-			if (tank?.derivedLevel !== null && tank?.derivedLevel !== undefined) {
-				if (tank.derivedLevel <= 0) {
-					attention.push({
-						severity: 'danger',
-						text: `Derived tank level is ${Math.round(tank.derivedLevel)} L — dip or refill records look out of date`,
-						href: '/tank'
-					});
-				} else if (tank.capacity && tank.derivedLevel / tank.capacity < 0.15) {
-					attention.push({
-						severity: 'warning',
-						text: `${tank.name} below 15% (${Math.round(tank.derivedLevel)} L) — plan a refill`,
-						href: '/tank'
-					});
-				}
-			}
-			const ageDays = dipAgeDays(tank?.lastDipDate ?? null, now);
-			if (isDipStale(ageDays)) {
-				attention.push({
-					severity: 'warning',
-					text: `Last dipstick reading is ${ageDays} days old — take a fresh dip`,
-					href: '/tank'
-				});
 			}
 			if (brokenGaugeCount > 0) {
 				attention.push({
@@ -446,9 +320,6 @@ function createInsightsStore() {
 					href: '/entries'
 				});
 			}
-			if (attention.length === 0) {
-				attention.push({ severity: 'info', text: 'No anomalies detected this month' });
-			}
 
 			const monthLabel = monthStart.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
 
@@ -462,7 +333,6 @@ function createInsightsStore() {
 				byActivity,
 				fleet,
 				attention,
-				tank,
 				daily,
 				brokenGaugeCount
 			};

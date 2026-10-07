@@ -1,6 +1,7 @@
 import { summaryCacheStore } from './summary-cache';
 import { dashboardInsightsStore } from './dashboard-insights';
 import { referenceDataStore } from './reference-data';
+import { tankStore } from './tank';
 
 /**
  * Central freshness hub.
@@ -17,6 +18,9 @@ import { referenceDataStore } from './reference-data';
 export function markFuelDataStale() {
 	summaryCacheStore.invalidate();
 	dashboardInsightsStore.invalidate();
+	// Refetches immediately when a screen is showing the tank, so a dip
+	// recorded from the sidebar moves the balance already on screen.
+	tankStore.invalidate();
 	// Vehicles/bowsers are enriched with current_odometer / current_reading
 	// derived from fuel_entries, so the wizard's prefills go stale on every
 	// fuel mutation too — not just the summary caches.

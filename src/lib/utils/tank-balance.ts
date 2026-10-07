@@ -30,7 +30,7 @@
  * unit-testable end to end.
  */
 
-import { daysBetween, isoLocal } from './dates';
+import { daysBetween, fmtDayMonth, fmtFull, isoLocal } from './dates';
 
 /** Dips check the book; they never re-anchor it. See the module note. */
 export const ANCHOR_POLICY = 'close-first' as const;
@@ -231,6 +231,203 @@ export function burnRate(dispenses: DispenseRow[], days: number = BURN_WINDOW_DA
 export function runwayDays(litres: number, dailyBurn: number): number | null {
 	if (litres <= 0 || dailyBurn <= 0) return null;
 	return Math.floor(litres / dailyBurn);
+}
+
+// ---------------------------------------------------------------------------
+// The live tank: one insight, built once, read by every screen
+// ---------------------------------------------------------------------------
+
+/** What `getTankBalanceInputs` fetches: the anchor and every movement after it. */
+export interface TankBalanceInputs {
+	anchor: TankAnchor | null;
+	latestClose: CloseRow | null;
+	latestDip: DipRow | null;
+	/** Windowed to (anchor.date, asOf]. */
+	refills: RefillRow[];
+	/** Windowed to (anchor.date, asOf]. */
+	dispenses: DispenseRow[];
+	/** The trailing BURN_WINDOW_DAYS, for the runway. */
+	burnDispenses: DispenseRow[];
+}
+
+/** One row of the Tank page's recent activity. */
+export interface TankActivity {
+	kind: 'dip' | 'delivery';
+	date: string;
+	litres: number;
+	supplier: string | null;
+	invoice: string | null;
+}
+
+export interface DipCheck {
+	date: string;
+	dipLitres: number;
+	bookAtDip: number;
+	gapLitres: number;
+	gapPct: number | null;
+}
+
+export interface TankInsight {
+	name: string;
+	capacity: number | null;
+	/** The book balance today: anchor + deliveries − dispensed. */
+	bookLitres: number;
+	deliveriesSinceAnchor: number;
+	dispensedSinceAnchor: number;
+	/** Days of fuel left at the recent burn rate; null when unknown. */
+	runwayDays: number | null;
+	/** The latest close, or a dip only when nothing has ever been closed. */
+	anchor: TankAnchor;
+	lastDipLitres: number | null;
+	lastDipDate: string | null;
+	/**
+	 * The latest dip against the book on that same date. Null when the latest
+	 * dip is on or before the anchor — the close already accounts for it, and a
+	 * dip-anchored book trivially agrees with its own dip.
+	 */
+	dipCheck: DipCheck | null;
+	asOf: string;
+}
+
+/**
+ * Null when there is nothing to anchor a book to (no close, no dip): a fresh
+ * install. Callers render an empty state rather than a zero.
+ */
+export function buildTankInsight(
+	inputs: TankBalanceInputs | null,
+	bowser: { name?: string | null; capacity?: number | null } | null,
+	asOf: string
+): TankInsight | null {
+	if (!inputs?.anchor) return null;
+	const { anchor, refills, dispenses, latestDip } = inputs;
+
+	const balance = deriveBalance({ anchor, refills, dispenses, asOf });
+
+	let dipCheck: DipCheck | null = null;
+	if (latestDip && latestDip.reading_date > anchor.date) {
+		const bookAtDip = deriveBalance({
+			anchor,
+			refills,
+			dispenses,
+			asOf: latestDip.reading_date
+		}).litres;
+		const dipLitres = latestDip.reading_value || 0;
+		const gap = computeVariance(bookAtDip, dipLitres);
+		dipCheck = {
+			date: latestDip.reading_date,
+			dipLitres,
+			bookAtDip,
+			gapLitres: gap.litres,
+			gapPct: gap.pct
+		};
+	}
+
+	return {
+		name: bowser?.name || 'Tank',
+		capacity: bowser?.capacity ?? null,
+		bookLitres: balance.litres,
+		deliveriesSinceAnchor: balance.deliveries,
+		dispensedSinceAnchor: balance.dispensed,
+		runwayDays: runwayDays(balance.litres, burnRate(inputs.burnDispenses)),
+		anchor,
+		lastDipLitres: latestDip?.reading_value ?? null,
+		lastDipDate: latestDip?.reading_date ?? null,
+		dipCheck,
+		asOf
+	};
+}
+
+/** Percent of capacity, clamped to 0–100; null without a capacity. */
+export function pctFull(litres: number, capacity: number | null | undefined): number | null {
+	if (!capacity) return null;
+	return Math.max(0, Math.min(100, (litres / capacity) * 100));
+}
+
+/** "31 Aug close" / "dip 12 Aug" — or with the year in the long form. */
+export function anchorLabel(anchor: TankAnchor, form: 'short' | 'long' = 'short'): string {
+	const date = form === 'long' ? fmtFull(anchor.date) : fmtDayMonth(anchor.date);
+	return anchor.kind === 'close' ? `${date} close` : `dip ${date}`;
+}
+
+export const LOW_TANK_PCT = 15;
+
+export interface TankAttention {
+	severity: 'danger' | 'warning';
+	text: string;
+	href: string;
+}
+
+/** Tank-related items for the dashboard's "needs attention" list. */
+export function tankAttention(insight: TankInsight | null, now: Date = new Date()): TankAttention[] {
+	if (!insight) return [];
+	const items: TankAttention[] = [];
+	const pct = pctFull(insight.bookLitres, insight.capacity);
+
+	if (insight.bookLitres <= 0) {
+		items.push({
+			severity: 'danger',
+			text: `Book balance is ${Math.round(insight.bookLitres)} L — dip or delivery records look out of date`,
+			href: '/tank'
+		});
+	} else if (pct !== null && pct < LOW_TANK_PCT) {
+		items.push({
+			severity: 'warning',
+			text: `${insight.name} below ${LOW_TANK_PCT}% (${Math.round(insight.bookLitres)} L) — plan a delivery`,
+			href: '/tank'
+		});
+	}
+
+	const age = dipAgeDays(insight.lastDipDate, now);
+	if (isDipStale(age)) {
+		items.push({
+			severity: 'warning',
+			text: `Last dip is ${age} days old — take a fresh dip`,
+			href: '/tank'
+		});
+	}
+	return items;
+}
+
+export interface BalancePoint {
+	date: string;
+	/** Book balance at the end of the day. */
+	litres: number;
+	delivered: number;
+	dispensed: number;
+}
+
+/**
+ * The book balance at the end of each day from the anchor through `asOf`,
+ * from the movements already fetched for the live balance — no extra query.
+ * The first point is the anchor itself.
+ */
+export function balanceSeries(inputs: TankBalanceInputs | null, asOf: string): BalancePoint[] {
+	if (!inputs?.anchor || asOf < inputs.anchor.date) return [];
+	const { anchor } = inputs;
+
+	const delivered = new Map<string, number>();
+	for (const r of inputs.refills) {
+		if (r.delivery_date > anchor.date && r.delivery_date <= asOf)
+			delivered.set(r.delivery_date, (delivered.get(r.delivery_date) || 0) + (r.litres_added || 0));
+	}
+	const dispensed = new Map<string, number>();
+	for (const d of inputs.dispenses) {
+		if (d.entry_date > anchor.date && d.entry_date <= asOf)
+			dispensed.set(d.entry_date, (dispensed.get(d.entry_date) || 0) + (d.litres_dispensed || 0));
+	}
+
+	const points: BalancePoint[] = [];
+	let litres = anchor.litres;
+	const day = new Date(`${anchor.date}T12:00:00`);
+	for (let date = anchor.date; date <= asOf; ) {
+		const inn = date === anchor.date ? 0 : delivered.get(date) || 0;
+		const out = date === anchor.date ? 0 : dispensed.get(date) || 0;
+		litres += inn - out;
+		points.push({ date, litres, delivered: inn, dispensed: out });
+		day.setDate(day.getDate() + 1);
+		date = isoLocal(day);
+	}
+	return points;
 }
 
 // ---------------------------------------------------------------------------

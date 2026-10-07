@@ -9,7 +9,8 @@
 	import FuelEntryModal from '$lib/components/modals/FuelEntryModal.svelte';
 	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
 	import { hasDraft } from '$lib/stores/fuel-entry-draft';
-	import { dashboardInsightsStore, insightsData } from '$lib/stores/dashboard-insights';
+	import { tankStore, tankData } from '$lib/stores/tank';
+	import { anchorLabel, pctFull } from '$lib/utils/tank-balance';
 
 	// Svelte 5 children prop
 	let { children }: { children: any } = $props();
@@ -32,17 +33,17 @@
 
 	const nfSidebar = new Intl.NumberFormat('en-ZA');
 	let tankStrip = $derived.by(() => {
-		const t = $insightsData?.tank;
-		if (!t || t.derivedLevel === null) return null;
+		const t = $tankData?.insight;
+		if (!t) return null;
 		// The anchor goes in the tooltip so the strip is never a bare number of
-		// unknown provenance — same rule as the Tank page trust line.
-		const anchor = t.anchor
-			? t.anchor.kind === 'close'
-				? `anchored to the ${t.anchor.date} close`
-				: `anchored to the dip on ${t.anchor.date}`
-			: null;
-		const pct = t.capacity ? Math.max(0, Math.min(100, (t.derivedLevel / t.capacity) * 100)) : null;
-		return { name: t.name, litres: Math.round(t.derivedLevel), runway: t.runwayDays, anchor, pct };
+		// unknown provenance — same rule as the Tank page.
+		return {
+			name: t.name,
+			litres: Math.round(t.bookLitres),
+			runway: t.runwayDays,
+			anchor: `from the ${anchorLabel(t.anchor, 'long')}`,
+			pct: pctFull(t.bookLitres, t.capacity)
+		};
 	});
 
 	// Action menu state
@@ -106,7 +107,7 @@
 			/* private mode */
 		}
 		if (window.matchMedia('(min-width: 1024px)').matches) {
-			dashboardInsightsStore.load(); // 5-min cached, shared with Dashboard/Tank
+			tankStore.load(); // 5-min cached, shared with the Tank page and dashboard
 		}
 	});
 </script>
@@ -346,12 +347,10 @@
 	<DipstickModal
 		bind:show={showDipstickModal}
 		onClose={() => showDipstickModal = false}
-		onSuccess={() => dashboardInsightsStore.load(true)}
 	/>
 	<TankRefillModal
 		bind:show={showRefillModal}
 		onClose={() => showRefillModal = false}
-		onSuccess={() => dashboardInsightsStore.load(true)}
 	/>
 
 	<ToastContainer />

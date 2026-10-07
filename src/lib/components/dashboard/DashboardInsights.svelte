@@ -7,14 +7,20 @@
 	} from '$lib/stores/dashboard-insights';
 	import { referenceDataStore, activeVehicles, activeDrivers } from '$lib/stores/reference-data';
 	import { onVisible } from '$lib/stores/freshness';
+	import { tankStore, tankData } from '$lib/stores/tank';
+	import { pctFull, tankAttention } from '$lib/utils/tank-balance';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
 	onMount(() => {
 		dashboardInsightsStore.load();
+		tankStore.load();
 		referenceDataStore.loadAllData(); // cached — powers the vehicle lookup
 		// Returning to a stale tab: TTL-respecting silent refresh
-		return onVisible(() => dashboardInsightsStore.load());
+		return onVisible(() => {
+			dashboardInsightsStore.load();
+			tankStore.load();
+		});
 	});
 
 	function openVehicle(vehicleId: string) {
@@ -36,10 +42,17 @@
 		$insightsData ? Math.max(1, ...$insightsData.byActivity.map((x) => x.pct)) : 1
 	);
 
-	let tankPct = $derived.by(() => {
-		const t = $insightsData?.tank;
-		if (!t || t.derivedLevel === null || !t.capacity) return null;
-		return Math.max(0, Math.min(100, (t.derivedLevel / t.capacity) * 100));
+	let tank = $derived($tankData?.insight ?? null);
+	let tankPct = $derived(tank ? pctFull(tank.bookLitres, tank.capacity) : null);
+
+	const SEVERITY_ORDER = { danger: 0, warning: 1, info: 2 } as const;
+	let attention = $derived.by(() => {
+		const items = [...tankAttention(tank), ...($insightsData?.attention ?? [])].sort(
+			(a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
+		);
+		return items.length > 0
+			? items
+			: [{ severity: 'info' as const, text: 'No anomalies detected this month', href: undefined }];
 	});
 
 	function dayLabel(date: string): string {
@@ -125,24 +138,20 @@
 				<div class="ov-v ov-v-sm">{nf.format(d.entryCount)}</div>
 				<div class="ov-sub">{d.fleet.length} {d.fleet.length === 1 ? 'vehicle' : 'vehicles'} fuelled</div>
 			</div>
-			{#if d.tank}
+			{#if tank}
 				<a class="ov-cell ov-tank" href="/tank">
-					<div class="ov-k">{d.tank.name} book balance</div>
-					{#if d.tank.derivedLevel !== null}
-						<div class="ov-v ov-v-sm" class:tank-negative={d.tank.derivedLevel <= 0}>
-							{nf.format(Math.round(d.tank.derivedLevel))}<span class="ov-unit">L</span>
+					<div class="ov-k">{tank.name} book balance</div>
+					<div class="ov-v ov-v-sm" class:tank-negative={tank.bookLitres <= 0}>
+						{nf.format(Math.round(tank.bookLitres))}<span class="ov-unit">L</span>
+					</div>
+					{#if tankPct !== null}
+						<div class="tank-track" title="{Math.round(tankPct)}% full">
+							<div class="tank-fill" class:low={tankPct < 15} style="width: {tankPct}%"></div>
 						</div>
-						{#if tankPct !== null}
-							<div class="tank-track" title="{Math.round(tankPct)}% full">
-								<div class="tank-fill" class:low={tankPct < 15} style="width: {tankPct}%"></div>
-							</div>
-						{/if}
-						<div class="ov-sub">
-							{d.tank.runwayDays !== null ? `About ${d.tank.runwayDays} days left` : `${Math.round(tankPct ?? 0)}% full`}
-						</div>
-					{:else}
-						<div class="ov-sub">Nothing to anchor the book to yet</div>
 					{/if}
+					<div class="ov-sub">
+						{tank.runwayDays !== null ? `About ${tank.runwayDays} days left` : `${Math.round(tankPct ?? 0)}% full`}
+					</div>
 				</a>
 			{/if}
 		</section>
@@ -155,7 +164,7 @@
 			<section class="panel p-attention">
 				<h2 class="panel-title">Needs attention</h2>
 				<ul class="attention-list">
-					{#each d.attention as item}
+					{#each attention as item}
 						<li class="attention-item {item.severity}">
 							<span class="attention-dot"></span>
 							{#if item.href}

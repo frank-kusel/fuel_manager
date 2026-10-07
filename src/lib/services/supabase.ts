@@ -31,7 +31,9 @@ import {
 	type DispenseRow,
 	type MonthLedger,
 	type RefillRow,
-	type TankAnchor
+	type TankActivity,
+	type TankAnchor,
+	type TankBalanceInputs
 } from '$lib/utils/tank-balance';
 
 class SupabaseService {
@@ -971,16 +973,7 @@ class SupabaseService {
 	 * tank_readings: neither table has that column (only fuel_entries does), and
 	 * PostgREST 400s on a filter naming a column that does not exist.
 	 */
-	async getTankBalanceInputs(asOf: string = todayIso()): Promise<
-		ApiResponse<{
-			anchor: TankAnchor | null;
-			latestClose: CloseRow | null;
-			latestDip: DipRow | null;
-			refills: RefillRow[];
-			dispenses: DispenseRow[];
-			burnDispenses: DispenseRow[];
-		}>
-	> {
+	async getTankBalanceInputs(asOf: string = todayIso()): Promise<ApiResponse<TankBalanceInputs>> {
 		const client = this.ensureInitialized();
 
 		try {
@@ -1056,6 +1049,56 @@ class SupabaseService {
 			return {
 				data: null,
 				error: error instanceof Error ? error.message : 'Failed to load tank balance inputs'
+			};
+		}
+	}
+
+	/**
+	 * Dips and deliveries merged into one newest-first list — the Tank page's
+	 * recent activity. `limit` rows of each are fetched, then the merge is cut
+	 * to `limit`, so neither kind can crowd the other out of the window.
+	 */
+	async getRecentTankActivity(limit = 8): Promise<ApiResponse<TankActivity[]>> {
+		const client = this.ensureInitialized();
+		try {
+			const [dips, deliveries] = await Promise.all([
+				client
+					.from('tank_readings')
+					.select('reading_value, reading_date')
+					.eq('reading_type', 'dipstick')
+					.order('reading_date', { ascending: false })
+					.limit(limit),
+				client
+					.from('tank_refills')
+					.select('litres_added, delivery_date, supplier, invoice_number')
+					.order('delivery_date', { ascending: false })
+					.limit(limit)
+			]);
+			const firstError = dips.error || deliveries.error;
+			if (firstError) throw new Error(firstError.message);
+
+			const activity: TankActivity[] = [
+				...(dips.data || []).map((d) => ({
+					kind: 'dip' as const,
+					date: d.reading_date,
+					litres: Number(d.reading_value || 0),
+					supplier: null,
+					invoice: null
+				})),
+				...(deliveries.data || []).map((r) => ({
+					kind: 'delivery' as const,
+					date: r.delivery_date,
+					litres: Number(r.litres_added || 0),
+					supplier: r.supplier?.trim() || null,
+					invoice: r.invoice_number || null
+				}))
+			];
+			activity.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+			return { data: activity.slice(0, limit), error: null };
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error.message : 'Failed to load tank activity'
 			};
 		}
 	}

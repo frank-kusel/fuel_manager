@@ -2,30 +2,21 @@
 	import { onMount } from 'svelte';
 	import DipstickModal from '$lib/components/modals/DipstickModal.svelte';
 	import TankRefillModal from '$lib/components/modals/TankRefillModal.svelte';
-	import {
-		dashboardInsightsStore,
-		insightsData,
-		insightsLoading
-	} from '$lib/stores/dashboard-insights';
+	import { tankStore, tankData, tankLoading } from '$lib/stores/tank';
 	import { onVisible } from '$lib/stores/freshness';
 	import { daysBetween, fmtDayMonth, fmtFull, todayIso } from '$lib/utils/dates';
 	import {
 		bandVariance,
 		dipAgeDays,
 		isDipStale,
+		pctFull,
 		varianceTrend,
 		type CloseRow
 	} from '$lib/utils/tank-balance';
 
 	let showDipModal = $state(false);
 	let showRefillModal = $state(false);
-	let recentDips = $state<{ reading_value: number; reading_date: string }[]>([]);
-	let recentRefills = $state<
-		{ litres_added: number; delivery_date: string; supplier: string | null; invoice_number: string | null }[]
-	>([]);
 	let closes = $state<CloseRow[]>([]);
-	// Until the first fetch lands, an empty list means "not loaded", not "none".
-	let historyLoaded = $state(false);
 
 	const nf = new Intl.NumberFormat('en-ZA');
 	const nf1 = new Intl.NumberFormat('en-ZA', {
@@ -40,25 +31,8 @@
 	async function loadHistory() {
 		const { default: supabaseService } = await import('$lib/services/supabase');
 		await supabaseService.init();
-		const client = supabaseService.getClient();
-		const [dips, refills, history] = await Promise.all([
-			client
-				.from('tank_readings')
-				.select('reading_value, reading_date')
-				.eq('reading_type', 'dipstick')
-				.order('reading_date', { ascending: false })
-				.limit(5),
-			client
-				.from('tank_refills')
-				.select('litres_added, delivery_date, supplier, invoice_number')
-				.order('delivery_date', { ascending: false })
-				.limit(5),
-			supabaseService.getTankCloseHistory(24)
-		]);
-		recentDips = dips.data || [];
-		recentRefills = refills.data || [];
+		const history = await supabaseService.getTankCloseHistory(24);
 		closes = (history.data || []) as CloseRow[];
-		historyLoaded = true;
 	}
 
 	function ago(iso: string): string {
@@ -67,24 +41,19 @@
 	}
 
 	onMount(() => {
-		dashboardInsightsStore.load();
+		tankStore.load();
 		loadHistory();
 		// Returning to a stale tab: TTL-respecting silent refresh
-		return onVisible(() => dashboardInsightsStore.load());
+		return onVisible(() => tankStore.load());
 	});
 
-	function refreshAll() {
-		dashboardInsightsStore.load(true);
-		loadHistory();
-	}
-
-	let tank = $derived($insightsData?.tank ?? null);
+	let tank = $derived($tankData?.insight ?? null);
 	let anchor = $derived(tank?.anchor ?? null);
+	let historyLoaded = $derived($tankData !== null);
+	let recentDips = $derived(($tankData?.recent ?? []).filter((a) => a.kind === 'dip'));
+	let recentRefills = $derived(($tankData?.recent ?? []).filter((a) => a.kind === 'delivery'));
 
-	let tankPct = $derived.by(() => {
-		if (!tank || tank.derivedLevel === null || !tank.capacity) return null;
-		return Math.max(0, Math.min(100, (tank.derivedLevel / tank.capacity) * 100));
-	});
+	let tankPct = $derived(tank ? pctFull(tank.bookLitres, tank.capacity) : null);
 
 	let dipAge = $derived(dipAgeDays(tank?.lastDipDate ?? null));
 
@@ -110,7 +79,7 @@
 	let dipBand = $derived.by(() => {
 		const check = tank?.dipCheck;
 		if (!check) return null;
-		return bandVariance(check.varianceLitres, check.dipLitres);
+		return bandVariance(check.gapLitres, check.dipLitres);
 	});
 
 	let trend = $derived(varianceTrend(closes));
@@ -126,16 +95,16 @@
 		<p>Book balance, physical dips, and deliveries</p>
 	</div>
 
-	{#if $insightsLoading && !tank}
+	{#if $tankLoading && !$tankData}
 		<div class="skeleton" style="height: 10rem"></div>
 	{:else if tank}
 		<!-- Book balance hero -->
-		<section class="panel hero" class:alert={tank.derivedLevel !== null && tank.derivedLevel <= 0}>
+		<section class="panel hero" class:alert={tank.bookLitres <= 0}>
 			<div class="hero-top">
 				<div>
 					<div class="hero-label">{tank.name} book balance</div>
-					<div class="hero-value" class:negative={tank.derivedLevel !== null && tank.derivedLevel <= 0}>
-						{tank.derivedLevel !== null ? nf.format(Math.round(tank.derivedLevel)) : '—'}<span class="hero-unit">L</span>
+					<div class="hero-value" class:negative={tank.bookLitres <= 0}>
+						{nf.format(Math.round(tank.bookLitres))}<span class="hero-unit">L</span>
 					</div>
 					{#if tank.runwayDays !== null}
 						<div class="hero-sub">About {tank.runwayDays} days left at the recent burn rate</div>
@@ -175,15 +144,15 @@
 					</tr>
 					<tr>
 						<td>+ Deliveries since</td>
-						<td class="ledger-val">{nf.format(Math.round(tank.refillsSinceDip))} L</td>
+						<td class="ledger-val">{nf.format(Math.round(tank.deliveriesSinceAnchor))} L</td>
 					</tr>
 					<tr>
 						<td>− Dispensed since</td>
-						<td class="ledger-val">{nf.format(Math.round(tank.dispensedSinceDip))} L</td>
+						<td class="ledger-val">{nf.format(Math.round(tank.dispensedSinceAnchor))} L</td>
 					</tr>
 					<tr class="ledger-total">
 						<td>= Book balance</td>
-						<td class="ledger-val">{tank.derivedLevel !== null ? nf.format(Math.round(tank.derivedLevel)) : '—'} L</td>
+						<td class="ledger-val">{nf.format(Math.round(tank.bookLitres))} L</td>
 					</tr>
 				</tbody>
 			</table>
@@ -218,9 +187,9 @@
 						Last dip {dipAge} {dipAge === 1 ? 'day' : 'days'} ago read {nf.format(
 							Math.round(tank.dipCheck.dipLitres)
 						)} L — <strong class="v {dipBand?.key || ''}"
-							>{signed(tank.dipCheck.varianceLitres)} L</strong
-						> vs book{#if tank.dipCheck.variancePct !== null}&nbsp;({nf1.format(
-								tank.dipCheck.variancePct
+							>{signed(tank.dipCheck.gapLitres)} L</strong
+						> vs book{#if tank.dipCheck.gapPct !== null}&nbsp;({nf1.format(
+								tank.dipCheck.gapPct
 							)}%){/if}{#if dipBand?.key === 'good'}, within dipstick tolerance{/if}.
 					{:else if isDipStale(dipAge)}
 						Last dip is {dipAge} days old — take a fresh one to check the book.
@@ -283,10 +252,10 @@
 							{#each recentDips as dip}
 								<tr>
 									<td class="hist-date">
-										{fmtFull(dip.reading_date)}
-										<span class="hist-sub">{ago(dip.reading_date)}</span>
+										{fmtFull(dip.date)}
+										<span class="hist-sub">{ago(dip.date)}</span>
 									</td>
-									<td class="hist-val">{nf.format(Math.round(dip.reading_value))} L</td>
+									<td class="hist-val">{nf.format(Math.round(dip.litres))} L</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -306,10 +275,10 @@
 							{#each recentRefills as r}
 								<tr>
 									<td class="hist-date">
-										{fmtFull(r.delivery_date)}
-										<span class="hist-sub">{r.supplier?.trim() || 'No supplier'}, {r.invoice_number ? `inv. ${r.invoice_number}` : 'no invoice number'}</span>
+										{fmtFull(r.date)}
+										<span class="hist-sub">{r.supplier || 'No supplier'}, {r.invoice ? `inv. ${r.invoice}` : 'no invoice number'}</span>
 									</td>
-									<td class="hist-val">+{nf.format(Math.round(r.litres_added))} L</td>
+									<td class="hist-val">+{nf.format(Math.round(r.litres))} L</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -319,8 +288,8 @@
 		</div>
 </div>
 
-<DipstickModal bind:show={showDipModal} onClose={() => (showDipModal = false)} onSuccess={refreshAll} />
-<TankRefillModal bind:show={showRefillModal} onClose={() => (showRefillModal = false)} onSuccess={refreshAll} />
+<DipstickModal bind:show={showDipModal} onClose={() => (showDipModal = false)} />
+<TankRefillModal bind:show={showRefillModal} onClose={() => (showRefillModal = false)} />
 
 <style>
 	.empty-state p {
