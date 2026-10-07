@@ -605,29 +605,10 @@ a.ui-pill:hover {
 	height: 1rem;
 }
 
-/* Primary actions: inline on desktop, a sticky bar above the bottom nav on
-   phones so they are always one thumb away. */
+/* Primary page actions, side by side */
 .ui-actions {
 	display: flex;
 	gap: 0.5rem;
-}
-
-@media (max-width: 767px) {
-	.ui-actions.sticky {
-		position: sticky;
-		bottom: 4.5rem;
-		z-index: 50;
-		padding: 0.5rem;
-		margin: 0 -0.25rem;
-		background: rgba(245, 245, 244, 0.92);
-		backdrop-filter: blur(8px);
-		border-radius: var(--radius-lg);
-	}
-
-	.ui-actions.sticky .ui-btn {
-		flex: 1;
-		padding: 0.75rem;
-	}
 }
 
 .ui-skeleton {

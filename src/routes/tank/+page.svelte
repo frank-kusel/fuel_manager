@@ -15,13 +15,7 @@
 	import { onVisible } from '$lib/stores/freshness';
 	import { financialYearStart, fmtDayMonth, fmtFull, isoLocal } from '$lib/utils/dates';
 	import { formatSigned, formatWholeLitres } from '$lib/utils/formatting';
-	import {
-		anchorLabel,
-		dipAgeDays,
-		dipChecks,
-		isDipStale,
-		pctFull
-	} from '$lib/utils/tank-balance';
+	import { anchorLabel, dipAgeDays, dipChecks, isDipStale, pctFull } from '$lib/utils/tank-balance';
 
 	let showDipModal = $state(false);
 	let showRefillModal = $state(false);
@@ -35,9 +29,7 @@
 	let tank = $derived($tankData?.insight ?? null);
 	let pct = $derived(tank ? pctFull(tank.bookLitres, tank.capacity) : null);
 	let tolerance = $derived($claimSettings.dipToleranceL);
-	let checks = $derived(
-		$tankData ? dipChecks($tankData.history, $tankData.dips, tolerance) : []
-	);
+	let checks = $derived($tankData ? dipChecks($tankData.history, $tankData.dips, tolerance) : []);
 	let lastCheck = $derived(checks.at(-1) ?? null);
 	let lastDip = $derived($tankData?.dips.at(-1) ?? null);
 	let dipAge = $derived(dipAgeDays(lastDip?.reading_date ?? null));
@@ -55,23 +47,36 @@
 	<title>Tank - FarmTrack</title>
 </svelte:head>
 
-{#snippet actions(sticky: boolean)}
-	<div class="ui-actions" class:sticky class:head-actions={!sticky} class:foot-actions={sticky}>
-		<button class="ui-btn primary" onclick={() => (showDipModal = true)}>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20V6M8 10l4-4 4 4M5 20h14" /></svg>
-			Record dip
-		</button>
-		<button class="ui-btn" onclick={() => (showRefillModal = true)}>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14" /></svg>
-			Record delivery
-		</button>
-	</div>
-{/snippet}
-
 <div class="ui-page">
 	<div class="ui-head">
 		<h1>Tank</h1>
-		{@render actions(false)}
+		<!-- Tablet and desktop only: on phones the + button already records both. -->
+		<div class="ui-actions head-actions">
+			<button class="ui-btn primary" onclick={() => (showDipModal = true)}>
+				<svg
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"><path d="M12 20V6M8 10l4-4 4 4M5 20h14" /></svg
+				>
+				Record dip
+			</button>
+			<button class="ui-btn" onclick={() => (showRefillModal = true)}>
+				<svg
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"><path d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14" /></svg
+				>
+				Record delivery
+			</button>
+		</div>
 	</div>
 
 	{#if $tankError && !$tankData}
@@ -99,7 +104,9 @@
 					<div class="side">
 						{#if pct !== null}<span class="pct">{Math.round(pct)}<small>%</small></span>{/if}
 						{#if tank.runwayDays !== null}
-							<span class="ui-pill plain" title="At the last 14 days' burn rate">≈ {tank.runwayDays} days</span>
+							<span class="ui-pill plain" title="At the last 14 days' burn rate"
+								>≈ {tank.runwayDays} days</span
+							>
 						{/if}
 					</div>
 				</div>
@@ -124,11 +131,17 @@
 				<div class="check">
 					<dt>
 						Last dip
-						{#if lastDip}<small>{fmtDayMonth(lastDip.reading_date)}{dipAge !== null ? ` · ${dipAge} d ago` : ''}</small>{/if}
+						{#if lastDip}<small
+								>{fmtDayMonth(lastDip.reading_date)}{dipAge !== null
+									? ` · ${dipAge} d ago`
+									: ''}</small
+							>{/if}
 					</dt>
 					<dd>
 						{#if lastCheck && lastCheck.date === lastDip?.reading_date}
-							<span class="gap {lastCheck.band ? TONE[lastCheck.band.key] : ''}">{formatSigned(lastCheck.gapLitres)}</span>
+							<span class="gap {lastCheck.band ? TONE[lastCheck.band.key] : ''}"
+								>{formatSigned(lastCheck.gapLitres)}</span
+							>
 							<span class="ui-muted">vs book</span>
 						{:else if lastDip}
 							{formatWholeLitres(lastDip.reading_value)}
@@ -199,15 +212,13 @@
 			{/if}
 		</section>
 	{/if}
-
-	{@render actions(true)}
 </div>
 
 <DipstickModal bind:show={showDipModal} onClose={() => (showDipModal = false)} />
 <TankRefillModal bind:show={showRefillModal} onClose={() => (showRefillModal = false)} />
 
 <style>
-	/* Actions: in the header from tablet up, a sticky bar on phones */
+	/* Phones record dips and deliveries from the + button in the bottom nav */
 	.head-actions {
 		display: none;
 	}
@@ -215,10 +226,6 @@
 	@media (min-width: 768px) {
 		.head-actions {
 			display: flex;
-		}
-
-		.foot-actions {
-			display: none;
 		}
 	}
 
