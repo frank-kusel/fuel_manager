@@ -12,7 +12,7 @@
 		calculateClassifierVariance,
 		calculateDieselClaim
 	} from '$lib/utils/diesel-claim';
-	import { formatLitres, formatNumber } from '$lib/utils/formatting';
+	import { formatNumber, formatSigned, formatWholeLitres } from '$lib/utils/formatting';
 	import type { VehicleMonthlyClaimAdjustment } from '$lib/types';
 
 	export interface ClassifierVehicle {
@@ -117,258 +117,167 @@
 	}
 </script>
 
-<section class="adjustment-panel">
-	<div class="panel-heading">
-		<div>
-			<p class="eyebrow">Monthly classifier</p>
-			<h2>{vehicle.code} {vehicle.name}</h2>
-		</div>
-		{#if existing}<span class="saved-badge">Saved</span>{/if}
+<section class="classifier">
+	<div class="top">
+		<p class="name"><span class="ui-label">Classifier</span>{vehicle.code} {vehicle.name}</p>
+		<span class="ui-pill {existing ? 'good' : 'warn'}">
+			{existing ? 'Saved' : 'Missing'}{claim.claimablePercentage !== null
+				? ` · ${formatNumber(claim.claimablePercentage, 1)}%`
+				: ''}
+		</span>
 	</div>
 
-		<div class="metric-grid">
-			<div><span>Fuel Manager total</span><strong>{formatLitres(totalLitres)} L</strong></div>
-			<div>
-				<span>Activity-eligible base</span><strong>{formatLitres(baseEligibleLitres)} L</strong>
-			</div>
-			<div>
-				<span>Final claimable</span><strong class="claimable"
-					>{formatLitres(claim.claimableLitres)} L</strong
-				>
-			</div>
-			<div>
-				<span>Non-claimable</span><strong>{formatLitres(claim.nonClaimableLitres)} L</strong>
-			</div>
-		</div>
+	<dl class="figs">
+		<div><dt>Bowser</dt><dd>{formatWholeLitres(totalLitres)}</dd></div>
+		<div><dt>On claimable work</dt><dd>{formatWholeLitres(baseEligibleLitres)}</dd></div>
+		<div class="hl"><dt>Claimable</dt><dd>{formatWholeLitres(claim.claimableLitres)}</dd></div>
+	</dl>
 
-		<div class="input-grid">
-			<label>
-				<span>Classifier measured litres</span>
-				<input
-					type="number"
-					min="0.01"
-					step="0.01"
-					bind:value={measuredLitres}
-					placeholder="e.g. 850.25"
-				/>
-			</label>
-			<label>
-				<span>Classifier claimable litres</span>
-				<input
-					type="number"
-					min="0"
-					step="0.01"
-					bind:value={classifierClaimableLitres}
-					placeholder="e.g. 527.16"
-				/>
-			</label>
-			<label>
-				<span>Classifier workbook reference</span>
-				<input
-					type="text"
-					bind:value={sourceReference}
-					placeholder="e.g. diesel-claim-june-2026.xlsx"
-				/>
-			</label>
-			<label>
-				<span>Notes</span>
-				<input type="text" bind:value={notes} placeholder="Optional audit note" />
-			</label>
-		</div>
+	<div class="inputs">
+		<label>
+			<span>Measured L</span>
+			<input type="number" inputmode="decimal" min="0.01" step="0.01" bind:value={measuredLitres} />
+		</label>
+		<label>
+			<span>Claimable L</span>
+			<input type="number" inputmode="decimal" min="0" step="0.01" bind:value={classifierClaimableLitres} />
+		</label>
+		<label class="wide">
+			<span>Workbook</span>
+			<input type="text" bind:value={sourceReference} placeholder="file name" />
+		</label>
+		<label class="wide">
+			<span>Note</span>
+			<input type="text" bind:value={notes} placeholder="optional" />
+		</label>
+	</div>
 
-		<div class="calculation-row">
-			<div>
-				<span>Derived share</span>
-				<strong
-					>{claim.claimablePercentage === null
-						? 'Not entered'
-						: `${formatNumber(claim.claimablePercentage, 2)}%`}</strong
-				>
-			</div>
-			{#if measuredLitres && measuredLitres > 0}
-				<div class:variance-warning={variance.exceedsThreshold}>
-					<span>Bowser vs telematics</span>
-					<strong
-						>{variance.litres >= 0 ? '+' : ''}{formatLitres(variance.litres)} L ({variance.percentage >=
-						0
-							? '+'
-							: ''}{formatNumber(variance.percentage, 1)}%)</strong
-					>
-				</div>
-			{/if}
-		</div>
-		{#if variance.exceedsThreshold}
-			<p class="message warning">
-				The two totals differ by more than {VARIANCE_THRESHOLD_PCT}%. Confirm the GPS file is for
-				{vehicle.code} and the selected month.
-			</p>
-		{:else if totalLitres > 0 && !existing && !draftAdjustment}
-			<p class="message warning">
-				No classifier result is saved. Until one is saved, the claim excludes this month's
-				{vehicle.code} litres.
-			</p>
+	<div class="foot">
+		{#if measuredLitres && measuredLitres > 0}
+			<span
+				class="ui-pill {variance.exceedsThreshold ? 'warn' : 'plain'}"
+				title="Bowser total vs the classifier's measured litres. Over {VARIANCE_THRESHOLD_PCT}%: check the GPS file is {vehicle.code}'s for this month."
+			>
+				Bowser vs GPS {formatSigned(variance.litres)} L ({formatSigned(variance.percentage, 1)}%)
+			</span>
+		{:else}
+			<span></span>
 		{/if}
-		{#if error}<p class="message error">{error}</p>{/if}
-		{#if success}<p class="message success">{success}</p>{/if}
-
-		<div class="actions">
-			<button type="button" onclick={save} disabled={saving || !draftAdjustment}>
-				{saving ? 'Saving...' : existing ? 'Update adjustment' : 'Save adjustment'}
-			</button>
-		</div>
+		<button
+			type="button"
+			class="ui-btn primary"
+			onclick={save}
+			disabled={saving || !draftAdjustment}
+		>
+			{saving ? 'Saving…' : existing ? 'Update' : 'Save'}
+		</button>
+	</div>
+	{#if error}<p class="msg err">{error}</p>{/if}
+	{#if success}<p class="msg ok">{success}</p>{/if}
 </section>
 
 <style>
-	.adjustment-panel {
-		background: var(--white);
+	.classifier {
+		margin-top: 1rem;
+		padding: 0.875rem;
 		border: 1px solid var(--gray-200);
 		border-radius: var(--radius-lg);
-		padding: 1rem 1.125rem;
+		background: var(--gray-50);
 	}
-	.panel-heading {
+
+	.top {
 		display: flex;
 		justify-content: space-between;
-		align-items: flex-start;
-		gap: 1rem;
-		margin-bottom: 1rem;
-	}
-	.eyebrow {
-		margin: 0 0 0.2rem;
-		color: var(--brand-hover);
-		font-size: 0.7rem;
-		font-weight: 700;
-	}
-	h2 {
-		margin: 0;
-		color: var(--gray-900);
-		font-size: 1.05rem;
-	}
-	.saved-badge {
-		background: #eef7ef;
-		color: #24633a;
-		border-radius: 999px;
-		padding: 0.25rem 0.55rem;
-		font-size: 0.72rem;
-		font-weight: 700;
-	}
-	.metric-grid {
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-	}
-	.metric-grid div {
-		background: var(--gray-50);
-		border-radius: var(--radius-md);
-		padding: 0.7rem;
-		min-width: 0;
-	}
-	.metric-grid span,
-	.calculation-row span {
-		display: block;
-		color: var(--gray-500);
-		font-size: 0.72rem;
-		margin-bottom: 0.15rem;
-	}
-	.metric-grid strong,
-	.calculation-row strong {
-		color: var(--gray-900);
-		font-size: 0.95rem;
-		font-variant-numeric: tabular-nums;
-	}
-	.metric-grid .claimable {
-		color: #24633a;
-	}
-	.input-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
+		align-items: center;
 		gap: 0.75rem;
 	}
-	label span {
-		display: block;
-		color: var(--gray-700);
-		font-size: 0.78rem;
-		font-weight: 600;
-		margin-bottom: 0.3rem;
+
+	.name {
+		margin: 0;
+		display: grid;
+		gap: 0.125rem;
+		font-weight: 700;
 	}
-	input {
+
+	.figs {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.5rem;
+		margin: 0.75rem 0;
+	}
+
+	.figs dt {
+		font-size: var(--text-xs);
+		color: var(--gray-500);
+	}
+
+	.figs dd {
+		margin: 0;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.figs .hl dd {
+		color: #1f6b3a;
+	}
+
+	.inputs {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.5rem;
+	}
+
+	.inputs label {
+		display: grid;
+		gap: 0.25rem;
+	}
+
+	.inputs span {
+		font-size: var(--text-xs);
+		color: var(--gray-500);
+	}
+
+	.inputs input {
 		width: 100%;
-		min-height: 2.65rem;
-		box-sizing: border-box;
+		padding: 0.5rem 0.625rem;
 		border: 1px solid var(--gray-300);
 		border-radius: var(--radius-md);
-		padding: 0.6rem 0.7rem;
-		color: var(--gray-900);
 		background: var(--white);
 		font: inherit;
+		font-size: var(--text-sm);
+		font-variant-numeric: tabular-nums;
 	}
-	input:focus {
-		outline: 2px solid rgba(142, 43, 52, 0.16);
-		border-color: var(--primary);
+
+	.inputs input:focus {
+		outline: none;
+		border-color: var(--brand);
+		box-shadow: var(--focus-ring);
 	}
-	.calculation-row {
-		display: flex;
-		gap: 1.5rem;
-		align-items: flex-start;
-		margin-top: 0.9rem;
-		padding-top: 0.8rem;
-		border-top: 1px solid var(--gray-200);
-	}
-	.variance-warning strong {
-		color: #9a5a0a;
-	}
-	.message {
-		margin: 0.75rem 0 0;
-		border-radius: var(--radius-md);
-		padding: 0.65rem 0.75rem;
-		font-size: 0.78rem;
-	}
-	.message.warning {
-		background: #fff7e7;
-		color: #87520b;
-	}
-	.message.error {
-		background: #fff0f0;
-		color: #9b2c2c;
-	}
-	.message.success {
-		background: #eef7ef;
-		color: #24633a;
-	}
-	.actions {
-		display: flex;
-		justify-content: flex-end;
-		margin-top: 0.9rem;
-	}
-	.actions button {
-		border: 0;
-		border-radius: var(--radius-md);
-		background: var(--primary);
-		color: white;
-		min-height: 2.65rem;
-		padding: 0.65rem 1rem;
-		font: inherit;
-		font-weight: 700;
-		cursor: pointer;
-	}
-	.actions button:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
+
 	@media (max-width: 640px) {
-		.metric-grid,
-		.input-grid {
+		.inputs {
 			grid-template-columns: 1fr 1fr;
 		}
-		.calculation-row {
-			flex-direction: column;
-			gap: 0.55rem;
-		}
 	}
-	@media (max-width: 400px) {
-		.metric-grid,
-		.input-grid {
-			grid-template-columns: 1fr;
-		}
+
+	.foot {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+		margin-top: 0.75rem;
+	}
+
+	.msg {
+		margin: 0.5rem 0 0;
+		font-size: var(--text-sm);
+	}
+
+	.msg.err {
+		color: var(--error);
+	}
+
+	.msg.ok {
+		color: #1f6b3a;
 	}
 </style>

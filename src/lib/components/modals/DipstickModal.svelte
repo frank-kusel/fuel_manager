@@ -9,13 +9,24 @@
 		show: boolean;
 		onClose: () => void;
 		onSuccess?: () => void;
+		/** Date to open on — e.g. a past month's last day when closing it. Defaults to today. */
+		defaultDate?: string;
 	}
 
-	let { show = $bindable(false), onClose, onSuccess }: Props = $props();
+	let { show = $bindable(false), onClose, onSuccess, defaultDate }: Props = $props();
+
+	// Never later than today, whatever the caller asks for.
+	const initialDate = () =>
+		defaultDate && defaultDate < todayIso() ? defaultDate : todayIso();
 
 	// Form fields
 	let dipstickReading = $state<number | string | null>('');
 	let dipstickDate = $state(todayIso());
+
+	// Re-seed the date each time the modal opens.
+	$effect(() => {
+		if (show) dipstickDate = initialDate();
+	});
 	let dipstickNotes = $state('');
 	let submitting = $state(false);
 
@@ -49,13 +60,13 @@
 				// Reset form
 				dipstickReading = '';
 				dipstickNotes = '';
-				dipstickDate = todayIso();
+				dipstickDate = initialDate();
 
 				// Dips move the derived tank level everywhere — modal-level so
 				// FAB/sidebar launches count, not just the Tank page's onSuccess.
 				markFuelDataStale();
 
-				toast.success('Dip reading saved');
+				toast.success('Dip saved');
 
 				// Call success callback
 				if (onSuccess) onSuccess();
@@ -63,10 +74,10 @@
 				// Close modal
 				onClose();
 			} else {
-				toast.error('Failed to save reading: ' + result.error);
+				toast.error('Dip not saved: ' + result.error);
 			}
 		} catch (error) {
-			toast.error('Failed to save reading');
+			toast.error('Dip not saved');
 		}
 		submitting = false;
 	}
@@ -75,7 +86,7 @@
 		// Reset form
 		dipstickReading = '';
 		dipstickNotes = '';
-		dipstickDate = todayIso();
+		dipstickDate = initialDate();
 		onClose();
 	}
 </script>
@@ -84,7 +95,7 @@
 	<div class="modal-overlay" onclick={handleClose}></div>
 	<div class="modal">
 		<div class="modal-header">
-			<h3>New Dipstick Reading</h3>
+			<h3>Record dip</h3>
 			<button class="close-btn" onclick={handleClose}>
 				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 			</button>

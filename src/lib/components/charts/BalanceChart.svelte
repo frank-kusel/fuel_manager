@@ -174,6 +174,10 @@
 	.chart {
 		position: relative;
 		width: 100%;
+		min-width: 0;
+		/* The svg is drawn at the measured width; without this it would hold
+		   the container open at its first width instead of letting it shrink. */
+		overflow: hidden;
 	}
 
 	svg {

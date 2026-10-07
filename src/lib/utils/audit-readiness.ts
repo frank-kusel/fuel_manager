@@ -1,13 +1,11 @@
 /**
- * Month-end readiness — is this month's claim defensible, and if not, what is
- * the single next thing to do about it?
+ * Month-end readiness, as four steps: Dip → Close → Claim → Export.
  *
- * Extracted from the Audit page because it is the only genuinely derived logic
- * there and the only place a wrong answer is silent: a readiness row that says
- * "fine" when it isn't looks exactly like one that's right.
+ * Each check belongs to the step where you fix it, and a step's state is the
+ * worst of its checks. That is what lets the Audit page be one ordered list
+ * rather than a status band, two tabs and a collapsible setup panel.
  *
- * Two distinctions the earlier inline version got wrong, both of which matter
- * once a row can be promoted to "your next action":
+ * Two distinctions matter once a check decides what you do next:
  *
  * - A **blocker** is something you can act on that makes the claim wrong or
  *   unsubmittable. An **info** row is a fact worth surfacing that you cannot
@@ -15,35 +13,36 @@
  *   someone to "record a delivery" for a month in which no fuel was delivered
  *   is worse than saying nothing.
  * - A close that exists is not the same as a close that was **accepted**. The
- *   close screen signs off on the leak check (`accepted` is written from the
- *   variance band), so a month closed over tolerance must not read green — that
- *   is precisely the month you need to look at.
+ *   close signs off on the leak check (`accepted` is written from the gap
+ *   band), so a month closed over tolerance must not read green — that is
+ *   precisely the month you need to look at.
  */
 
-import type { CloseRow } from './tank-balance';
+import type { CloseRow, DipRow } from './tank-balance';
+
+export type StepId = 'dip' | 'close' | 'claim' | 'export';
+
+export const STEP_ORDER: StepId[] = ['dip', 'close', 'claim', 'export'];
 
 export type ReadinessId =
-	| 'registration'
+	| 'dip'
+	| 'close'
 	| 'eligibility'
+	| 'registration'
+	| 'classifier'
 	| 'usage'
 	| 'storage'
-	| 'close'
 	| 'invoices';
 
 /** `warn` is amber: real, but not a hard blocker on submitting. */
 export type ReadinessState = 'ok' | 'warn' | 'blocker' | 'info';
 
-/** Where the band's action control should take you. */
-export type ReadinessTarget = 'close' | 'claim-setup' | 'registration';
-
 export interface ReadinessItem {
 	id: ReadinessId;
+	step: StepId;
 	state: ReadinessState;
 	title: string;
 	detail: string;
-	/** Month-scoped rows sit under "This month"; the rest are standing facts. */
-	scope: 'month' | 'standing';
-	action?: { label: string; target: ReadinessTarget };
 }
 
 export interface ReadinessInput {
@@ -52,28 +51,17 @@ export interface ReadinessInput {
 	unreviewedActivityCount: number;
 	entryCount: number;
 	deliveryCount: number;
+	/** The month's last dip, or null when none was taken. */
+	monthDip: DipRow | null;
 	/** The close for the selected month, or null when it has not been closed. */
 	selectedClose: CloseRow | null;
+	/** Codes of classifier vehicles with litres this month but no result. */
+	missingClassifierCodes: string[];
 	/** Deliveries in the last 12 months with no invoice number. */
 	missingInvoices12m: number;
 }
 
-/**
- * Priority for "your next action", most urgent first.
- *
- * The close leads because it is why you opened the page and is the only
- * near-irreversible record here. Eligibility is second because it silently
- * changes every claim figure on screen. Registration is third: a ten-second fix
- * that gates submission. `storage` and `invoices` are deliberately absent — you
- * cannot edit a delivery from anywhere in this app, so offering either as an
- * action would be a dead end.
- */
-export const NEXT_ACTION_ORDER: ReadinessId[] = [
-	'close',
-	'eligibility',
-	'registration',
-	'usage'
-];
+const rounded = (litres: number | null | undefined) => Math.round(litres ?? 0);
 
 export function buildReadiness(input: ReadinessInput): ReadinessItem[] {
 	const {
@@ -82,105 +70,127 @@ export function buildReadiness(input: ReadinessInput): ReadinessItem[] {
 		unreviewedActivityCount,
 		entryCount,
 		deliveryCount,
+		monthDip,
 		selectedClose,
+		missingClassifierCodes,
 		missingInvoices12m
 	} = input;
 
 	const trimmedReg = regNo.trim();
+	const items: ReadinessItem[] = [];
 
-	// A close that exists but failed its own leak check is amber, never green.
-	let close: ReadinessItem;
+	// A closed month necessarily had its dip; the close row records it.
+	const dipLitres = monthDip?.reading_value ?? selectedClose?.measured_level ?? null;
+	const dipDate = monthDip?.reading_date ?? selectedClose?.dip_date ?? null;
+	items.push(
+		dipLitres !== null
+			? {
+					id: 'dip',
+					step: 'dip',
+					state: 'ok',
+					title: 'Dip taken',
+					detail: `${rounded(dipLitres)} L${dipDate ? ` on ${dipDate}` : ''}`
+				}
+			: {
+					id: 'dip',
+					step: 'dip',
+					state: 'blocker',
+					title: 'Dip taken',
+					detail: `No dip in ${monthLabel}`
+				}
+	);
+
 	if (!selectedClose) {
-		close = {
+		items.push({
 			id: 'close',
+			step: 'close',
 			state: 'blocker',
-			scope: 'month',
 			title: `${monthLabel} closed`,
-			detail: 'Not closed yet — reconcile the tank against a physical dip',
-			action: { label: `Close ${monthLabel}`, target: 'close' }
-		};
+			detail: dipLitres === null ? 'Needs the month’s dip first' : 'Not closed yet'
+		});
 	} else if (selectedClose.accepted === false) {
-		close = {
+		items.push({
 			id: 'close',
+			step: 'close',
 			state: 'warn',
-			scope: 'month',
 			title: `${monthLabel} closed over tolerance`,
-			detail: `Carried forward ${Math.round(selectedClose.calculated_level ?? 0)} L, but the leak check fell outside tolerance`,
-			action: { label: 'Review the close', target: 'close' }
-		};
+			detail: `Carried forward ${rounded(selectedClose.calculated_level)} L; the gap fell outside tolerance`
+		});
 	} else {
-		close = {
+		items.push({
 			id: 'close',
+			step: 'close',
 			state: 'ok',
-			scope: 'month',
 			title: `${monthLabel} closed`,
-			detail: `Carried forward ${Math.round(selectedClose.calculated_level ?? 0)} L${selectedClose.is_rebaseline ? ' (re-baselined)' : ''}`
-		};
+			detail: `Carried forward ${rounded(selectedClose.calculated_level)} L${selectedClose.is_rebaseline ? ' (re-baselined)' : ''}`
+		});
 	}
 
-	return [
-		close,
+	items.push(
 		{
 			id: 'eligibility',
+			step: 'claim',
 			state: unreviewedActivityCount === 0 ? 'ok' : 'blocker',
-			scope: 'standing',
 			title: 'Activity eligibility reviewed',
 			detail:
 				unreviewedActivityCount === 0
-					? 'Claimable and non-claimable activities are saved in the database'
-					: `${unreviewedActivityCount} ${unreviewedActivityCount === 1 ? 'activity still needs' : 'activities still need'} confirmation`,
-			...(unreviewedActivityCount === 0
-				? {}
-				: { action: { label: 'Review eligibility', target: 'claim-setup' as const } })
+					? 'Every activity is marked claimable or not'
+					: `${unreviewedActivityCount} ${unreviewedActivityCount === 1 ? 'activity' : 'activities'} to review`
+		},
+		{
+			id: 'classifier',
+			step: 'claim',
+			state: missingClassifierCodes.length === 0 ? 'ok' : 'blocker',
+			title: 'Classifier results entered',
+			detail:
+				missingClassifierCodes.length === 0
+					? 'Every classifier vehicle has its result'
+					: `${missingClassifierCodes.join(', ')} classifier result missing`
 		},
 		{
 			id: 'registration',
-			state: trimmedReg.length > 0 ? 'ok' : 'blocker',
-			scope: 'standing',
-			title: 'Diesel refund registration captured',
-			detail: trimmedReg ? `Registered as ${trimmedReg}` : 'No DRS registration number on file',
-			...(trimmedReg.length > 0
-				? {}
-				: { action: { label: 'Add registration', target: 'registration' as const } })
+			step: 'claim',
+			state: trimmedReg ? 'ok' : 'blocker',
+			title: 'DRS registration on file',
+			detail: trimmedReg ? `Registered as ${trimmedReg}` : 'No DRS registration number'
 		},
 		{
 			id: 'usage',
+			step: 'claim',
 			state: entryCount > 0 ? 'ok' : 'blocker',
-			scope: 'month',
-			title: 'Usage logbook maintained',
-			detail:
-				entryCount > 0
-					? `${entryCount} entries in ${monthLabel} — litres out per vehicle, activity and location`
-					: `No fuel entries recorded in ${monthLabel}`
+			title: 'Usage logbook',
+			detail: entryCount > 0 ? `${entryCount} entries` : `No fuel entries in ${monthLabel}`
 		},
 		{
 			// Info, not a blocker: a month with no delivery is an ordinary month,
 			// and there is no delivery to add.
 			id: 'storage',
+			step: 'export',
 			state: 'info',
-			scope: 'month',
 			title: 'Storage logbook',
 			detail:
 				deliveryCount > 0
-					? `${deliveryCount} ${deliveryCount === 1 ? 'delivery' : 'deliveries'} recorded in ${monthLabel}`
-					: `No deliveries recorded in ${monthLabel}`
+					? `${deliveryCount} ${deliveryCount === 1 ? 'delivery' : 'deliveries'} in ${monthLabel}`
+					: `No deliveries in ${monthLabel}`
 		},
 		{
-			// Info until tank_refills gets a CRUD entity in tools/database — there
-			// is currently no screen anywhere that can edit an invoice number.
+			// Info until deliveries can be edited somewhere in the app — there is
+			// no screen that can add a missing invoice number.
 			id: 'invoices',
+			step: 'export',
 			state: 'info',
-			scope: 'standing',
-			title: 'Delivery invoice numbers on file',
+			title: 'Delivery invoice numbers',
 			detail:
 				missingInvoices12m === 0
-					? 'Every delivery in the last 12 months has its invoice number'
-					: `${missingInvoices12m} ${missingInvoices12m === 1 ? 'delivery' : 'deliveries'} in the last 12 months missing an invoice number`
+					? 'All on file for the last 12 months'
+					: `${missingInvoices12m} ${missingInvoices12m === 1 ? 'delivery' : 'deliveries'} in 12 months without one`
 		}
-	];
+	);
+
+	return items;
 }
 
-/** Rows that count toward "N of M checks outstanding". Info rows never do. */
+/** Rows that count as checks. Info rows never do. */
 export function isCheck(item: ReadinessItem): boolean {
 	return item.state !== 'info';
 }
@@ -189,33 +199,51 @@ export function outstandingCount(items: ReadinessItem[]): number {
 	return items.filter((i) => isCheck(i) && i.state !== 'ok').length;
 }
 
-export function checkCount(items: ReadinessItem[]): number {
-	return items.filter(isCheck).length;
-}
-
-/**
- * The single thing to do next, or null when nothing is outstanding. Only rows
- * with an action are eligible — an unactionable row can never be the next step.
- */
-export function nextAction(items: ReadinessItem[]): ReadinessItem | null {
-	for (const id of NEXT_ACTION_ORDER) {
-		const item = items.find((i) => i.id === id);
-		if (item && item.state !== 'ok' && item.state !== 'info' && item.action) return item;
-	}
-	return null;
-}
-
-/**
- * The most urgent failing check, actionable or not — what the summary line
- * names. Distinct from nextAction: a failing check with no action (no fuel
- * entries this month) still needs saying, or the band reads "1 check
- * outstanding" with nothing to explain it.
- */
+/** The most urgent failing check in step order, or null when all are clear. */
 export function firstOutstanding(items: ReadinessItem[]): ReadinessItem | null {
-	const failing = items.filter((i) => isCheck(i) && i.state !== 'ok');
-	for (const id of NEXT_ACTION_ORDER) {
-		const item = failing.find((i) => i.id === id);
-		if (item) return item;
+	for (const step of STEP_ORDER) {
+		const failing = items.find(
+			(i) => i.step === step && isCheck(i) && i.state === 'blocker'
+		);
+		if (failing) return failing;
 	}
-	return failing[0] ?? null;
+	return items.find((i) => isCheck(i) && i.state === 'warn') ?? null;
+}
+
+/** done: all clear · warn: done with a caveat · todo: something to fix · ready: export, all clear */
+export type StepState = 'done' | 'warn' | 'todo' | 'ready';
+
+export interface StepStatus {
+	id: StepId;
+	state: StepState;
+	items: ReadinessItem[];
+	/** The failing checks' details, most urgent first. */
+	issues: string[];
+}
+
+export function buildSteps(items: ReadinessItem[]): StepStatus[] {
+	const steps: StepStatus[] = STEP_ORDER.map((id) => {
+		const own = items.filter((i) => i.step === id);
+		const checks = own.filter(isCheck);
+		const blockers = checks.filter((i) => i.state === 'blocker');
+		const warnings = checks.filter((i) => i.state === 'warn');
+		const state: StepState =
+			blockers.length > 0 ? 'todo' : warnings.length > 0 ? 'warn' : 'done';
+		return {
+			id,
+			state,
+			items: own,
+			issues: [...blockers, ...warnings].map((i) => i.detail)
+		};
+	});
+
+	// Export has no checks of its own: it is ready when everything before it is.
+	const exportStep = steps.find((s) => s.id === 'export')!;
+	exportStep.state = steps.some((s) => s.id !== 'export' && s.state === 'todo') ? 'todo' : 'ready';
+	return steps;
+}
+
+/** Where to start: the first step with something to fix, else Export. */
+export function currentStep(steps: StepStatus[]): StepId {
+	return steps.find((s) => s.id !== 'export' && s.state === 'todo')?.id ?? 'export';
 }

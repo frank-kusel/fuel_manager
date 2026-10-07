@@ -510,6 +510,26 @@ export function buildMonthLedger(input: {
 	};
 }
 
+/** A stored close row as read back for the month being closed. */
+export interface StoredClose extends CloseRow {
+	id: string;
+	created_at: string;
+	notes?: string | null;
+}
+
+/** Everything the month-end close needs for one month (getMonthCloseData). */
+export interface MonthCloseData {
+	ledger: MonthLedger | null;
+	closingDip: DipRow | null;
+	anchor: TankAnchor | null;
+	/** Bowser meter at the start and end of the calendar month. */
+	bowserStart: number;
+	bowserEnd: number;
+	/** Litres dispensed in the calendar month, from fuel entries. */
+	monthDispensed: number;
+	existingClose: StoredClose | null;
+}
+
 /**
  * What a normal close carries forward: the book, drift and all.
  */

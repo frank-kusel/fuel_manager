@@ -180,7 +180,7 @@
 					{:else}
 						<span class="ui-pill warn">No dip on record</span>
 					{/if}
-					<a class="link" href="/audit">Leak trend →</a>
+					<a class="link" href="/audit#leak-trend">Leak trend →</a>
 				</div>
 			</section>
 
@@ -241,6 +241,7 @@
 <style>
 	.grid {
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		gap: 0.875rem;
 	}
 

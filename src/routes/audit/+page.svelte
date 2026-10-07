@@ -1,259 +1,175 @@
 <script lang="ts">
+	/**
+	 * Month-end, as one ordered list: Dip → Close → Claim → Export.
+	 *
+	 * Every step shows what it comes to in one line; the first one with
+	 * something to fix opens. All step bodies stay mounted, so a refresh after
+	 * a close or a classifier save never discards input. One month drives the
+	 * whole page — the close, the claim, the classifier results and the export.
+	 */
 	import { onMount } from 'svelte';
-	import DataExport from '$lib/components/dashboard/DataExport.svelte';
-	import ClassifierAdjustment, {
-		type ClassifierVehicle
-	} from '$lib/components/audit/ClassifierAdjustment.svelte';
-	import MonthCloseSection from '$lib/components/audit/MonthCloseSection.svelte';
-	import CloseHistory from '$lib/components/audit/CloseHistory.svelte';
-	import { recentMonths, type MonthOption } from '$lib/utils/dates';
-	import { DEFAULT_DIP_TOLERANCE_L, type CloseRow } from '$lib/utils/tank-balance';
+	import { page } from '$app/state';
+	import Step from '$lib/components/audit/Step.svelte';
+	import CloseStep from '$lib/components/audit/CloseStep.svelte';
+	import ClaimStep from '$lib/components/audit/ClaimStep.svelte';
+	import LeakTrend from '$lib/components/audit/LeakTrend.svelte';
+	import DataExport from '$lib/components/audit/DataExport.svelte';
+	import AppSettingsPanel from '$lib/components/settings/AppSettingsPanel.svelte';
+	import DipstickModal from '$lib/components/modals/DipstickModal.svelte';
+	import type { ClassifierVehicle } from '$lib/components/audit/ClassifierAdjustment.svelte';
+	import { claimSettings } from '$lib/stores/claim-settings';
+	import { toast } from '$lib/stores/toast';
+	import { fmtDayMonth, recentMonths, type MonthOption } from '$lib/utils/dates';
+	import { formatRand, formatSigned, formatWholeLitres } from '$lib/utils/formatting';
+	import { summariseClaim } from '$lib/utils/claim-totals';
 	import {
 		buildReadiness,
-		nextAction,
-		outstandingCount,
-		type ReadinessTarget
+		buildSteps,
+		currentStep,
+		STEP_ORDER,
+		type StepId,
+		type StepStatus
 	} from '$lib/utils/audit-readiness';
-	import ReadinessBand from '$lib/components/audit/ReadinessBand.svelte';
-	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
-	import { tick } from 'svelte';
-	import { summariseClaim } from '$lib/utils/claim-totals';
-	import { formatLitres, formatNumber } from '$lib/utils/formatting';
-	import { toast } from '$lib/stores/toast';
-	import { claimSettings, DEFAULT_CLAIM_SETTINGS } from '$lib/stores/claim-settings';
+	import { dipAgeDays, type CloseRow, type MonthCloseData } from '$lib/utils/tank-balance';
 	import type { Activity, DieselClaimMethod, VehicleMonthlyClaimAdjustment } from '$lib/types';
-
-	const SETTINGS_KEY = 'farmtrack_audit_settings_v1';
-	const NON_ELIGIBLE_GUESS = /transport|market|town|private|road|staff/i;
-
-	interface AuditSettings {
-		rateCents: number;
-		regNo: string;
-		nonEligible: string[];
-		seeded: boolean;
-		/** Dipstick resolution; variance bands never flag below this. */
-		dipToleranceL: number;
-	}
 
 	interface AuditEntry {
 		litres: number;
-		activityEligible: boolean;
+		eligible: boolean;
 		date: string;
 		vehicleId: string;
-		claimMethod: DieselClaimMethod;
+		method: DieselClaimMethod;
 	}
 
-	let settings = $state<AuditSettings>({
-		rateCents: 303.8,
-		regNo: '',
-		nonEligible: [],
-		seeded: false,
-		dipToleranceL: DEFAULT_DIP_TOLERANCE_L
-	});
-	let legacySettingsFound = $state(false);
-
-	// ONE period for the whole page: the close, the claim figures, the classifier
-	// classifier and the export target all follow this month. Previously these
-	// were three independent selectors that could silently disagree.
 	const months: MonthOption[] = recentMonths(6);
-	let selectedKey = $state(months[1].key); // the month you are closing
+	let selectedKey = $state(months[1].key); // last month: the one you are closing
 	let selected = $derived(months.find((m) => m.key === selectedKey) ?? months[1]);
-	// The skeleton is for a month we have never shown, not for every load():
-	// load() is also the onclosed/onsaved callback, and replacing the workspace
-	// with a skeleton then would unmount MonthCloseSection and
-	// the classifier cards, discarding their banners and half-typed input.
+
+	// The skeleton is for a month never shown, not for every load(): load() is
+	// also the refresh after a close or save, and a skeleton then would unmount
+	// the steps and discard their input.
 	let loadedKey = $state<string | null>(null);
 	let loadSeq = 0;
 	let error = $state<string | null>(null);
-	let showClaimSetup = $state(false);
-	// Plain let, not $state: this must not re-trigger. prepareEligibilityDraft
-	// runs on EVERY load(), and load() is also the onclosed/onsaved callback —
-	// so without the guard, closing the month re-expands this panel underneath
-	// you. saveEligibility used to mask that by force-closing afterwards.
-	let autoOpenedSetup = false;
-	let savingEligibility = $state(false);
-	let eligibilityError = $state('');
-	let eligibilitySuccess = $state('');
-	let eligibilityDraft = $state<Record<string, boolean>>({});
-	let unmatchedLegacyNames = $state<string[]>([]);
 
 	let entries = $state<AuditEntry[]>([]);
-	let refills = $state<
-		{ litres_added: number; delivery_date: string; invoice_number: string | null }[]
-	>([]);
+	let deliveries = $state<{ litres_added: number | null }[]>([]);
 	let activities = $state<Activity[]>([]);
 	let adjustments = $state<VehicleMonthlyClaimAdjustment[]>([]);
 	let classifierVehicles = $state<ClassifierVehicle[]>([]);
 	let closes = $state<CloseRow[]>([]);
+	let closeData = $state<MonthCloseData | null>(null);
 	let missingInvoices12m = $state(0);
 
-	function loadSettings() {
-		// The legacy eligibility list still lives in this browser's storage.
-		try {
-			const raw = localStorage.getItem(SETTINGS_KEY);
-			if (raw) {
-				settings = { ...settings, ...JSON.parse(raw) };
-				legacySettingsFound = true;
-			}
-		} catch {
-			/* keep defaults */
-		}
-	}
-
-	// Rate, registration and tolerance follow the shared store (the database
-	// row once migration 022 is applied), not this browser.
-	$effect(() => {
-		const shared = $claimSettings;
-		settings.rateCents = shared.rateCents;
-		settings.regNo = shared.regNo;
-		settings.dipToleranceL = shared.dipToleranceL;
-	});
-
-	// Rate, registration and tolerance go through the shared store so the
-	// Tank page and the claim PDF band gaps with the same tolerance.
-	function saveSettings() {
-		claimSettings.save({
-			rateCents: Number(settings.rateCents) || DEFAULT_CLAIM_SETTINGS.rateCents,
-			regNo: settings.regNo,
-			dipToleranceL: Number(settings.dipToleranceL) > 0 ? Number(settings.dipToleranceL) : DEFAULT_DIP_TOLERANCE_L
-		});
-	}
-
-	// Whole calendar month, from local-calendar helpers. The old version built
-	// these with toISOString(), which in SAST rolled the start back into the
-	// previous month.
-	function periodRange(): { start: string; end: string } {
-		return { start: selected.monthStart, end: selected.monthEnd };
-	}
+	let showSettings = $state(false);
+	let showDipModal = $state(false);
+	let openSteps = $state(new Set<StepId>());
 
 	function one<T>(relation: T | T[] | null | undefined): T | null {
 		return Array.isArray(relation) ? (relation[0] ?? null) : (relation ?? null);
 	}
 
-	function prepareEligibilityDraft() {
-		const currentNames = new Set(activities.map((activity) => activity.name));
-		unmatchedLegacyNames = legacySettingsFound
-			? settings.nonEligible.filter((name) => !currentNames.has(name))
-			: [];
-		eligibilityDraft = Object.fromEntries(
-			activities.map((activity) => {
-				if (activity.diesel_claim_reviewed_at) return [activity.id, activity.diesel_claim_eligible];
-				if (legacySettingsFound)
-					return [activity.id, !settings.nonEligible.includes(activity.name)];
-				return [activity.id, !NON_ELIGIBLE_GUESS.test(activity.name)];
-			})
-		);
-		if (!autoOpenedSetup && activities.some((activity) => !activity.diesel_claim_reviewed_at)) {
-			showClaimSetup = true;
-			autoOpenedSetup = true;
-		}
-	}
-
-	async function load() {
+	async function load(): Promise<void> {
 		const seq = ++loadSeq;
-		const key = selectedKey;
+		const month = selected;
 		try {
 			const { default: supabaseService } = await import('$lib/services/supabase');
 			await supabaseService.init();
 			const client = supabaseService.getClient();
-			const { start, end } = periodRange();
-
-			// A delivery without an invoice number is a storage-logbook gap
-			// regardless of which month is on screen, so that check spans a year
-			// while everything else is month-scoped.
+			const { monthStart: start, monthEnd: end } = month;
+			// A delivery without an invoice number is a storage-logbook gap whatever
+			// month is on screen, so that check spans a year.
 			const yearAgo = `${Number(start.slice(0, 4)) - 1}${start.slice(4)}`;
 
 			const [
 				entriesRes,
-				refillsRes,
+				deliveriesRes,
 				actsRes,
 				closesRes,
 				invoiceRes,
-				adjustmentsRes,
-				classifierRes
+				adjRes,
+				classifierRes,
+				closeRes
 			] = await Promise.all([
-					client
-						.from('fuel_entries')
-						.select(
-							'entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
-						)
-						.is('deleted_at', null)
-						.gte('entry_date', start)
-						.lte('entry_date', end),
-					client
-						.from('tank_refills')
-						.select('litres_added, delivery_date, invoice_number')
-						.gte('delivery_date', start)
-						.lte('delivery_date', end),
-					supabaseService.getActivities(),
-					// The full window, not just the newest row: checking one row and
-					// testing its date meant closing THIS month made LAST month read
-					// as unclosed.
-					supabaseService.getTankCloseHistory(24),
-					client
-						.from('tank_refills')
-						.select('delivery_date, invoice_number')
-						.gte('delivery_date', yearAgo)
-						.is('invoice_number', null),
-					supabaseService.getVehicleMonthlyClaimAdjustments(
-						`${start.slice(0, 7)}-01`,
-						`${end.slice(0, 7)}-01`
-					),
-					// Every vehicle whose claim share comes from a monthly classifier
-					// gets a card — not one hard-coded fleet code.
-					client
-						.from('vehicles')
-						.select('id, code, name')
-						.eq('diesel_claim_method', 'monthly_classifier')
-						.eq('active', true)
-						.order('code')
-				]);
+				client
+					.from('fuel_entries')
+					.select(
+						'entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
+					)
+					.is('deleted_at', null)
+					.gte('entry_date', start)
+					.lte('entry_date', end),
+				client
+					.from('tank_refills')
+					.select('litres_added')
+					.gte('delivery_date', start)
+					.lte('delivery_date', end),
+				supabaseService.getActivities(),
+				supabaseService.getTankCloseHistory(24),
+				client
+					.from('tank_refills')
+					.select('delivery_date')
+					.gte('delivery_date', yearAgo)
+					.is('invoice_number', null),
+				supabaseService.getVehicleMonthlyClaimAdjustments(`${month.key}-01`, `${month.key}-01`),
+				// Every vehicle whose share comes from a monthly classifier gets a
+				// card — found by method, not one hard-coded fleet code.
+				client
+					.from('vehicles')
+					.select('id, code, name')
+					.eq('diesel_claim_method', 'monthly_classifier')
+					.eq('active', true)
+					.order('code'),
+				supabaseService.getMonthCloseData(start, end, $claimSettings.dipToleranceL)
+			]);
 			const firstError =
 				entriesRes.error ||
-				refillsRes.error ||
+				deliveriesRes.error ||
 				actsRes.error ||
-				invoiceRes.error ||
-				adjustmentsRes.error ||
 				closesRes.error ||
-				classifierRes.error;
+				invoiceRes.error ||
+				adjRes.error ||
+				classifierRes.error ||
+				closeRes.error;
 			if (firstError)
 				throw new Error(typeof firstError === 'string' ? firstError : firstError.message);
 			// A newer load (month switched mid-flight) owns the page now.
 			if (seq !== loadSeq) return;
 
-			entries = (entriesRes.data || []).map((row: any) => {
-				const activity = one(row.activities) as { diesel_claim_eligible: boolean } | null;
-				const vehicle = one(row.vehicles) as { diesel_claim_method: DieselClaimMethod } | null;
-				return {
-					litres: Number(row.litres_dispensed || 0),
-					activityEligible: activity?.diesel_claim_eligible === true,
-					date: row.entry_date,
-					vehicleId: row.vehicle_id,
-					claimMethod: vehicle?.diesel_claim_method ?? 'activity_only'
-				};
-			});
-			refills = refillsRes.data || [];
+			entries = (entriesRes.data || []).map((row: any) => ({
+				litres: Number(row.litres_dispensed || 0),
+				eligible:
+					one<{ diesel_claim_eligible: boolean }>(row.activities)?.diesel_claim_eligible === true,
+				date: row.entry_date,
+				vehicleId: row.vehicle_id,
+				method:
+					one<{ diesel_claim_method: DieselClaimMethod }>(row.vehicles)?.diesel_claim_method ??
+					'activity_only'
+			}));
+			deliveries = deliveriesRes.data || [];
 			activities = actsRes.data || [];
-			adjustments = adjustmentsRes.data || [];
-			classifierVehicles = (classifierRes.data || []) as ClassifierVehicle[];
 			closes = (closesRes.data || []) as CloseRow[];
 			missingInvoices12m = (invoiceRes.data || []).length;
-			prepareEligibilityDraft();
+			adjustments = adjRes.data || [];
+			classifierVehicles = (classifierRes.data || []) as ClassifierVehicle[];
+			closeData = closeRes.data;
 			error = null;
-			loadedKey = key;
+			const firstLoadOfMonth = loadedKey !== month.key;
+			const firstLoadOfPage = loadedKey === null;
+			loadedKey = month.key;
+			// Open where the work is — once per month, never on a refresh.
+			if (firstLoadOfMonth) openSteps = new Set([startingStep(firstLoadOfPage)]);
 		} catch (err) {
 			if (seq !== loadSeq) return;
-			const message = err instanceof Error ? err.message : 'Failed to load audit data';
-			// A failed refresh keeps the month on screen; only a month we could
-			// never load gets the full-page error.
-			if (loadedKey === key) toast.error(`Couldn't refresh audit data: ${message}`);
+			const message = err instanceof Error ? err.message : 'Failed to load the month';
+			// A failed refresh keeps the month on screen; only a month never
+			// loaded gets the full-page error.
+			if (loadedKey === month.key) toast.error(`Couldn't refresh: ${message}`);
 			else error = message;
 		}
 	}
 
 	onMount(() => {
-		loadSettings();
 		load();
 	});
 
@@ -264,989 +180,496 @@
 		load();
 	}
 
-	function toggleActivity(id: string) {
-		eligibilityDraft[id] = !eligibilityDraft[id];
-		eligibilityDraft = { ...eligibilityDraft };
-		eligibilityError = '';
-		eligibilitySuccess = '';
-	}
-
-	async function saveEligibility() {
-		savingEligibility = true;
-		eligibilityError = '';
-		eligibilitySuccess = '';
-		try {
-			const { default: supabaseService } = await import('$lib/services/supabase');
-			await supabaseService.init();
-			const result = await supabaseService.saveActivityClaimEligibility(
-				activities.map((activity) => ({
-					id: activity.id,
-					diesel_claim_eligible: eligibilityDraft[activity.id] !== false
-				}))
-			);
-			if (result.error) throw new Error(result.error);
-			await load();
-			eligibilitySuccess = 'Activity eligibility saved to the database.';
-			showClaimSetup = false;
-		} catch (err) {
-			eligibilityError = err instanceof Error ? err.message : 'Failed to save activity eligibility';
-		} finally {
-			savingEligibility = false;
-		}
-	}
-
-	let claimTotals = $derived(
+	// ---- The month's figures ----
+	let claim = $derived(
 		summariseClaim(
 			entries.map((e) => ({
 				vehicleId: e.vehicleId,
 				date: e.date,
 				litres: e.litres,
-				eligible: e.activityEligible,
-				method: e.claimMethod
+				eligible: e.eligible,
+				method: e.method
 			})),
 			adjustments
 		)
 	);
-
-	let eligibleLitres = $derived(claimTotals.claimableLitres);
-	let nonEligibleLitres = $derived(claimTotals.nonClaimableLitres);
-	let purchasedLitres = $derived(
-		refills.reduce((sum, refill) => sum + (refill.litres_added || 0), 0)
-	);
-	let refundRands = $derived((eligibleLitres * settings.rateCents) / 100);
-	let eligibleActivityCount = $derived(
-		activities.filter((activity) => eligibilityDraft[activity.id] !== false).length
-	);
-	let unreviewedActivityCount = $derived(
-		activities.filter((activity) => !activity.diesel_claim_reviewed_at).length
-	);
-
-	/** Which months have a close on record — the whole window, not just the newest. */
-	let closedMonthKeys = $derived(
-		new Set(closes.map((c) => c.reconciliation_date.slice(0, 7)))
-	);
-
+	let deliveredLitres = $derived(deliveries.reduce((s, d) => s + (d.litres_added || 0), 0));
+	let refundRands = $derived((claim.claimableLitres * $claimSettings.rateCents) / 100);
 	let selectedClose = $derived(
 		closes.find((c) => c.reconciliation_date.slice(0, 7) === selected.key) ?? null
 	);
+	let ledger = $derived(closeData?.ledger ?? null);
+	let monthDip = $derived(closeData?.closingDip ?? null);
+	let dipAge = $derived(dipAgeDays(monthDip?.reading_date ?? null));
 
-	let checklist = $derived(
+	let items = $derived(
 		buildReadiness({
 			monthLabel: selected.label,
-			regNo: settings.regNo,
-			unreviewedActivityCount,
+			regNo: $claimSettings.regNo,
+			unreviewedActivityCount: activities.filter((a) => !a.diesel_claim_reviewed_at).length,
 			entryCount: entries.length,
-			deliveryCount: refills.length,
+			deliveryCount: deliveries.length,
+			monthDip,
 			selectedClose,
+			missingClassifierCodes: classifierVehicles
+				.filter((v) => (claim.byVehicle.get(v.id)?.missingMonths.length ?? 0) > 0)
+				.map((v) => v.code),
 			missingInvoices12m
 		})
 	);
+	let steps = $derived(buildSteps(items));
+	let stepOf = $derived(
+		Object.fromEntries(steps.map((s) => [s.id, s])) as Record<StepId, StepStatus>
+	);
+	let openStepCount = $derived(steps.filter((s) => s.id !== 'export' && s.state === 'todo').length);
 
-	let readinessNext = $derived(nextAction(checklist));
-	let readinessOutstanding = $derived(outstandingCount(checklist));
+	// ---- Which steps are open ----
+	/** ?step= (or the old ?tab=claim) on arrival; the first step to fix otherwise. */
+	function startingStep(arrival: boolean): StepId {
+		const asked = page.url.searchParams.get('step') ?? page.url.searchParams.get('tab');
+		if (arrival && asked && (STEP_ORDER as string[]).includes(asked)) return asked as StepId;
+		return currentStep(steps);
+	}
 
-	// ---- Tabs ----
-	// URL-backed so a reload or a trip to /tank and back keeps your place.
-	// /audit has no `load`, so a same-route query change does not remount this
-	// component — the derived value just recomputes.
-	let tab = $derived(page.url.searchParams.get('tab') === 'claim' ? 'claim' : 'close');
+	function toggle(id: StepId) {
+		const next = new Set(openSteps);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		openSteps = next;
+	}
 
-	// Claim mounts on first visit and then stays. Neither panel is ever
-	// destroyed: MonthCloseSection refetches on mount (4-5 round trips) and
-	// holds a half-typed note and the post-close banner, which a remount would
-	// silently discard. The classifier cards are the same shape.
-	let claimMounted = $state(false);
-	$effect(() => {
-		if (tab === 'claim') claimMounted = true;
+	// ---- One-line summaries ----
+	function issueLine(id: StepId): string | null {
+		const issues = stepOf[id]?.issues ?? [];
+		if (issues.length === 0) return null;
+		return issues.length > 1 ? `${issues[0]} · +${issues.length - 1} more` : issues[0];
+	}
+
+	let dipSummary = $derived.by(() => {
+		if (monthDip?.reading_value !== null && monthDip?.reading_value !== undefined)
+			return `${formatWholeLitres(monthDip.reading_value)} L · ${fmtDayMonth(monthDip.reading_date)}`;
+		if (selectedClose?.measured_level !== null && selectedClose?.measured_level !== undefined)
+			return `${formatWholeLitres(selectedClose.measured_level)} L`;
+		return issueLine('dip') ?? '';
 	});
-
-	async function showTab(next: 'close' | 'claim') {
-		await goto(`?tab=${next}`, { replaceState: true, noScroll: true, keepFocus: true });
-		await tick();
-	}
-
-	/** The band's next-action control: switch tab, open the panel, scroll to it. */
-	async function goToTarget(target: ReadinessTarget) {
-		if (target === 'close') {
-			await showTab('close');
-			document.getElementById('month-close')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-			return;
+	let closeSummary = $derived.by(() => {
+		if (selectedClose) {
+			const hasGap =
+				selectedClose.book_at_dip !== null &&
+				selectedClose.book_at_dip !== undefined &&
+				selectedClose.measured_level !== null;
+			const gap = hasGap
+				? ` · gap ${formatSigned((selectedClose.book_at_dip as number) - (selectedClose.measured_level as number))} L`
+				: '';
+			return `Carried ${formatWholeLitres(selectedClose.calculated_level)} L${gap}`;
 		}
-		await showTab('claim');
-		showClaimSetup = true;
-		await tick();
-		document.getElementById('claim-setup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-		if (target === 'registration') {
-			(document.getElementById('drs-reg') as HTMLInputElement | null)?.focus();
-		}
-	}
+		if (ledger?.variance) return `Gap ${formatSigned(ledger.variance.litres)} L · not closed`;
+		return issueLine('close') ?? '';
+	});
+	let claimSummary = $derived(
+		issueLine('claim') ??
+			`${formatRand(refundRands)} · ${formatWholeLitres(claim.claimableLitres)} L claimable`
+	);
+	let exportSummary = $derived(
+		stepOf.export?.state === 'ready' ? 'Claim PDF · Excel' : 'Earlier steps still open'
+	);
 
-	async function goToExports() {
-		await showTab('claim');
-		document.getElementById('exports')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-	}
+	const TONE = { good: 'good', acceptable: 'warn', high: 'bad' } as const;
 
+	/** Closed-month status for the month chips. */
+	let monthStatus = $derived(
+		new Map(
+			closes.map((c) => [c.reconciliation_date.slice(0, 7), c.accepted === false ? 'warn' : 'good'])
+		)
+	);
 </script>
 
 <svelte:head>
 	<title>Audit - FarmTrack</title>
 </svelte:head>
 
-<div class="audit-page">
-	<div class="page-header">
+<div class="ui-page">
+	<div class="ui-head">
 		<h1>Audit</h1>
-		<p>Claim estimate, readiness, and exports</p>
+		<button
+			class="ui-btn icon"
+			onclick={() => (showSettings = true)}
+			aria-label="Settings"
+			title="Rate, DRS number, dip tolerance"
+		>
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg>
+		</button>
 	</div>
 
-	<div class="chips">
+	<nav class="months" aria-label="Month">
 		{#each months as m (m.key)}
-			<button class="chip" class:on={m.key === selectedKey} onclick={() => selectMonth(m.key)}>
+			<button
+				class="month"
+				class:on={m.key === selectedKey}
+				aria-pressed={m.key === selectedKey}
+				onclick={() => selectMonth(m.key)}
+			>
 				{m.shortLabel}
-				{#if closedMonthKeys.has(m.key)}
-					<span class="chip-badge closed" title="Closed">✓</span>
+				{#if monthStatus.has(m.key)}
+					<i class="dot {monthStatus.get(m.key)}" title="Closed"></i>
 				{/if}
 			</button>
 		{/each}
-	</div>
+	</nav>
 
 	{#if error && loadedKey !== selectedKey}
-		<div class="error-banner">
-			<p>Couldn't load audit data</p>
-			<small>{error}</small>
-		</div>
+		<section class="ui-panel failed">
+			<p>Couldn't load {selected.label}: {error}</p>
+			<button class="ui-btn" onclick={load}>Retry</button>
+		</section>
 	{:else if loadedKey !== selectedKey}
-		<div class="skeleton" style="height: 9rem"></div>
+		<div class="ui-skeleton" style="height: 5.5rem"></div>
+		<div class="ui-skeleton" style="height: 14rem"></div>
 	{:else}
-		<ReadinessBand
-			items={checklist}
-			next={readinessNext}
-			outstanding={readinessOutstanding}
-			monthLabel={selected.label}
-			{eligibleLitres}
-			{refundRands}
-			onact={goToTarget}
-			onexports={goToExports}
-		/>
-
-		<!--
-			Links, not a tablist widget: these are genuinely URL-addressable, so
-			<a> is honest and costs less than roving tabindex for a binary choice.
-			replacestate keeps back out of the tab cycle (it is the primary gesture
-			on mobile); keepfocus stops SvelteKit throwing focus to <body>.
-		-->
-		<nav class="tabs" aria-label="Month-end sections">
-			<a
-				class="tab"
-				class:on={tab === 'close'}
-				href="?tab=close"
-				aria-current={tab === 'close' ? 'page' : undefined}
-				data-sveltekit-replacestate
-				data-sveltekit-noscroll
-				data-sveltekit-keepfocus>Close</a
-			>
-			<a
-				class="tab"
-				class:on={tab === 'claim'}
-				href="?tab=claim"
-				aria-current={tab === 'claim' ? 'page' : undefined}
-				data-sveltekit-replacestate
-				data-sveltekit-noscroll
-				data-sveltekit-keepfocus>Claim</a
-			>
-		</nav>
-
-		<div class="tabpanel close-panel" hidden={tab !== 'close'}>
-			<div id="month-close">
-				<MonthCloseSection
-					month={selected}
-					toleranceL={$claimSettings.dipToleranceL}
-					onclosed={load}
-				/>
-			</div>
-
-			<CloseHistory rows={closes} toleranceL={$claimSettings.dipToleranceL} />
-		</div>
-
-		{#if claimMounted}
-		<div class="tabpanel claim-panel" hidden={tab !== 'claim'}>
-		<!-- Claim stats -->
-		<h2 class="section-heading">Claim — {selected.label}</h2>
-		<section class="panel claim">
-			<div class="claim-main">
-				<div>
-					<div class="stat-k">Eligible litres</div>
-					<div class="stat-v brand">{formatLitres(eligibleLitres)}<span class="unit">L</span></div>
-					<div class="stat-sub">after activity and vehicle adjustments</div>
+		<div class="layout">
+			<!-- The month at a glance -->
+			<section class="kpis" aria-label="{selected.label} at a glance">
+				<div class="kpi">
+					<p class="ui-label">Dispensed</p>
+					<p class="ui-figure">{formatWholeLitres(claim.totalLitres)}<small>L</small></p>
 				</div>
-				<div>
-					<div class="stat-k">Refund estimate</div>
-					<div class="stat-v">R {formatNumber(refundRands, 0)}</div>
-					<div class="stat-sub">@ {settings.rateCents} c/L — estimate only</div>
+				<div class="kpi">
+					<p class="ui-label">Delivered</p>
+					<p class="ui-figure">{formatWholeLitres(deliveredLitres)}<small>L</small></p>
 				</div>
-			</div>
-			<div class="claim-row">
-				<div>
-					<span class="mini-k">Non-eligible</span>
-					<span class="mini-v red">{formatLitres(nonEligibleLitres)} L</span>
+				<div class="kpi">
+					<p class="ui-label">Gap at dip</p>
+					<p class="ui-figure {ledger?.band ? TONE[ledger.band.key] : ''}">
+						{ledger?.variance ? formatSigned(ledger.variance.litres) : '—'}<small>L</small>
+					</p>
 				</div>
-				<div>
-					<span class="mini-k">Purchased</span>
-					<span class="mini-v">{formatLitres(purchasedLitres)} L</span>
+				<div class="kpi">
+					<p class="ui-label">Refund est.</p>
+					<p class="ui-figure good">{formatRand(refundRands)}</p>
 				</div>
-				<div>
-					<span class="mini-k">Entries</span>
-					<span class="mini-v">{entries.length}</span>
+				<div class="progress" role="img" aria-label="{3 - openStepCount} of 3 steps done">
+					{#each steps as s (s.id)}<i class={s.state}></i>{/each}
 				</div>
-			</div>
-			{#if claimTotals.missingAdjustments > 0}
-				<p class="claim-warning">
-					{claimTotals.missingAdjustments} vehicle-month classifier result{claimTotals.missingAdjustments ===
-					1
-						? ' is'
-						: 's are'} missing and conservatively excluded.
-				</p>
-			{/if}
-		</section>
+			</section>
 
-		<!--
-			One "Claim setup" panel, no nested collapses — nesting is what made
-			these two hard to find in the first place.
-		-->
-		<section class="panel" id="claim-setup">
-			<button class="collapser" onclick={() => (showClaimSetup = !showClaimSetup)}>
-				<span>
-					Claim setup
-					<span class="setup-summary">
-						{eligibleActivityCount} claimable · {settings.rateCents} c/L ·
-						{settings.regNo.trim() ? settings.regNo.trim() : 'no DRS no.'}
-					</span>
-					{#if unreviewedActivityCount > 0 || !settings.regNo.trim()}
-						<span class="setup-dot" title="Needs attention"></span>
-					{/if}
-				</span>
-				<svg
-					class:open={showClaimSetup}
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg
+			<div class="steps">
+				<Step
+					n={1}
+					id="dip"
+					title="Dip"
+					state={stepOf.dip.state}
+					summary={dipSummary}
+					open={openSteps.has('dip')}
+					ontoggle={() => toggle('dip')}
 				>
-			</button>
+					<div class="dip-body">
+						{#if monthDip?.reading_value !== null && monthDip?.reading_value !== undefined}
+							<div>
+								<p class="ui-label">Last dip in {selected.label}</p>
+								<p class="ui-figure dip-fig">
+									{formatWholeLitres(monthDip.reading_value)}<small>L</small>
+								</p>
+								<p class="ui-muted">
+									{fmtDayMonth(monthDip.reading_date)}{dipAge !== null ? ` · ${dipAge} d ago` : ''}
+								</p>
+							</div>
+							<button class="ui-btn" onclick={() => (showDipModal = true)}>Record another</button>
+						{:else}
+							{#if ledger}
+								<div>
+									<p class="ui-label">Book expects</p>
+									<p class="ui-figure dip-fig">{formatWholeLitres(ledger.bookAtDip)}<small>L</small></p>
+									<p class="ui-muted">at {fmtDayMonth(selected.monthEnd)}, before the dip</p>
+								</div>
+							{/if}
+							<button class="ui-btn primary" onclick={() => (showDipModal = true)}>Record dip</button>
+						{/if}
+					</div>
+				</Step>
 
-			{#if showClaimSetup}
-				<h3 class="setup-h">Activity eligibility</h3>
-				{#if unreviewedActivityCount > 0}
-					<p class="review-intro">
-						Review these defaults, then save once. Previous browser choices are only used to prefill
-						this unsaved list.
-					</p>
-				{/if}
-				<div class="elig-list">
-					{#each activities as activity (activity.id)}
-						<button
-							class="elig-row"
-							class:excluded={eligibilityDraft[activity.id] === false}
-							onclick={() => toggleActivity(activity.id)}
-						>
-							<span class="elig-name">{activity.name}</span>
-							<span class="elig-state"
-								>{eligibilityDraft[activity.id] === false ? 'Non-claimable' : 'Claimable'}</span
-							>
-						</button>
-					{/each}
-				</div>
-				{#if unmatchedLegacyNames.length > 0}
-					<p class="elig-message warning">
-						Previous browser settings referenced activities that no longer exist: {unmatchedLegacyNames.join(
-							', '
-						)}.
-					</p>
-				{/if}
-				{#if eligibilityError}<p class="elig-message error">{eligibilityError}</p>{/if}
-				<div class="elig-actions">
-					<p class="hint">
-						Non-claimable activities are excluded before any classifier percentage is applied.
-					</p>
-					<button type="button" onclick={saveEligibility} disabled={savingEligibility}
-						>{savingEligibility ? 'Saving...' : 'Save eligibility'}</button
-					>
-				</div>
+				<Step
+					n={2}
+					id="close"
+					title="Close"
+					state={stepOf.close.state}
+					summary={closeSummary}
+					open={openSteps.has('close')}
+					ontoggle={() => toggle('close')}
+				>
+					<CloseStep
+						month={selected}
+						data={closeData}
+						toleranceL={$claimSettings.dipToleranceL}
+						onrefresh={load}
+					/>
+				</Step>
 
-				<h3 class="setup-h">Rates and registration</h3>
-				<div class="settings-grid">
-					<label class="setting">
-						<span>Rebate rate (c/L)</span>
-						<input type="number" step="0.1" bind:value={settings.rateCents} onchange={saveSettings} />
-					</label>
-					<label class="setting">
-						<span>Dipstick tolerance (L)</span>
-						<input
-							type="number"
-							step="10"
-							bind:value={settings.dipToleranceL}
-							onchange={saveSettings}
+				<Step
+					n={3}
+					id="claim"
+					title="Claim"
+					state={stepOf.claim.state}
+					summary={claimSummary}
+					open={openSteps.has('claim')}
+					ontoggle={() => toggle('claim')}
+				>
+					<div class="claim-step">
+						<ClaimStep
+							month={selected}
+							{claim}
+							{activities}
+							{classifierVehicles}
+							{adjustments}
+							onrefresh={load}
+							onsettings={() => (showSettings = true)}
 						/>
-					</label>
-					<label class="setting">
-						<span>DRS registration no.</span>
-						<input
-							id="drs-reg"
-							type="text"
-							placeholder="e.g. DRS-2026-…"
-							bind:value={settings.regNo}
-							onchange={saveSettings}
-						/>
-					</label>
-				</div>
-				<p class="hint">
-					These are your settings, not verified tax rules — confirm the current rate, the
-					eligible-percentage rules, and activity eligibility with your accountant or SARS before
-					claiming.
-				</p>
-			{/if}
-			{#if eligibilitySuccess}<p class="elig-message success">{eligibilitySuccess}</p>{/if}
-		</section>
+					</div>
+				</Step>
 
-		<div class="actros-slot">
-			{#each classifierVehicles as vehicle (vehicle.id)}
-				{@const vehicleClaim = claimTotals.byVehicle.get(vehicle.id)}
-				<ClassifierAdjustment
-					{vehicle}
-					claimMonth={`${selected.key}-01`}
-					totalLitres={vehicleClaim?.totalLitres ?? 0}
-					baseEligibleLitres={vehicleClaim?.baseEligibleLitres ?? 0}
-					existing={adjustments.find(
-						(a) => a.vehicle_id === vehicle.id && a.claim_month.startsWith(selected.key)
-					) ?? null}
-					onsaved={load}
-				/>
-			{/each}
-		</div>
+				<Step
+					n={4}
+					id="export"
+					title="Export"
+					state={stepOf.export.state}
+					summary={exportSummary}
+					open={openSteps.has('export')}
+					ontoggle={() => toggle('export')}
+				>
+					{#if stepOf.export.state !== 'ready'}
+						<p class="ui-pill warn export-warn">
+							{openStepCount}
+							{openStepCount === 1 ? 'step is' : 'steps are'} still open, and the export will show it
+						</p>
+					{/if}
+					<DataExport selectedYear={selected.year} selectedMonth={selected.month} hideMonthPicker />
+					<ul class="facts">
+						{#each stepOf.export.items as item (item.id)}
+							<li><span class="ui-label">{item.title}</span>{item.detail}</li>
+						{/each}
+					</ul>
+				</Step>
+			</div>
 
-		<!-- Exports -->
-		<h2 class="section-heading" id="exports">Exports</h2>
-		<div class="exports-slot">
-			<DataExport selectedYear={selected.year} selectedMonth={selected.month} hideMonthPicker />
-		</div>
-
-		</div>
-		{/if}
-
-		<!-- Manage — the desktop sidebar already carries every one of these -->
-		<h2 class="section-heading manage-heading">Manage</h2>
-		<div class="manage-links">
-			{#each [
-				{ href: '/entries', t: 'All entries', d: 'Spreadsheet view — fix any cell in place' },
-				{ href: '/tank', t: 'Tank', d: 'Book balance, dips and deliveries' },
-				{ href: '/tools/database', t: 'Database', d: 'Vehicles, drivers, activities, fields' },
-				{ href: '/menu', t: 'System settings', d: 'Thresholds and preferences' }
-			] as link (link.href)}
-				<a href={link.href} class="manage-link">
-					<span class="manage-text">
-						<span class="manage-t">{link.t}</span>
-						<span class="manage-d">{link.d}</span>
-					</span>
-					<svg class="manage-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
-				</a>
-			{/each}
+			<div class="trend">
+				<LeakTrend rows={closes} toleranceL={$claimSettings.dipToleranceL} />
+			</div>
 		</div>
 	{/if}
 </div>
 
+{#if showSettings}
+	<AppSettingsPanel onclose={() => (showSettings = false)} />
+{/if}
+
+<DipstickModal
+	bind:show={showDipModal}
+	onClose={() => (showDipModal = false)}
+	onSuccess={load}
+	defaultDate={selected.monthEnd}
+/>
+
 <style>
-	.audit-page {
-		max-width: 800px;
-		margin: 0 auto;
-		padding: 0 0.25rem 1rem;
+	.ui-btn.icon {
+		padding: 0.5rem;
+	}
+
+	/* ---- Months ---- */
+	.months {
 		display: flex;
-		flex-direction: column;
-		gap: 0.875rem;
-	}
-
-	.page-header h1 {
-		margin: 0;
-		font-size: 2rem;
-		font-weight: var(--font-weight-bold);
-		color: var(--gray-900);
-	}
-
-	.page-header p {
-		margin: 0.25rem 0 0;
-		color: var(--gray-500);
-		font-size: var(--text-base);
-	}
-
-	.chips {
-		display: flex;
-		gap: 0.5rem;
+		gap: 0.375rem;
 		overflow-x: auto;
-		padding-bottom: 2px;
-		/* Swipeable row — the bar under it is noise on touch screens */
 		scrollbar-width: none;
+		margin: 0 -0.25rem;
+		padding: 0 0.25rem;
 	}
 
-	.chips::-webkit-scrollbar {
+	.months::-webkit-scrollbar {
 		display: none;
 	}
 
-	.chip {
-		white-space: nowrap;
-		font-size: var(--text-sm);
-		font-weight: 500;
-		color: var(--gray-600);
-		background: var(--white);
-		border: 1px solid var(--gray-300);
-		padding: 0.45rem 0.875rem;
-		border-radius: var(--radius-full);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	/* ---- Tabs ---- */
-	.tabs {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.25rem;
-		padding: 0.25rem;
-		background: var(--gray-100);
-		border-radius: var(--radius-lg);
-		/* The layout header is in normal flow and is hidden entirely at >=1024px,
-		   and .main has no overflow container, so top: 0 resolves against the
-		   viewport at both breakpoints. */
-		position: sticky;
-		top: 0;
-		z-index: 5;
-	}
-
-	.tab {
-		display: flex;
+	.month {
+		display: inline-flex;
 		align-items: center;
-		justify-content: center;
-		min-height: 44px;
-		border-radius: var(--radius-md);
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-600);
-		text-decoration: none;
-		transition: background 0.15s ease, color 0.15s ease;
-	}
-
-	.tab.on {
-		background: var(--white);
-		color: var(--brand);
-		box-shadow: var(--shadow-sm);
-	}
-
-	.tabpanel {
-		display: flex;
-		flex-direction: column;
-		gap: 0.875rem;
-	}
-
-	/* The hidden ATTRIBUTE (a11y tree + tab order), which otherwise loses to
-	   the display: flex above. */
-	.tabpanel[hidden] {
-		display: none !important;
-	}
-
-	/* ---- Desktop: use the width ---- */
-	@media (min-width: 1100px) {
-		.audit-page {
-			max-width: 1180px;
-		}
-
-		/* The close on the left, the leak trend it feeds on the right */
-		.close-panel {
-			display: grid;
-			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-			gap: 1rem;
-			align-items: start;
-		}
-
-		.claim-panel {
-			display: grid;
-			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-			/* heading, claim, setup (takes the slack beside the tall Actros
-			   form), exports heading, exports */
-			grid-template-rows: auto auto 1fr auto auto;
-			gap: 1rem;
-			align-items: start;
-		}
-
-		.claim-panel > .section-heading,
-		.claim-panel > .exports-slot {
-			grid-column: 1 / -1;
-		}
-
-		/* Figures and setup on the left; the Actros adjustment (a long form)
-		   fills the right column beside them */
-		.claim-panel > .claim,
-		.claim-panel > #claim-setup {
-			grid-column: 1;
-		}
-
-		.claim-panel > .actros-slot {
-			grid-column: 2;
-			grid-row: 2 / span 2;
-		}
-	}
-
-	@media (min-width: 1024px) {
-		.manage-heading,
-		.manage-links {
-			display: none;
-		}
-	}
-
-	/* ---- Claim setup ---- */
-	.setup-summary {
-		display: block;
-		font-size: var(--text-xs);
-		font-weight: 400;
-		color: var(--gray-500);
-		margin-top: 0.1rem;
-	}
-
-	.setup-dot {
-		display: inline-block;
-		width: 0.45rem;
-		height: 0.45rem;
-		border-radius: 50%;
-		background: #d97706;
-		margin-left: 0.35rem;
-		vertical-align: 0.15rem;
-	}
-
-	.setup-h {
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-700);
-		margin: 1rem 0 0.5rem;
-	}
-
-	.setup-h:first-of-type {
-		margin-top: 0.75rem;
-	}
-
-	@media (min-width: 768px) {
-		.tabs {
-			max-width: 320px;
-		}
-	}
-
-	.chip-badge {
-		display: inline-block;
-		margin-left: 0.3rem;
-		font-size: var(--text-xs);
-		opacity: 0.45;
-	}
-
-	.chip-badge.closed {
-		opacity: 1;
-		color: var(--success-dark);
-	}
-
-	.chip.on .chip-badge.closed {
-		color: #fff;
-	}
-
-	.chip.on {
-		background: var(--brand);
-		border-color: var(--brand);
-		color: #fff;
-	}
-
-	.panel {
-		background: var(--white);
+		gap: 0.375rem;
+		padding: 0.4375rem 0.875rem;
+		border-radius: var(--radius-full);
 		border: 1px solid var(--gray-200);
-		border-radius: var(--radius-lg);
-		padding: 1rem 1.125rem;
-	}
-
-	.section-heading {
-		font-size: 1.125rem;
-		font-weight: 700;
-		color: var(--gray-900);
-		margin: 0.75rem 0 -0.125rem;
-	}
-
-	/* Claim */
-	.claim {
-		background: #faf1f2;
-		border-color: #e9ccd0;
-	}
-
-	.claim-main {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-
-	.stat-k {
+		background: var(--white);
+		font: inherit;
 		font-size: var(--text-sm);
 		font-weight: var(--font-weight-semibold);
 		color: var(--gray-600);
-	}
-
-	.stat-v {
-		font-size: 2.4rem;
-		font-weight: 750;
-		font-stretch: var(--figure-stretch);
-		color: var(--gray-900);
-		letter-spacing: -0.02em;
-		line-height: 1.15;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.stat-v.brand {
-		color: var(--brand-hover);
-	}
-
-	.unit {
-		font-size: 1rem;
-		color: var(--gray-400);
-		margin-left: 0.25rem;
-	}
-
-	.stat-sub {
-		font-size: var(--text-xs);
-		color: var(--gray-500);
-		margin-top: 0.25rem;
-	}
-
-	.claim-row {
-		display: flex;
-		gap: 1.5rem;
-		margin-top: 0.875rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid #f3dee1;
-		flex-wrap: wrap;
-	}
-
-	.claim-warning {
-		margin: 0.75rem 0 0;
-		padding: 0.55rem 0.7rem;
-		border-radius: var(--radius-md);
-		background: #fff7e7;
-		color: #87520b;
-		font-size: var(--text-xs);
-	}
-
-	.mini-k {
-		display: block;
-		font-size: var(--text-xs);
-		color: var(--gray-500);
-	}
-
-	.mini-v {
-		font-size: var(--text-base);
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-800);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.mini-v.red {
-		color: var(--error);
-	}
-
-	/* Collapser */
-	.collapser {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		width: 100%;
-		background: none;
-		border: none;
-		padding: 0;
-		text-align: left;
-		font-size: 1rem;
-		font-weight: var(--font-weight-semibold);
-		color: var(--gray-900);
 		cursor: pointer;
+		white-space: nowrap;
 	}
 
-	.collapser svg {
-		width: 1.1rem;
-		height: 1.1rem;
-		color: var(--gray-400);
-		transition: transform 0.2s ease;
+	.month.on {
+		background: var(--gray-900);
+		border-color: var(--gray-900);
+		color: var(--white);
 	}
 
-	.collapser svg.open {
-		transform: rotate(180deg);
+	.dot {
+		width: 0.4375rem;
+		height: 0.4375rem;
+		border-radius: 50%;
 	}
 
-	/* Eligibility list */
-	.elig-list {
-		margin-top: 0.75rem;
+	.dot.good {
+		background: var(--success);
+	}
+
+	.dot.warn {
+		background: var(--warning);
+	}
+
+	.failed {
 		display: flex;
-		flex-direction: column;
-	}
-
-	.elig-row {
-		display: flex;
-		justify-content: space-between;
 		align-items: center;
-		gap: 0.75rem;
-		padding: 0.55rem 0.25rem;
-		background: none;
-		border: none;
-		border-bottom: 1px solid var(--gray-100);
-		cursor: pointer;
-		font-size: var(--text-sm);
-		text-align: left;
-	}
-
-	.elig-row:last-child {
-		border-bottom: none;
-	}
-
-	.elig-name {
-		color: var(--gray-800);
-	}
-
-	.elig-state {
-		flex-shrink: 0;
-		font-size: var(--text-xs);
-		font-weight: var(--font-weight-semibold);
-		padding: 0.2rem 0.55rem;
-		border-radius: var(--radius-full);
-		background: #dcfce7;
-		color: var(--success-dark);
-	}
-
-	.elig-row.excluded .elig-state {
-		background: #fee2e2;
-		color: #991b1b;
-	}
-
-	.elig-row.excluded .elig-name {
-		color: var(--gray-500);
-	}
-
-	.review-intro {
-		margin: 0.75rem 0 0;
-		padding: 0.65rem 0.75rem;
-		border-radius: var(--radius-md);
-		background: #fff7e7;
-		color: #87520b;
-		font-size: var(--text-xs);
-		line-height: 1.5;
-	}
-
-	.elig-actions {
-		display: flex;
 		justify-content: space-between;
-		align-items: center;
 		gap: 1rem;
-		margin-top: 0.75rem;
 	}
 
-	.elig-actions .hint {
+	.failed p {
 		margin: 0;
 	}
 
-	.elig-actions button {
-		flex-shrink: 0;
-		min-height: 2.5rem;
-		border: 0;
-		border-radius: var(--radius-md);
-		padding: 0.55rem 0.85rem;
-		background: var(--primary);
-		color: white;
-		font: inherit;
-		font-size: var(--text-sm);
-		font-weight: 700;
-		cursor: pointer;
-	}
-
-	.elig-actions button:disabled {
-		opacity: 0.55;
-		cursor: not-allowed;
-	}
-
-	.elig-message {
-		margin: 0.7rem 0 0;
-		padding: 0.55rem 0.7rem;
-		border-radius: var(--radius-md);
-		font-size: var(--text-xs);
-	}
-
-	.elig-message.warning {
-		background: #fff7e7;
-		color: #87520b;
-	}
-	.elig-message.error {
-		background: #fef2f2;
-		color: #991b1b;
-	}
-	.elig-message.success {
-		background: #eef7ef;
-		color: #24633a;
-	}
-
-	.hint {
-		font-size: var(--text-xs);
-		color: var(--gray-400);
-		margin: 0.625rem 0 0;
-		line-height: 1.5;
-	}
-
-	/* Settings */
-	.settings-grid {
+	/* ---- Layout ---- */
+	.layout {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.75rem;
-		margin-top: 0.75rem;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0.875rem;
 	}
 
-	.setting span {
-		display: block;
-		font-size: var(--text-xs);
-		font-weight: 500;
-		color: var(--gray-500);
-		margin-bottom: 0.3rem;
-	}
+	@media (min-width: 1024px) {
+		.layout {
+			grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+			grid-template-areas:
+				'kpis kpis'
+				'steps trend';
+			align-items: start;
+		}
 
-	.setting input {
-		width: 100%;
-		min-height: 2.5rem;
-		padding: 0.5rem 0.7rem;
-		border: 1px solid var(--gray-300);
-		border-radius: var(--radius-md);
-		font-size: var(--text-base);
-		box-sizing: border-box;
-	}
+		.kpis {
+			grid-area: kpis;
+		}
 
-	.setting input:focus {
-		outline: none;
-		border-color: var(--brand);
-		box-shadow: var(--focus-ring);
-	}
+		.steps {
+			grid-area: steps;
+		}
 
-	/* Manage links */
-	.manage-links {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 0.625rem;
-	}
-
-	@media (min-width: 640px) {
-		.manage-links {
-			grid-template-columns: 1fr 1fr;
+		.trend {
+			grid-area: trend;
+			position: sticky;
+			top: 1rem;
 		}
 	}
 
-	.manage-text {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.manage-t {
-		color: var(--gray-900);
-		font-weight: var(--font-weight-semibold);
-	}
-
-	.manage-d {
-		font-size: var(--text-xs);
-		font-weight: 400;
-		color: var(--gray-500);
-	}
-
-	.manage-chev {
-		flex-shrink: 0;
-		width: 1rem;
-		height: 1rem;
-		color: var(--gray-400);
-	}
-
-	.manage-link:hover .manage-chev {
-		color: var(--brand);
-	}
-
-	.manage-link {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.8rem 1rem;
-		background: var(--white);
+	/* ---- KPIs ---- */
+	.kpis {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 1px;
+		background: var(--gray-200);
 		border: 1px solid var(--gray-200);
 		border-radius: var(--radius-lg);
+		overflow: hidden;
+	}
+
+	.kpi {
+		background: var(--white);
+		padding: 0.75rem 1rem 0.875rem;
+	}
+
+	.kpi p {
+		margin: 0;
+	}
+
+	.kpi .ui-figure {
+		font-size: 1.5rem;
+		margin-top: 0.3rem;
+	}
+
+	.ui-figure.good {
+		color: #1f6b3a;
+	}
+
+	.ui-figure.warn {
+		color: #8a4b08;
+	}
+
+	.ui-figure.bad {
+		color: var(--error);
+	}
+
+	.progress {
+		grid-column: 1 / -1;
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 1px;
+		background: var(--white);
+	}
+
+	.progress i {
+		height: 4px;
+		background: var(--gray-200);
+	}
+
+	.progress i.done,
+	.progress i.ready {
+		background: var(--success);
+	}
+
+	.progress i.warn {
+		background: var(--warning);
+	}
+
+	@media (max-width: 639px) {
+		.kpis {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	/* ---- Steps ---- */
+	.steps {
+		display: grid;
+		gap: 0.5rem;
+		min-width: 0;
+	}
+
+	.dip-body {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.dip-body p {
+		margin: 0;
+	}
+
+	.dip-fig {
+		font-size: 1.75rem;
+		margin: 0.25rem 0 !important;
+	}
+
+	.export-warn {
+		margin: 0 0 0.75rem;
+		white-space: normal;
+	}
+
+	.facts {
+		list-style: none;
+		margin: 0.75rem 0 0;
+		padding: 0;
+		display: grid;
+		gap: 0.25rem;
 		font-size: var(--text-sm);
-		font-weight: 500;
-		color: var(--gray-700);
-		text-decoration: none;
-		transition: all 0.15s ease;
+		color: var(--gray-600);
 	}
 
-	.manage-link:hover {
-		border-color: var(--brand);
-		color: var(--brand-hover);
-	}
-
-	.error-banner {
-		background: #fef2f2;
-		border: 1px solid #fecaca;
-		border-radius: var(--radius-lg);
-		padding: 1rem;
-	}
-
-	.error-banner p {
-		font-weight: var(--font-weight-semibold);
-		color: #991b1b;
-		margin: 0 0 0.25rem;
-	}
-
-	.error-banner small {
-		color: #b91c1c;
-	}
-
-	.skeleton {
-		background: linear-gradient(
-			90deg,
-			var(--gray-100) 25%,
-			var(--gray-200) 50%,
-			var(--gray-100) 75%
-		);
-		background-size: 200% 100%;
-		animation: shimmer 1.5s infinite;
-		border-radius: var(--radius-lg);
-	}
-
-	@keyframes shimmer {
-		0% {
-			background-position: 200% 0;
-		}
-		100% {
-			background-position: -200% 0;
-		}
-	}
-
-	@media (max-width: 768px) {
-		.audit-page {
-			padding: 0.5rem;
-		}
-
-		.page-header h1 {
-			font-size: 1.75rem;
-		}
-
-		.claim-main {
-			grid-template-columns: 1fr;
-			gap: 0.875rem;
-		}
-
-		.settings-grid {
-			grid-template-columns: 1fr;
-		}
-
-		.elig-actions {
-			align-items: stretch;
-			flex-direction: column;
-		}
+	.facts .ui-label {
+		display: inline;
+		margin-right: 0.5rem;
 	}
 </style>

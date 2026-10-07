@@ -31,7 +31,7 @@ import {
 	type CloseRow,
 	type DipRow,
 	type DispenseRow,
-	type MonthLedger,
+	type MonthCloseData,
 	type RefillRow,
 	type TankActivity,
 	type TankAnchor,
@@ -1163,17 +1163,7 @@ class SupabaseService {
 		monthStart: string,
 		monthEnd: string,
 		toleranceL?: number
-	): Promise<
-		ApiResponse<{
-			ledger: MonthLedger | null;
-			closingDip: DipRow | null;
-			anchor: TankAnchor | null;
-			bowserStart: number;
-			bowserEnd: number;
-			monthDispensed: number;
-			existingClose: any | null;
-		}>
-	> {
+	): Promise<ApiResponse<MonthCloseData>> {
 		const client = this.ensureInitialized();
 
 		try {
