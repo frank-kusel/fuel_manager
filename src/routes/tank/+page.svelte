@@ -250,8 +250,14 @@
 				{/if}
 			</div>
 		</section>
+	{:else}
+		<!-- No close and no dip yet: nothing to anchor a book to. -->
+		<section class="panel empty-state">
+			<p>Record your first dip to start the book.</p>
+		</section>
+	{/if}
 
-		<!-- Actions -->
+		<!-- Actions: always available — the first dip is how a fresh tank starts. -->
 		<div class="actions">
 			<button class="action-btn primary" onclick={() => (showDipModal = true)}>
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V6M8 10l4-4 4 4"/><path d="M5 20h14"/></svg>
@@ -311,14 +317,17 @@
 				{/if}
 			</section>
 		</div>
-
-	{/if}
 </div>
 
 <DipstickModal bind:show={showDipModal} onClose={() => (showDipModal = false)} onSuccess={refreshAll} />
 <TankRefillModal bind:show={showRefillModal} onClose={() => (showRefillModal = false)} onSuccess={refreshAll} />
 
 <style>
+	.empty-state p {
+		margin: 0;
+		color: var(--text-secondary, #57534e);
+	}
+
 	.tank-page {
 		max-width: 800px;
 		margin: 0 auto;

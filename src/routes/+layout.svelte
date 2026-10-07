@@ -346,10 +346,12 @@
 	<DipstickModal
 		bind:show={showDipstickModal}
 		onClose={() => showDipstickModal = false}
+		onSuccess={() => dashboardInsightsStore.load(true)}
 	/>
 	<TankRefillModal
 		bind:show={showRefillModal}
 		onClose={() => showRefillModal = false}
+		onSuccess={() => dashboardInsightsStore.load(true)}
 	/>
 
 	<ToastContainer />
