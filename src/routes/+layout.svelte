@@ -12,6 +12,8 @@
 	import { tankStore, tankData } from '$lib/stores/tank';
 	import { claimSettings } from '$lib/stores/claim-settings';
 	import { anchorLabel, pctFull } from '$lib/utils/tank-balance';
+	import SignIn from '$lib/components/auth/SignIn.svelte';
+	import { auth } from '$lib/stores/auth';
 
 	// Svelte 5 children prop
 	let { children }: { children: any } = $props();
@@ -86,6 +88,25 @@
 	// Service worker: built from src/service-worker.js and registered by
 	// SvelteKit automatically.
 	onMount(() => {
+		// Signed in, with a farm, before anything is read.
+		auth.start();
+		try {
+			sidebarCollapsed = localStorage.getItem(SIDEBAR_KEY) === 'collapsed';
+		} catch {
+			/* private mode */
+		}
+	});
+
+	const farmName = $derived($auth.farms.find((f) => f.id === $auth.farmId)?.name ?? '');
+
+	let dataStarted = false;
+	$effect(() => {
+		if ($auth.status !== 'ready' || dataStarted) return;
+		dataStarted = true;
+		startData();
+	});
+
+	function startData() {
 		// Prefetch reference data (vehicles/drivers/activities/fields/zones/
 		// bowsers) while the user is on their first screen, so the fuel-entry
 		// wizard and quick entry open instantly instead of waiting ~1s for
@@ -104,23 +125,21 @@
 		// device (migration 022). Pages render from the cached copy meanwhile.
 		claimSettings.load();
 
-		// Desktop sidebar: restore collapse state, and only fetch the tank
-		// strip's data when the sidebar can actually be seen — phones pay nothing.
-		try {
-			sidebarCollapsed = localStorage.getItem(SIDEBAR_KEY) === 'collapsed';
-		} catch {
-			/* private mode */
-		}
+		// Desktop sidebar: only fetch the tank strip's data when the sidebar can
+		// actually be seen — phones pay nothing.
 		if (window.matchMedia('(min-width: 1024px)').matches) {
 			tankStore.load(); // 5-min cached, shared with the Tank page and dashboard
 		}
-	});
+	}
 </script>
 
 <svelte:head>
 	<title>FarmTrack - Farm Management Platform</title>
 </svelte:head>
 
+{#if $auth.status !== 'ready'}
+	<SignIn />
+{:else}
 <div class="app" class:sb-collapsed={sidebarCollapsed}>
 	<!-- Desktop Sidebar (≥1024px) -->
 	<aside class="sidebar">
@@ -194,6 +213,20 @@
 				</span>
 			</a>
 		{/if}
+
+		<div class="sb-group sb-account">
+			<div class="sb-group-label"><span class="sb-label" title={$auth.email ?? ''}>{farmName}</span></div>
+			{#if $auth.farms.length > 1}
+				<button class="sb-item" title="Change farm" onclick={() => auth.changeFarm()}>
+					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M3 7h18"/><path d="M7 21l-4-4 4-4"/><path d="M21 17H3"/></svg>
+					<span class="sb-label">Change farm</span>
+				</button>
+			{/if}
+			<button class="sb-item" title="Sign out" onclick={() => auth.signOut()}>
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+				<span class="sb-label">Sign out</span>
+			</button>
+		</div>
 
 		<button class="sb-collapse" onclick={toggleSidebar} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
 			<svg class="sb-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -337,6 +370,13 @@
 					<div class="action-menu-desc">Single-page form for experienced users</div>
 				</div>
 			</button>
+			<div class="action-menu-account">
+				<span>{farmName}</span>
+				{#if $auth.farms.length > 1}
+					<button onclick={() => auth.changeFarm()}>Change farm</button>
+				{/if}
+				<button onclick={() => auth.signOut()}>Sign out</button>
+			</div>
 		</div>
 	{/if}
 
@@ -356,6 +396,7 @@
 
 	<ToastContainer />
 </div>
+{/if}
 
 <style>
 	/* Body styles moved to app.css to avoid conflicts */
@@ -879,6 +920,29 @@
 		flex-shrink: 0;
 	}
 
+	.action-menu-account {
+		display: flex;
+		align-items: center;
+		gap: var(--space-md);
+		padding: var(--space-sm) var(--space-md) 0;
+		font-size: var(--text-sm);
+		color: var(--gray-500);
+	}
+	.action-menu-account span {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.action-menu-account button {
+		background: none;
+		border: none;
+		padding: 0;
+		font: inherit;
+		color: var(--gray-600);
+		text-decoration: underline;
+		cursor: pointer;
+	}
 	.sb-spacer {
 		flex: 1;
 	}

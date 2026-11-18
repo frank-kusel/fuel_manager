@@ -589,14 +589,17 @@ class ExportService {
 
 				const summary = vehicleSummaries.get(key)!;
 				const litres = Number(entry.litres_dispensed || 0);
-				const activityEligible = activity?.diesel_claim_eligible === true;
+				// Fuel marked Not claimable is never claimed, whatever its activity;
+				// it gets a line of its own in the activity breakdown.
+				const notClaimable = entry.not_claimable === true;
+				const activityEligible = !notClaimable && activity?.diesel_claim_eligible === true;
 				summary.totalFuel += litres;
 				if (activityEligible) summary.baseEligibleFuel += litres;
-				const activityKey = activity?.id || 'unknown';
+				const activityKey = notClaimable ? '__not_claimable' : activity?.id || 'unknown';
 				const activitySummary = summary.activities.get(activityKey) || {
-					name: activity?.name || 'Unknown / unassigned',
+					name: notClaimable ? 'Not claimable' : activity?.name || 'Unknown / unassigned',
 					eligible: activityEligible,
-					reviewed: !!activity?.diesel_claim_reviewed_at,
+					reviewed: notClaimable || !!activity?.diesel_claim_reviewed_at,
 					litres: 0
 				};
 				activitySummary.litres += litres;

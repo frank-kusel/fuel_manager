@@ -213,6 +213,13 @@ export interface FuelEntry {
 	deleted_at?: string | null;
 	deleted_reason?: string | null;
 
+	// Fallow (the fuel_manager views): fuel marked "Not claimable" (field
+	// "__not_claimable"), the fill-up's field groups, and the saved version's id
+	// (an edit saves a new version; `id` stays the first one's).
+	not_claimable?: boolean;
+	field_groups?: string | null;
+	record_id?: string;
+
 	// System fields
 	created_at: string;
 	updated_at: string;

@@ -524,6 +524,8 @@ function createFuelEntryWorkflowStore() {
 				
 				// Create fuel entry data matching the database schema
 				const fuelEntryData = {
+					// Made here, so a retry (or the offline queue) saves it once.
+					id: crypto.randomUUID(),
 					entry_date: currentData!.entryDate,
 					time: currentData!.entryTime,
 					vehicle_id: currentData!.vehicle!.id,

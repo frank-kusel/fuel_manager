@@ -97,7 +97,7 @@
 				client
 					.from('fuel_entries')
 					.select(
-						'entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
+						'entry_date, litres_dispensed, vehicle_id, not_claimable, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
 					)
 					.is('deleted_at', null)
 					.gte('entry_date', start)
@@ -141,7 +141,9 @@
 
 			entries = (entriesRes.data || []).map((row: any) => ({
 				litres: Number(row.litres_dispensed || 0),
+				// Claimable: an eligible activity, and not marked Not claimable.
 				eligible:
+					row.not_claimable !== true &&
 					one<{ diesel_claim_eligible: boolean }>(row.activities)?.diesel_claim_eligible === true,
 				date: row.entry_date,
 				vehicleId: row.vehicle_id,

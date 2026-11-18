@@ -135,7 +135,6 @@
 		isSaving = true;
 
 		try {
-			const client = supabaseService.getClient();
 
 			// Build updates object with only changed fields
 			const updates: any = {};
@@ -197,38 +196,19 @@
 				hasChanges = true;
 			}
 
-			// Apply other updates if there are any (and litres didn't change, or as additional updates)
-			if (hasChanges && Object.keys(updates).length > 0) {
-				const { error } = await client
-					.from('fuel_entries')
-					.update(updates)
-					.eq('id', entry.id)
-					.is('deleted_at', null);
+			// Other changes and the fields go in one save: Fallow takes the
+			// fill-up back and saves the new version.
+			const fieldsChanged =
+				JSON.stringify([...selectedFieldIds].sort()) !==
+				JSON.stringify([...originalValues.field_ids].sort());
 
-				if (error) throw error;
-			}
-
-			// Check if field selections changed
-			const fieldsChanged = JSON.stringify(selectedFieldIds.sort()) !== JSON.stringify(originalValues.field_ids.sort());
-
-			if (fieldsChanged) {
-				// Delete existing field associations
-				await client
-					.from('fuel_entry_fields')
-					.delete()
-					.eq('fuel_entry_id', entry.id);
-
-				// Insert new field associations if any selected
-				if (selectedFieldIds.length > 0) {
-					const fieldAssociations = selectedFieldIds.map(fieldId => ({
-						fuel_entry_id: entry.id,
-						field_id: fieldId
-					}));
-
-					await client
-						.from('fuel_entry_fields')
-						.insert(fieldAssociations);
-				}
+			if (Object.keys(updates).length > 0 || (fieldsChanged && selectedFieldIds.length > 0)) {
+				const result = await supabaseService.updateFuelEntry(
+					entry.id,
+					updates,
+					fieldsChanged && selectedFieldIds.length > 0 ? selectedFieldIds : undefined
+				);
+				if (result.error) throw new Error(result.error);
 				hasChanges = true;
 			}
 
