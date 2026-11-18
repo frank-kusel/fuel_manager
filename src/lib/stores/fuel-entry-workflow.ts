@@ -502,7 +502,7 @@ function createFuelEntryWorkflowStore() {
 			
 			try {
 				const { default: supabaseService } = await import('$lib/services/supabase');
-				const { offlineSyncService } = await import('$lib/services/offline-sync');
+				const { offlineSyncService, isRetryable } = await import('$lib/services/offline-sync');
 				
 				await supabaseService.init();
 				
@@ -524,6 +524,8 @@ function createFuelEntryWorkflowStore() {
 				
 				// Create fuel entry data matching the database schema
 				const fuelEntryData = {
+					// Made here, so a retry (or the offline queue) saves it once.
+					id: crypto.randomUUID(),
 					entry_date: currentData!.entryDate,
 					time: currentData!.entryTime,
 					vehicle_id: currentData!.vehicle!.id,
@@ -549,14 +551,15 @@ function createFuelEntryWorkflowStore() {
 				
 				let result;
 				let isOffline = false;
-				
+
+				// Determine which fields to associate
+				const fieldIds: string[] = [];
+				if (currentData!.fieldSelectionMode === 'multiple' && currentData!.selectedFields.length > 0) {
+					fieldIds.push(...currentData!.selectedFields.map(f => f.id));
+				}
+
 				// Try to submit online first
 				try {
-					// Determine which fields to associate
-					const fieldIds: string[] = [];
-					if (currentData!.fieldSelectionMode === 'multiple' && currentData!.selectedFields.length > 0) {
-						fieldIds.push(...currentData!.selectedFields.map(f => f.id));
-					}
 
 					// Use new multi-field method if fields are selected, otherwise use legacy method
 					if (fieldIds.length > 0) {
@@ -570,13 +573,13 @@ function createFuelEntryWorkflowStore() {
 					}
 				} catch (error) {
 					// If network error or offline, store for later sync
-					if (!navigator.onLine || error instanceof Error && (
-						error.message.includes('fetch') || 
-						error.message.includes('network') ||
-						error.message.includes('Failed to fetch')
-					)) {
+					if (!navigator.onLine || (error instanceof Error && isRetryable(error.message))) {
 						console.log('Storing fuel entry offline for later sync');
-						const offlineId = await offlineSyncService.storeOfflineEntry('fuel_entry', fuelEntryData);
+						// Its fields go with it, so a fill-up on several fields keeps them.
+						const offlineId = await offlineSyncService.storeOfflineEntry('fuel_entry', {
+							...fuelEntryData,
+							field_ids: fieldIds.length > 0 ? fieldIds : null
+						});
 						isOffline = true;
 						result = { data: { id: offlineId }, error: null };
 					} else {

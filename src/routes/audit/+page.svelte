@@ -13,6 +13,7 @@
 	import DatabaseLink from '$lib/components/ui/DatabaseLink.svelte';
 	import CloseStep from '$lib/components/audit/CloseStep.svelte';
 	import ClaimStep from '$lib/components/audit/ClaimStep.svelte';
+	import { isClaimEligible } from '$lib/utils/diesel-claim';
 	import MonthHistory from '$lib/components/audit/MonthHistory.svelte';
 	import DataExport from '$lib/components/audit/DataExport.svelte';
 	import AppSettingsPanel from '$lib/components/settings/AppSettingsPanel.svelte';
@@ -97,7 +98,7 @@
 				client
 					.from('fuel_entries')
 					.select(
-						'entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
+						'entry_date, litres_dispensed, vehicle_id, not_claimable, purpose_claimable, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
 					)
 					.is('deleted_at', null)
 					.gte('entry_date', start)
@@ -141,8 +142,12 @@
 
 			entries = (entriesRes.data || []).map((row: any) => ({
 				litres: Number(row.litres_dispensed || 0),
-				eligible:
-					one<{ diesel_claim_eligible: boolean }>(row.activities)?.diesel_claim_eligible === true,
+				// Claimable: an eligible activity (or purpose code), not marked Not claimable.
+				eligible: isClaimEligible({
+					not_claimable: row.not_claimable,
+					purpose_claimable: row.purpose_claimable,
+					activity: one<{ diesel_claim_eligible: boolean }>(row.activities)
+				}),
 				date: row.entry_date,
 				vehicleId: row.vehicle_id,
 				method:

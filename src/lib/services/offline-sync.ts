@@ -1,6 +1,27 @@
 import { browser } from '$app/environment';
 import { writable } from 'svelte/store';
 import supabaseService from './supabase';
+import { requestFarm } from './farm';
+
+/** A fill-up that cannot be sent yet (no signal, or the sign-in needs renewing). */
+class NotYet extends Error {}
+
+/** A failure to reach the server or to sign in, as opposed to a refusal. */
+export function isRetryable(message: string | null | undefined): boolean {
+	if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+	const m = (message ?? '').toLowerCase();
+	return (
+		m.includes('fetch') ||
+		m.includes('network') ||
+		m.includes('load failed') ||
+		m.includes('jwt') ||
+		// The sign-in lapsed: the request went without it. Kept until signed in.
+		m.includes('permission denied') ||
+		m.includes('timeout') ||
+		m.includes('timed out') ||
+		m.includes('statement canceled')
+	);
+}
 
 // Types for offline sync
 export interface OfflineEntry {
@@ -114,6 +135,8 @@ class OfflineSyncService {
 			type,
 			data: {
 				...data,
+				// Sent only to the farm it was made for.
+				farm_id: data?.farm_id ?? requestFarm(),
 				offline_created_at: new Date().toISOString(),
 				device_id: this.deviceId
 			},
@@ -154,9 +177,16 @@ class OfflineSyncService {
 					await this.markAsSynced(entry.id);
 					syncedCount++;
 				} catch (error) {
-					console.error('Failed to sync entry:', entry.id, error);
-					// Create conflict resolution record
+					if (error instanceof NotYet) {
+						// Stays queued; the next try sends it (the server saves an id once).
+						console.warn('Fill-up kept for later:', entry.id, error.message);
+						continue;
+					}
+					// Refused by the server: kept aside as a conflict, out of the queue.
+					console.error('Fill-up refused:', entry.id, error);
 					await this.createSyncConflict(entry, error);
+					await this.markAsSynced(entry.id);
+					syncStatus.update((status) => ({ ...status, conflicts: [...status.conflicts, entry] }));
 				}
 			}
 
@@ -182,20 +212,25 @@ class OfflineSyncService {
 
 	private async syncSingleEntry(entry: OfflineEntry): Promise<void> {
 		await supabaseService.init();
-		
-		switch (entry.type) {
-			case 'fuel_entry':
-				await supabaseService.createFuelEntry(entry.data);
-				break;
-			case 'bowser_reading':
-				await supabaseService.updateBowserReading(
-					entry.data.bowser_id,
-					entry.data.new_reading,
-					entry.data.fuel_entry_id
-				);
-				break;
-			default:
-				throw new Error(`Unknown entry type: ${entry.type}`);
+
+		if (entry.type !== 'fuel_entry') {
+			throw new Error(`Unknown entry type: ${entry.type}`);
+		}
+		const { farm_id, field_ids, offline_created_at, device_id, ...fill } = entry.data ?? {};
+		void offline_created_at;
+		void device_id;
+		if (farm_id && farm_id !== requestFarm()) {
+			throw new NotYet('made for another farm; sent when that farm is open');
+		}
+		const fieldIds: string[] = Array.isArray(field_ids)
+			? field_ids
+			: fill.field_id
+				? [fill.field_id]
+				: [];
+		const result = await supabaseService.createFuelEntryWithFields(fill, fieldIds);
+		if (result.error) {
+			if (isRetryable(result.error)) throw new NotYet(result.error);
+			throw new Error(result.error);
 		}
 	}
 
@@ -203,10 +238,10 @@ class OfflineSyncService {
 		return new Promise((resolve, reject) => {
 			const transaction = this.db!.transaction(['offline_entries'], 'readonly');
 			const store = transaction.objectStore('offline_entries');
-			const index = store.index('synced');
-			const request = index.getAll(false);
-			
-			request.onsuccess = () => resolve(request.result);
+			// Not through the 'synced' index: a boolean is not a valid IndexedDB key.
+			const request = store.getAll();
+
+			request.onsuccess = () => resolve((request.result as OfflineEntry[]).filter((e) => !e.synced));
 			request.onerror = () => reject(request.error);
 		});
 	}
@@ -272,13 +307,12 @@ class OfflineSyncService {
 		return new Promise((resolve, reject) => {
 			const transaction = this.db!.transaction(['offline_entries'], 'readwrite');
 			const store = transaction.objectStore('offline_entries');
-			const index = store.index('synced');
-			const request = index.openCursor(true);
-			
+			const request = store.openCursor();
+
 			request.onsuccess = (event) => {
 				const cursor = (event.target as IDBRequest).result;
 				if (cursor) {
-					cursor.delete();
+					if (cursor.value?.synced) cursor.delete();
 					cursor.continue();
 				} else {
 					resolve();

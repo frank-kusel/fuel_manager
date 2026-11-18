@@ -8,7 +8,7 @@ import type {
 	FuelEntry,
 	VehicleMonthlyClaimAdjustment
 } from '$lib/types';
-import { roundClaimLitres } from '$lib/utils/diesel-claim';
+import { isClaimEligible, roundClaimLitres } from '$lib/utils/diesel-claim';
 import { summariseClaim, type ClaimEntry } from '$lib/utils/claim-totals';
 import { DEFAULT_DIP_TOLERANCE_L, type MonthLedger } from '$lib/utils/tank-balance';
 import { fmtFull, isoDayBefore } from '$lib/utils/dates';
@@ -589,14 +589,21 @@ class ExportService {
 
 				const summary = vehicleSummaries.get(key)!;
 				const litres = Number(entry.litres_dispensed || 0);
-				const activityEligible = activity?.diesel_claim_eligible === true;
+				// Fuel marked Not claimable is never claimed, whatever its activity;
+				// it gets a line of its own in the activity breakdown.
+				const notClaimable = entry.not_claimable === true;
+				const activityEligible = isClaimEligible({
+					not_claimable: entry.not_claimable,
+					purpose_claimable: entry.purpose_claimable,
+					activity
+				});
 				summary.totalFuel += litres;
 				if (activityEligible) summary.baseEligibleFuel += litres;
-				const activityKey = activity?.id || 'unknown';
+				const activityKey = notClaimable ? '__not_claimable' : activity?.id || 'unknown';
 				const activitySummary = summary.activities.get(activityKey) || {
-					name: activity?.name || 'Unknown / unassigned',
+					name: notClaimable ? 'Not claimable' : activity?.name || 'Unknown / unassigned',
 					eligible: activityEligible,
-					reviewed: !!activity?.diesel_claim_reviewed_at,
+					reviewed: notClaimable || !!activity?.diesel_claim_reviewed_at,
 					litres: 0
 				};
 				activitySummary.litres += litres;

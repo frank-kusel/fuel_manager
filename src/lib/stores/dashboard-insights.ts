@@ -128,7 +128,7 @@ interface InsightsState {
 }
 
 const CACHE_MS = 5 * 60 * 1000;
-const STORAGE_KEY = 'farmtrack_insights_cache_v5';
+const STORAGE_KEY = 'farmtrack_insights_cache_v6';
 
 // Hydrate from localStorage so a cold app-open paints the dashboard (and the
 // month figures) instantly; fresh data replaces it silently.

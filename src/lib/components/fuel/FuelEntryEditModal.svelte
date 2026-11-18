@@ -135,7 +135,6 @@
 		isSaving = true;
 
 		try {
-			const client = supabaseService.getClient();
 
 			// Build updates object with only changed fields
 			const updates: any = {};
@@ -179,7 +178,10 @@
 			const newLitres = parseFloat(litresDispensed);
 			const litresChanged = newLitres !== originalValues.litres_dispensed;
 
-			if (litresChanged) {
+			if (litresChanged && (entry.bowser_reading_start === null || entry.bowser_reading_start === undefined)) {
+				// No meter reading: only the litres change.
+				updates.litres_dispensed = newLitres;
+			} else if (litresChanged) {
 				// Calculate new bowser end reading
 				const newBowserEnd = bowserReadingStart + newLitres;
 
@@ -197,38 +199,20 @@
 				hasChanges = true;
 			}
 
-			// Apply other updates if there are any (and litres didn't change, or as additional updates)
-			if (hasChanges && Object.keys(updates).length > 0) {
-				const { error } = await client
-					.from('fuel_entries')
-					.update(updates)
-					.eq('id', entry.id)
-					.is('deleted_at', null);
+			// Other changes and the fields go in one save: Fallow takes the
+			// fill-up back and saves the new version.
+			const fieldsChanged =
+				JSON.stringify([...selectedFieldIds].sort()) !==
+				JSON.stringify([...originalValues.field_ids].sort());
 
-				if (error) throw error;
-			}
-
-			// Check if field selections changed
-			const fieldsChanged = JSON.stringify(selectedFieldIds.sort()) !== JSON.stringify(originalValues.field_ids.sort());
-
-			if (fieldsChanged) {
-				// Delete existing field associations
-				await client
-					.from('fuel_entry_fields')
-					.delete()
-					.eq('fuel_entry_id', entry.id);
-
-				// Insert new field associations if any selected
-				if (selectedFieldIds.length > 0) {
-					const fieldAssociations = selectedFieldIds.map(fieldId => ({
-						fuel_entry_id: entry.id,
-						field_id: fieldId
-					}));
-
-					await client
-						.from('fuel_entry_fields')
-						.insert(fieldAssociations);
-				}
+			if (Object.keys(updates).length > 0 || fieldsChanged) {
+				// An empty list clears the fill-up's fields.
+				const result = await supabaseService.updateFuelEntry(
+					entry.id,
+					updates,
+					fieldsChanged ? selectedFieldIds : undefined
+				);
+				if (result.error) throw new Error(result.error);
 				hasChanges = true;
 			}
 

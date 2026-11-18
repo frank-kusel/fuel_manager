@@ -30,7 +30,7 @@ interface SummaryCacheState {
 }
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
-const STORAGE_KEY = 'farmtrack_summary_cache_v1';
+const STORAGE_KEY = 'farmtrack_summary_cache_v2';
 
 const initialState: SummaryCacheState = {
 	entries: [],

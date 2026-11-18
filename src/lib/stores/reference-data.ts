@@ -17,7 +17,7 @@ interface ReferenceDataState {
 }
 
 const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes (reference data rarely changes)
-const STORAGE_KEY = 'farmtrack_reference_cache_v1';
+const STORAGE_KEY = 'farmtrack_reference_cache_v2';
 
 const initialState: ReferenceDataState = {
 	vehicles: [],

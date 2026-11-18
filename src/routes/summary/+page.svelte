@@ -130,12 +130,11 @@
 					.select(`
 						fuel_entry_id,
 						field_id,
-						fields!inner(name, code),
-						fuel_entries!inner(entry_date, deleted_at)
+						fields!inner(name, code)
 					`)
-					.gte('fuel_entries.entry_date', startDate)
-					.lte('fuel_entries.entry_date', endDate)
-					.is('fuel_entries.deleted_at', null)
+					.gte('entry_date', startDate)
+					.lte('entry_date', endDate)
+					.is('deleted_at', null)
 			]);
 
 			if (entriesResult.error) throw entriesResult.error;

@@ -1,7 +1,11 @@
 // Supabase service for database operations
 // Provides a centralized interface for all Supabase interactions
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient as BaseClient } from '@supabase/supabase-js';
+
+// The client works on the fuel_manager schema (untyped).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseClient = BaseClient<any, any, any>;
 import type {
 	Vehicle,
 	Driver,
@@ -24,6 +28,8 @@ import type {
 	ApiResponse
 } from '$lib/types';
 import { isoDayBefore, todayIso } from '$lib/utils/dates';
+import { requestFarm } from '$lib/services/farm';
+import { isClaimEligible } from '$lib/utils/diesel-claim';
 import {
 	BURN_WINDOW_DAYS,
 	buildMonthLedger,
@@ -37,6 +43,31 @@ import {
 	type TankBalanceInputs
 } from '$lib/utils/tank-balance';
 
+/**
+ * Every data request says which farm it is for: this tab's farm. Sign-in
+ * requests (/auth/v1) go without it.
+ */
+const withFarmHeader: typeof fetch = (input, init) => {
+	const farm = requestFarm();
+	const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+	if (!farm || !url.includes('/rest/v1/')) return fetch(input, init);
+	const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+	headers.set('x-fallow-farm', farm);
+	return fetch(input, { ...init, headers });
+};
+
+/** Fuel Manager's columns a fill-up is saved from (the rest are worked out). */
+function entryPayload(entry: Record<string, unknown>): Record<string, unknown> {
+	const { created_at, updated_at, deleted_at, deleted_reason, fuel_consumption_l_per_100km, ...rest } =
+		entry;
+	void created_at;
+	void updated_at;
+	void deleted_at;
+	void deleted_reason;
+	void fuel_consumption_l_per_100km;
+	return rest;
+}
+
 class SupabaseService {
 	private client: SupabaseClient | null = null;
 	private isInitialized = false;
@@ -49,7 +80,13 @@ class SupabaseService {
 			// Load Supabase configuration
 			const config = await this.loadConfig();
 
-			this.client = createClient(config.url, config.key);
+			// Fuel Manager works on a Fallow farm's records: the `fuel_manager`
+			// schema, as a signed-in member, for the farm in x-fallow-farm.
+			this.client = createClient(config.url, config.key, {
+				db: { schema: 'fuel_manager' },
+				auth: { persistSession: true, autoRefreshToken: true, storageKey: 'fallow-fuel-auth' },
+				global: { fetch: withFarmHeader }
+			});
 			this.isInitialized = true;
 
 			console.log('Supabase client initialized successfully');
@@ -249,7 +286,7 @@ class SupabaseService {
 				.select(
 					`
 					*,
-					default_vehicle:vehicles!drivers_default_vehicle_id_fkey (
+					default_vehicle:default_vehicle_id (
 						id,
 						code,
 						name,
@@ -332,23 +369,34 @@ class SupabaseService {
 		return { data: rows, error: null, truncated };
 	}
 
+	/**
+	 * A new fill-up. Fallow saves it through its rules; sending the same id
+	 * again (an offline retry) saves it once. The field may be "__not_claimable".
+	 */
 	async createFuelEntry(
-		entry: Omit<FuelEntry, 'id' | 'created_at' | 'updated_at'>
+		entry: Omit<FuelEntry, 'id' | 'created_at' | 'updated_at'> & { id?: string }
 	): Promise<ApiResponse<FuelEntry>> {
-		const client = this.ensureInitialized();
-		return this.query(() => client.from('fuel_entries').insert(entry).select().single());
+		return this.createFuelEntryWithFields(entry, entry.field_id ? [entry.field_id] : []);
 	}
 
-	async updateFuelEntry(id: string, updates: Partial<FuelEntry>): Promise<ApiResponse<FuelEntry>> {
+	/**
+	 * Changes a fill-up. Fallow never changes a saved fill-up: it takes it back
+	 * and saves the new version, which keeps the first id here. Fields, when
+	 * given, replace the fill-up's fields.
+	 */
+	async updateFuelEntry(
+		id: string,
+		updates: Partial<FuelEntry>,
+		fieldIds?: string[]
+	): Promise<ApiResponse<FuelEntry>> {
 		const client = this.ensureInitialized();
 		return this.query(() =>
-			client
-				.from('fuel_entries')
-				.update({ ...updates, updated_at: new Date().toISOString() })
-				.eq('id', id)
-				.is('deleted_at', null)
-				.select()
-				.single()
+			client.rpc('update_fuel_entry', {
+				p_entry_id: id,
+				p_changes: entryPayload(updates as Record<string, unknown>),
+				// An empty list clears the fill-up's fields; none given keeps them.
+				p_field_ids: fieldIds ?? null
+			})
 		);
 	}
 
@@ -399,92 +447,26 @@ class SupabaseService {
 
 	// Multi-field fuel entry operations
 	async createFuelEntryWithFields(
-		entry: Omit<FuelEntry, 'id' | 'created_at' | 'updated_at'>,
+		entry: Omit<FuelEntry, 'id' | 'created_at' | 'updated_at'> & { id?: string },
 		fieldIds: string[] = []
 	): Promise<ApiResponse<FuelEntry>> {
 		const client = this.ensureInitialized();
-
-		try {
-			// Start transaction
-			const { data: fuelEntry, error: entryError } = await client
-				.from('fuel_entries')
-				.insert({
-					...entry,
-					field_selection_mode: fieldIds.length > 1 ? 'multiple' : 'single'
-				})
-				.select()
-				.single();
-
-			if (entryError) {
-				return { data: null, error: entryError.message };
-			}
-
-			// If multiple fields, create junction table entries
-			if (fieldIds.length > 0 && entry.field_selection_mode === 'multiple') {
-				const junctionEntries = fieldIds.map((fieldId) => ({
-					fuel_entry_id: fuelEntry.id,
-					field_id: fieldId
-				}));
-
-				const { error: junctionError } = await client
-					.from('fuel_entry_fields')
-					.insert(junctionEntries);
-
-				if (junctionError) {
-					// Rollback by deleting the fuel entry
-					await client.from('fuel_entries').delete().eq('id', fuelEntry.id);
-					return { data: null, error: junctionError.message };
-				}
-			}
-
-			return { data: fuelEntry, error: null };
-		} catch (error) {
-			return {
-				data: null,
-				error: error instanceof Error ? error.message : 'Failed to create fuel entry with fields'
-			};
-		}
+		const payload = entryPayload({
+			...entry,
+			id: entry.id ?? crypto.randomUUID(),
+			field_selection_mode: fieldIds.length > 1 ? 'multiple' : 'single'
+		});
+		return this.query(() =>
+			client.rpc('add_fuel_entry', {
+				p_entry: payload,
+				p_field_ids: fieldIds.length > 0 ? fieldIds : null
+			})
+		);
 	}
 
 	async updateFuelEntryFields(entryId: string, fieldIds: string[]): Promise<ApiResponse<boolean>> {
-		const client = this.ensureInitialized();
-
-		try {
-			// Delete existing field associations
-			await client.from('fuel_entry_fields').delete().eq('fuel_entry_id', entryId);
-
-			// Insert new field associations if provided
-			if (fieldIds.length > 0) {
-				const junctionEntries = fieldIds.map((fieldId) => ({
-					fuel_entry_id: entryId,
-					field_id: fieldId
-				}));
-
-				const { error: insertError } = await client
-					.from('fuel_entry_fields')
-					.insert(junctionEntries);
-
-				if (insertError) {
-					return { data: null, error: insertError.message };
-				}
-
-				// Update the field selection mode on the fuel entry
-				await client
-					.from('fuel_entries')
-					.update({
-						field_selection_mode: fieldIds.length > 1 ? 'multiple' : 'single',
-						updated_at: new Date().toISOString()
-					})
-					.eq('id', entryId);
-			}
-
-			return { data: true, error: null };
-		} catch (error) {
-			return {
-				data: null,
-				error: error instanceof Error ? error.message : 'Failed to update fuel entry fields'
-			};
-		}
+		const result = await this.updateFuelEntry(entryId, {}, fieldIds);
+		return result.error ? { data: null, error: result.error } : { data: true, error: null };
 	}
 
 	// Bowser operations
@@ -644,11 +626,10 @@ class SupabaseService {
 	): Promise<ApiResponse<VehicleMonthlyClaimAdjustment>> {
 		const client = this.ensureInitialized();
 		try {
-			const { data, error } = await client
-				.from('vehicle_monthly_claim_adjustments')
-				.upsert(adjustment, { onConflict: 'vehicle_id,claim_month' })
-				.select()
-				.single();
+			// One row per vehicle and month (an RPC: upsert does not work on a view).
+			const { data, error } = await client.rpc('save_claim_adjustment', {
+				p_adjustment: adjustment
+			});
 			return { data: data as VehicleMonthlyClaimAdjustment | null, error: error?.message ?? null };
 		} catch (error) {
 			return {
@@ -830,11 +811,8 @@ class SupabaseService {
 		patch: AppSettingsPatch
 	): Promise<ApiResponse<AppSettingsRow> & { missing?: boolean }> {
 		const client = this.ensureInitialized();
-		const { data, error } = await client
-			.from('app_settings')
-			.upsert({ id: true, ...patch })
-			.select()
-			.single();
+		// An RPC: upsert does not work on a view; only the keys sent change.
+		const { data, error } = await client.rpc('save_app_settings', { p_patch: patch });
 		if (error) {
 			if (this.isMissingTableError(error)) return { data: null, error: null, missing: true };
 			return { data: null, error: error.message };
@@ -1269,7 +1247,7 @@ class SupabaseService {
 				client
 					.from('fuel_entries')
 					.select(
-						'id, entry_date, litres_dispensed, vehicle_id, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
+						'id, entry_date, litres_dispensed, vehicle_id, not_claimable, purpose_claimable, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
 					)
 					.is('deleted_at', null)
 					.gte('entry_date', start)
@@ -1283,7 +1261,12 @@ class SupabaseService {
 					vehicleId: row.vehicle_id,
 					date: row.entry_date,
 					litres: Number(row.litres_dispensed || 0),
-					eligible: one<{ diesel_claim_eligible: boolean }>(row.activities)?.diesel_claim_eligible === true,
+					// Claimable: an eligible activity (or purpose code), not marked Not claimable.
+					eligible: isClaimEligible({
+						not_claimable: row.not_claimable,
+						purpose_claimable: row.purpose_claimable,
+						activity: one<{ diesel_claim_eligible: boolean }>(row.activities)
+					}),
 					method: one<{ diesel_claim_method: 'activity_only' | 'monthly_classifier' }>(row.vehicles)?.diesel_claim_method ?? 'activity_only'
 				})),
 				error: null

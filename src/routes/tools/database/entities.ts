@@ -6,6 +6,10 @@ import supabaseService from '$lib/services/supabase';
  * LIVE table columns (verified against the DB — migration files have drifted);
  * clutter columns (licence details, emergency contacts, year…) stay in the DB
  * but are deliberately not editable here.
+ *
+ * On Fallow's records, only what Fallow keeps is offered: no vehicle or
+ * driver notes, driver email, tank code, registration or fuel, zone type,
+ * order or description, or field type or location (they would be dropped).
  */
 
 export interface FieldDef {
@@ -69,8 +73,7 @@ export const ENTITIES: EntityConfig[] = [
 			},
 			{ key: 'fuel_type', label: 'Fuel', type: 'select', options: FUEL_TYPES },
 			{ key: 'make', label: 'Make', type: 'text' },
-			{ key: 'model', label: 'Model', type: 'text' },
-			{ key: 'notes', label: 'Notes', type: 'textarea' }
+			{ key: 'model', label: 'Model', type: 'text' }
 		],
 		create: (d) => supabaseService.createVehicle(d),
 		update: (id, d) => supabaseService.updateVehicle(id, d)
@@ -89,9 +92,7 @@ export const ENTITIES: EntityConfig[] = [
 			{ key: 'employee_code', label: 'Employee code', type: 'text', required: true },
 			{ key: 'name', label: 'Name', type: 'text', required: true },
 			{ key: 'phone', label: 'Phone', type: 'text' },
-			{ key: 'email', label: 'Email', type: 'text' },
-			{ key: 'default_vehicle_id', label: 'Default vehicle', type: 'select', optionsFromVehicles: true },
-			{ key: 'notes', label: 'Notes', type: 'textarea' }
+			{ key: 'default_vehicle_id', label: 'Default vehicle', type: 'select', optionsFromVehicles: true }
 		],
 		create: (d) => supabaseService.createDriver(d),
 		update: (id, d) => supabaseService.updateDriver(id, d)
@@ -109,10 +110,7 @@ export const ENTITIES: EntityConfig[] = [
 				.filter(Boolean)
 				.join(' · '),
 		fields: [
-			{ key: 'code', label: 'Code', type: 'text', required: true },
 			{ key: 'name', label: 'Name', type: 'text', required: true },
-			{ key: 'registration', label: 'Registration', type: 'text' },
-			{ key: 'fuel_type', label: 'Fuel', type: 'select', options: FUEL_TYPES, required: true },
 			{ key: 'capacity', label: 'Capacity', type: 'number', unit: 'L', required: true },
 			{ key: 'notes', label: 'Notes', type: 'textarea' }
 		],
@@ -152,9 +150,7 @@ export const ENTITIES: EntityConfig[] = [
 		fields: [
 			{ key: 'code', label: 'Code', type: 'text', required: true },
 			{ key: 'name', label: 'Name', type: 'text', required: true },
-			{ key: 'type', label: 'Type', type: 'suggest' },
 			{ key: 'area', label: 'Area', type: 'number', unit: 'ha', required: true },
-			{ key: 'location', label: 'Location', type: 'text' },
 			{ key: 'crop_type', label: 'Crop', type: 'suggest' },
 			{ key: 'notes', label: 'Notes', type: 'textarea' }
 		],
@@ -172,23 +168,8 @@ export const ENTITIES: EntityConfig[] = [
 		secondary: (r) => r.zone_type || '',
 		colorDot: (r) => r.color || null,
 		fields: [
-			{ key: 'code', label: 'Code', type: 'text', required: true },
 			{ key: 'name', label: 'Name', type: 'text', required: true },
-			{
-				key: 'zone_type',
-				label: 'Type',
-				type: 'select',
-				options: [
-					{ value: 'farm_section', label: 'Farm section' },
-					{ value: 'infrastructure', label: 'Infrastructure' },
-					{ value: 'transport', label: 'Transport' },
-					{ value: 'maintenance', label: 'Maintenance' },
-					{ value: 'general', label: 'General' }
-				]
-			},
-			{ key: 'color', label: 'Colour', type: 'color' },
-			{ key: 'display_order', label: 'Display order', type: 'number' },
-			{ key: 'description', label: 'Description', type: 'textarea' }
+			{ key: 'color', label: 'Colour', type: 'color' }
 		],
 		create: (d) => supabaseService.createZone(d),
 		update: (id, d) => supabaseService.updateZone(id, d)

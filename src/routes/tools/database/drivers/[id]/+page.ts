@@ -14,7 +14,7 @@ export const load: PageLoad = async ({ params }) => {
 	const [driverRes, entriesRes] = await Promise.all([
 		supabase
 			.from('drivers')
-			.select('*, default_vehicle:vehicles!drivers_default_vehicle_id_fkey(code, name)')
+			.select('*, default_vehicle:default_vehicle_id(code, name)')
 			.eq('id', id)
 			.single(),
 		supabase
