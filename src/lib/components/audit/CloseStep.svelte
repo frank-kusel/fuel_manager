@@ -104,9 +104,21 @@
 				: await supabaseService.createTankReconciliation(payload);
 			if (result.error) throw new Error(result.error);
 
-			const message = rebaseline
-				? `${month.label} re-baselined`
-				: `${month.label} ${existing ? 'close updated' : 'closed'} — gap ${formatSigned(gap)} L`;
+			// Fallow saves its own figures from its book. When they differ from
+			// the ones shown here, say so (the first close after the move can).
+			const saved = result.data as { book_at_dip?: number | null } | null;
+			const fallowGap =
+				saved?.book_at_dip !== null && saved?.book_at_dip !== undefined
+					? Number(saved.book_at_dip) - ledger.dip.litres
+					: null;
+			const differs =
+				fallowGap !== null && Math.abs(fallowGap - gap) >= 0.5
+					? ` · Fallow's book gives a gap of ${formatSigned(fallowGap, 1)} L, and that is what is saved`
+					: '';
+			const message =
+				(rebaseline
+					? `${month.label} re-baselined`
+					: `${month.label} ${existing ? 'close updated' : 'closed'} — gap ${formatSigned(gap)} L`) + differs;
 			markFuelDataStale(); // tank balance + sidebar pick up the new anchor
 			await onrefresh();
 			note = '';

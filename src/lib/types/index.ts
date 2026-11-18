@@ -217,6 +217,7 @@ export interface FuelEntry {
 	// "__not_claimable"), the fill-up's field groups, and the saved version's id
 	// (an edit saves a new version; `id` stays the first one's).
 	not_claimable?: boolean;
+	purpose_claimable?: boolean | null;
 	field_groups?: string | null;
 	record_id?: string;
 

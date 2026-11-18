@@ -46,7 +46,7 @@ interface TankState {
 }
 
 const CACHE_MS = 5 * 60 * 1000;
-const STORAGE_KEY = 'farmtrack_tank_cache_v2';
+const STORAGE_KEY = 'farmtrack_tank_cache_v3';
 
 function loadPersisted(): Pick<TankState, 'data' | 'timestamp' | 'stale'> {
 	try {

@@ -22,3 +22,14 @@ describe('settleFarm', () => {
 		expect(settleFarm([], 'a')).toBeNull();
 	});
 });
+
+import { isNetworkError } from './auth';
+
+describe('isNetworkError', () => {
+	it('tells no signal from an answer', () => {
+		expect(isNetworkError('TypeError: Failed to fetch')).toBe(true);
+		expect(isNetworkError('Load failed')).toBe(true);
+		expect(isNetworkError('Invalid login credentials')).toBe(false);
+		expect(isNetworkError(null)).toBe(false);
+	});
+});

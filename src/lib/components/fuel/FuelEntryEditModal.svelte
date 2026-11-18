@@ -178,7 +178,10 @@
 			const newLitres = parseFloat(litresDispensed);
 			const litresChanged = newLitres !== originalValues.litres_dispensed;
 
-			if (litresChanged) {
+			if (litresChanged && (entry.bowser_reading_start === null || entry.bowser_reading_start === undefined)) {
+				// No meter reading: only the litres change.
+				updates.litres_dispensed = newLitres;
+			} else if (litresChanged) {
 				// Calculate new bowser end reading
 				const newBowserEnd = bowserReadingStart + newLitres;
 
@@ -202,11 +205,12 @@
 				JSON.stringify([...selectedFieldIds].sort()) !==
 				JSON.stringify([...originalValues.field_ids].sort());
 
-			if (Object.keys(updates).length > 0 || (fieldsChanged && selectedFieldIds.length > 0)) {
+			if (Object.keys(updates).length > 0 || fieldsChanged) {
+				// An empty list clears the fill-up's fields.
 				const result = await supabaseService.updateFuelEntry(
 					entry.id,
 					updates,
-					fieldsChanged && selectedFieldIds.length > 0 ? selectedFieldIds : undefined
+					fieldsChanged ? selectedFieldIds : undefined
 				);
 				if (result.error) throw new Error(result.error);
 				hasChanges = true;

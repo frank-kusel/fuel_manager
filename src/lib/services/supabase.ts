@@ -28,6 +28,8 @@ import type {
 	ApiResponse
 } from '$lib/types';
 import { isoDayBefore, todayIso } from '$lib/utils/dates';
+import { requestFarm } from '$lib/services/farm';
+import { isClaimEligible } from '$lib/utils/diesel-claim';
 import {
 	BURN_WINDOW_DAYS,
 	buildMonthLedger,
@@ -41,17 +43,14 @@ import {
 	type TankBalanceInputs
 } from '$lib/utils/tank-balance';
 
-const FARM_KEY = 'fallow_farm_id';
-
-/** Every request says which farm it is for (the farm picked on this device). */
+/**
+ * Every data request says which farm it is for: this tab's farm. Sign-in
+ * requests (/auth/v1) go without it.
+ */
 const withFarmHeader: typeof fetch = (input, init) => {
-	let farm: string | null = null;
-	try {
-		farm = localStorage.getItem(FARM_KEY);
-	} catch {
-		/* private mode: the server uses the user's only farm */
-	}
-	if (!farm) return fetch(input, init);
+	const farm = requestFarm();
+	const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+	if (!farm || !url.includes('/rest/v1/')) return fetch(input, init);
 	const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
 	headers.set('x-fallow-farm', farm);
 	return fetch(input, { ...init, headers });
@@ -395,7 +394,8 @@ class SupabaseService {
 			client.rpc('update_fuel_entry', {
 				p_entry_id: id,
 				p_changes: entryPayload(updates as Record<string, unknown>),
-				p_field_ids: fieldIds && fieldIds.length > 0 ? fieldIds : null
+				// An empty list clears the fill-up's fields; none given keeps them.
+				p_field_ids: fieldIds ?? null
 			})
 		);
 	}
@@ -465,7 +465,6 @@ class SupabaseService {
 	}
 
 	async updateFuelEntryFields(entryId: string, fieldIds: string[]): Promise<ApiResponse<boolean>> {
-		if (fieldIds.length === 0) return { data: true, error: null };
 		const result = await this.updateFuelEntry(entryId, {}, fieldIds);
 		return result.error ? { data: null, error: result.error } : { data: true, error: null };
 	}
@@ -1248,7 +1247,7 @@ class SupabaseService {
 				client
 					.from('fuel_entries')
 					.select(
-						'id, entry_date, litres_dispensed, vehicle_id, not_claimable, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
+						'id, entry_date, litres_dispensed, vehicle_id, not_claimable, purpose_claimable, vehicles:vehicle_id(diesel_claim_method), activities:activity_id(diesel_claim_eligible)'
 					)
 					.is('deleted_at', null)
 					.gte('entry_date', start)
@@ -1262,10 +1261,12 @@ class SupabaseService {
 					vehicleId: row.vehicle_id,
 					date: row.entry_date,
 					litres: Number(row.litres_dispensed || 0),
-					// Claimable: an eligible activity, and not marked Not claimable.
-					eligible:
-						row.not_claimable !== true &&
-						one<{ diesel_claim_eligible: boolean }>(row.activities)?.diesel_claim_eligible === true,
+					// Claimable: an eligible activity (or purpose code), not marked Not claimable.
+					eligible: isClaimEligible({
+						not_claimable: row.not_claimable,
+						purpose_claimable: row.purpose_claimable,
+						activity: one<{ diesel_claim_eligible: boolean }>(row.activities)
+					}),
 					method: one<{ diesel_claim_method: 'activity_only' | 'monthly_classifier' }>(row.vehicles)?.diesel_claim_method ?? 'activity_only'
 				})),
 				error: null

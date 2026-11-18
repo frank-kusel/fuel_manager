@@ -97,3 +97,19 @@ export function calculateClassifierVariance(
 export function roundClaimLitres(value: number): number {
 	return Math.round((value + Number.EPSILON) * 100) / 100;
 }
+
+/**
+ * Whether a fill-up's fuel counts toward the claim: never when marked Not
+ * claimable; else its Fuel Manager activity's tick; and for a fill-up with no
+ * Fuel Manager activity (one made in Fallow's phone app), its SARS purpose
+ * code.
+ */
+export function isClaimEligible(row: {
+	not_claimable?: boolean | null;
+	purpose_claimable?: boolean | null;
+	activity?: { diesel_claim_eligible?: boolean | null } | null;
+}): boolean {
+	if (row.not_claimable === true) return false;
+	if (row.activity) return row.activity.diesel_claim_eligible === true;
+	return row.purpose_claimable === true;
+}

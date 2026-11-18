@@ -49,7 +49,11 @@ self.addEventListener('fetch', (event) => {
 	if (url.origin !== self.location.origin && !isSupabase) return;
 
 	if (isSupabase) {
-		event.respondWith(networkFirst(request, API_CACHE));
+		// Data only (not sign-in), kept per farm: the farm is in a header, not
+		// the URL, so it goes into the cache key.
+		if (url.pathname.startsWith('/rest/v1/')) {
+			event.respondWith(networkFirst(request, API_CACHE, undefined, farmKey(request)));
+		}
 		return;
 	}
 
@@ -74,16 +78,23 @@ async function cacheFirst(request) {
 	return response;
 }
 
-async function networkFirst(request, cacheName, fallbackUrl) {
+/** The cache key of a data request: its URL with its farm. */
+function farmKey(request) {
+	const url = new URL(request.url);
+	url.searchParams.set('__farm', request.headers.get('x-fallow-farm') || '');
+	return url.href;
+}
+
+async function networkFirst(request, cacheName, fallbackUrl, cacheKey = request) {
 	try {
 		const response = await fetch(request);
 		if (response.ok) {
 			const cache = await caches.open(cacheName);
-			cache.put(request, response.clone());
+			cache.put(cacheKey, response.clone());
 		}
 		return response;
 	} catch (error) {
-		const cached = await caches.match(request);
+		const cached = await caches.match(cacheKey);
 		if (cached) return cached;
 
 		if (fallbackUrl) {
