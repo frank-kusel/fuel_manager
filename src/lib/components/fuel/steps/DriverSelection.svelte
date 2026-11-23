@@ -32,7 +32,7 @@
 
 	let filteredDrivers = $derived(
 		[...$drivers]
-			.filter((d) => matchesSearch(d, searchQuery))
+			.filter((d) => d.active !== false && matchesSearch(d, searchQuery))
 			.sort((a, b) => {
 				const codeA = a.employee_code || 'ZZZ';
 				const codeB = b.employee_code || 'ZZZ';
