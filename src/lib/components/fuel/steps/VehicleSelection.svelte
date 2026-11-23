@@ -36,7 +36,7 @@
 		const groups: Record<string, Vehicle[]> = {};
 
 		// Filter for active vehicles only (and matching the search query), then sort
-		const activeVehicles = $vehicles.filter(v => v.is_active !== false && matchesSearch(v, searchQuery));
+		const activeVehicles = $vehicles.filter(v => v.active !== false && matchesSearch(v, searchQuery));
 		const sorted = [...activeVehicles].sort((a, b) => {
 			const typeA = a.type || 'Other';
 			const typeB = b.type || 'Other';
